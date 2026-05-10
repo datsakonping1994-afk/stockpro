@@ -847,10 +847,13 @@ function drawSparkline(ticker, data, currentPrice){
   if(!s2) s2=+(s1*0.95).toFixed(2);
   if(!r2) r2=+(r1*1.05).toFixed(2);
 
-  // ── Y range ──
-  const allPrices=[...prices,s2,s1,r1,r2].filter(Boolean);
-  const minP=Math.min(...allPrices)*0.997;
-  const maxP=Math.max(...allPrices)*1.003;
+  // ── Y range — ใช้แค่ราคาจริง ไม่รวม S2/R2 เพื่อให้กราฟขยับชัด ──
+  const allPrices=[...prices].filter(Boolean);
+  const rawMin=Math.min(...allPrices);
+  const rawMax=Math.max(...allPrices);
+  const pad=(rawMax-rawMin)*0.1||rawMin*0.02;
+  const minP=rawMin-pad;
+  const maxP=rawMax+pad;
   const range=maxP-minP||1;
   const PAD_T=6, PAD_B=14;
   const toY=p=>PAD_T+(1-(p-minP)/range)*(H-PAD_T-PAD_B);
@@ -1640,50 +1643,7 @@ async function doAI(t,btn){
   const fmt2=v=>v!=null?v.toFixed(2):'N/A';
   const cls=v=>v==null?'ind-neut':v>0?'ind-bull':'ind-bear';
 
-  el.innerHTML=`<div class="ind-analysis">
-
-<div class="ind-section">
-  <div class="ind-section-title" style="color:var(--accent)">📊 MOMENTUM</div>
-  <div class="ind-row"><span class="ind-label">RSI (14)</span><span class="ind-val ${rsi>=70?'ind-bear':rsi<=30?'ind-bull':'ind-neut'}">${rsi||'N/A'} — ${rsiTxt}</span></div>
-  <div class="ind-row"><span class="ind-label">MACD Line</span><span class="ind-val ${macdBull?'ind-bull':'ind-bear'}">${fmt2(macdLine)} — ${macdBull?'แนวโน้มขึ้น 🟢':'แนวโน้มลง 🔴'}</span></div>
-  <div class="ind-row"><span class="ind-label">Stochastic %K</span><span class="ind-val ${stochK>=80?'ind-bear':stochK<=20?'ind-bull':'ind-neut'}">${stochK||'N/A'} — ${stochTxt}</span></div>
-  <div class="ind-row"><span class="ind-label">Williams %R</span><span class="ind-val ${willR>=-20?'ind-bear':willR<=-80?'ind-bull':'ind-neut'}">${willR||'N/A'} — ${willTxt}</span></div>
-  <div class="ind-row"><span class="ind-label">CCI (20)</span><span class="ind-val ${cci>100?'ind-bear':cci<-100?'ind-bull':'ind-neut'}">${cci||'N/A'} — ${cciTxt}</span></div>
-</div>
-
-<div class="ind-section">
-  <div class="ind-section-title" style="color:var(--yellow)">📈 TREND</div>
-  <div class="ind-row"><span class="ind-label">EMA 20/50</span><span class="ind-val ${ema20&&ema50&&ema20>ema50?'ind-bull':'ind-bear'}">${ema20cross||'N/A'}</span></div>
-  <div class="ind-row"><span class="ind-label">EMA 50/200</span><span class="ind-val ${ema50&&ema200&&ema50>ema200?'ind-bull':'ind-bear'}">${ema50cross||'N/A'}</span></div>
-  <div class="ind-row"><span class="ind-label">ราคา vs EMA20</span><span class="ind-val ${ema20&&price>ema20?'ind-bull':'ind-bear'}">${ema20?'$'+fmt2(ema20):' N/A'} ${ema20?(price>ema20?'▲ เหนือ':'▼ ต่ำกว่า'):''}</span></div>
-  <div class="ind-row"><span class="ind-label">VWAP (20d)</span><span class="ind-val ${vwap&&price>vwap?'ind-bull':'ind-bear'}">${vwap?'$'+fmt2(vwap):' N/A'} ${vwap?(price>vwap?'▲':'▼'):''}</span></div>
-  <div class="ind-row"><span class="ind-label">Parabolic SAR</span><span class="ind-val ${sarTrend.includes('🟢')?'ind-bull':'ind-bear'}">${sarTrend}</span></div>
-</div>
-
-<div class="ind-section">
-  <div class="ind-section-title" style="color:var(--purple)">🎯 VOLATILITY</div>
-  <div class="ind-row"><span class="ind-label">Bollinger Mid</span><span class="ind-val ind-neut">${bbMid?'$'+fmt2(bbMid):'N/A'}</span></div>
-  <div class="ind-row"><span class="ind-label">BB Upper/Lower</span><span class="ind-val ind-neut">${bbUpper?'$'+fmt2(bbUpper)+' / $'+fmt2(bbLower):'N/A'}</span></div>
-  <div class="ind-row"><span class="ind-label">BB Width</span><span class="ind-val ${bbWidth>5?'ind-bear':'ind-bull'}">${bbWidth||'N/A'}% ${bbWidth?(bbWidth>5?'ผันผวนสูง':'ผันผวนต่ำ'):''}</span></div>
-  <div class="ind-row"><span class="ind-label">ราคาใน BB</span><span class="ind-val ${bbZone?.includes('🔴')?'ind-bear':bbZone?.includes('🟢')?'ind-bull':'ind-neut'}">${bbZone||'N/A'}</span></div>
-  <div class="ind-row"><span class="ind-label">ATR (14)</span><span class="ind-val ind-neut">${atr?'$'+fmt2(atr):'N/A'}</span></div>
-</div>
-
-<div class="ind-section">
-  <div class="ind-section-title" style="color:var(--green)">📦 VOLUME</div>
-  <div class="ind-row"><span class="ind-label">Volume วันนี้</span><span class="ind-val">${fmtVol(volToday)}</span></div>
-  <div class="ind-row"><span class="ind-label">Volume Ratio</span><span class="ind-val ${volRatio>=1.5?'ind-bull':volRatio<=0.7?'ind-bear':'ind-neut'}">${volRatio}x — ${volTxt}</span></div>
-  <div class="ind-row"><span class="ind-label">OBV Trend</span><span class="ind-val ${obvTrend.includes('🟢')?'ind-bull':'ind-bear'}">${obvTrend}</span></div>
-</div>
-
-<div class="ind-section">
-  <div class="ind-section-title" style="color:var(--red)">🛡️ SUPPORT / RESISTANCE</div>
-  <div class="ind-row"><span class="ind-label">แนวรับ S1</span><span class="ind-val ind-bear">$${s1v?.toFixed?.(2)||s1v}</span></div>
-  <div class="ind-row"><span class="ind-label">แนวต้าน R1</span><span class="ind-val ind-bull">$${r1v?.toFixed?.(2)||r1v}</span></div>
-  <div class="ind-row"><span class="ind-label">ห่างจาก S1</span><span class="ind-val ind-neut">${s1v&&price>0?(((price-s1v)/price)*100).toFixed(1)+'%':'N/A'}</span></div>
-</div>
-
-<div class="ind-summary">
+  el.innerHTML=`<div class="ind-summary">
 <strong style="color:var(--accent)">⚡ สรุปภาพรวม ${s.t}</strong><br>
 แนวโน้มโดยรวม: <strong>${overallTrend}</strong> (${bullCount} bullish / ${bearCount} bearish signals)<br>
 RSI ${rsi||'N/A'} ${rsiTxt} — MACD ${macdBull?'โมเมนตัมขึ้น':'โมเมนตัมลง'}<br>
@@ -1694,7 +1654,6 @@ OBV: ${obvTrend}<br>
 <br>
 <strong>แนวรับ:</strong> $${s1v?.toFixed?.(2)||s1v} | <strong>แนวต้าน:</strong> $${r1v?.toFixed?.(2)||r1v}<br>
 <span style="color:var(--dim);font-size:10px">*ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน*</span>
-</div>
 </div>`;
 
   btn.disabled=false;btn.textContent='🔄 วิเคราะห์ใหม่';
