@@ -862,9 +862,10 @@ function drawSparkline(ticker, data, currentPrice){
   const maxVol=Math.max(...vols)||1;
   const barW=CHART_W/n;
   vols.forEach((v,i)=>{
-    const h=Math.max(2,(v/maxVol)*12);
-    ctx.fillStyle='rgba(0,212,255,0.10)';
-    ctx.fillRect(i*barW,H-h,barW-1,h);
+    const h=Math.max(2,(v/maxVol)*10);
+    const volColor=vols[i]>=(vols[i-1]||0)?'rgba(0,230,118,0.25)':'rgba(255,68,102,0.25)';
+    ctx.fillStyle=volColor;
+    ctx.fillRect(i*barW,H-PAD_B-h+2,barW-1,h);
   });
 
   // ── Price scale (right side) ──
@@ -923,26 +924,43 @@ function drawSparkline(ticker, data, currentPrice){
   const pts=prices.map((p,i)=>({x:i/(n-1)*CHART_W, y:toY(p)}));
   const isUp=(prices[prices.length-1]||0)>=(prices[0]||0);
 
+  // ── Gradient fill สวยแบบ reference ──
   const grad=ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,isUp?'rgba(0,230,118,0.2)':'rgba(255,68,102,0.2)');
-  grad.addColorStop(1,'rgba(0,0,0,0)');
+  if(isUp){
+    grad.addColorStop(0,'rgba(0,230,118,0.55)');
+    grad.addColorStop(0.5,'rgba(0,180,80,0.25)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+  } else {
+    grad.addColorStop(0,'rgba(255,68,102,0.55)');
+    grad.addColorStop(0.5,'rgba(200,40,60,0.25)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+  }
   ctx.beginPath();
   ctx.moveTo(pts[0].x,pts[0].y);
   pts.forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.lineTo(pts[pts.length-1].x,H);
-  ctx.lineTo(0,H);ctx.closePath();
+  ctx.lineTo(pts[pts.length-1].x,H-PAD_B);
+  ctx.lineTo(0,H-PAD_B);ctx.closePath();
   ctx.fillStyle=grad;ctx.fill();
 
+  // ── glow effect ──
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x,pts[0].y);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle=isUp?'rgba(0,230,118,0.25)':'rgba(255,68,102,0.25)';
+  ctx.lineWidth=6;ctx.lineJoin='round';ctx.stroke();
+
+  // ── เส้นกราฟหลัก ──
   ctx.beginPath();
   ctx.moveTo(pts[0].x,pts[0].y);
   pts.forEach(p=>ctx.lineTo(p.x,p.y));
   ctx.strokeStyle=isUp?'#00e676':'#ff4466';
-  ctx.lineWidth=1.5;ctx.stroke();
+  ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
 
-  // จุดราคาปัจจุบัน
+  // จุดราคาปัจจุบัน + glow
   const last=pts[pts.length-1];
-  ctx.beginPath();
-  ctx.arc(last.x,last.y,3,0,Math.PI*2);
+  ctx.beginPath();ctx.arc(last.x,last.y,7,0,Math.PI*2);
+  ctx.fillStyle=isUp?'rgba(0,230,118,0.2)':'rgba(255,68,102,0.2)';ctx.fill();
+  ctx.beginPath();ctx.arc(last.x,last.y,3.5,0,Math.PI*2);
   ctx.fillStyle=isUp?'#00e676':'#ff4466';ctx.fill();
 
   // ── Current price label บน scale ──
