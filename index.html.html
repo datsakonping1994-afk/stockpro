@@ -768,8 +768,9 @@ async function fetchCandles(ticker, days=60){
   // ใช้ Yahoo Finance v8 chart API (ฟรี ไม่ต้องใช้ key)
   try{
     const range=days<=30?'1mo':days<=90?'3mo':'6mo';
-    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
-    const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0'}});
+    const yahooUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
+    const url=`https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`;
+    const r=await fetch(url);
     if(!r.ok) return null;
     const d=await r.json();
     const res=d?.chart?.result?.[0];
