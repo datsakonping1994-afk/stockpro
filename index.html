@@ -892,13 +892,13 @@ function drawSparkline(ticker, data, currentPrice){
   // แบ่ง 4 level ระหว่าง min-max
   const scaleSteps=4;
   ctx.save();
-  ctx.font='bold 8px IBM Plex Mono,monospace';
+  ctx.font='bold 9px IBM Plex Mono,monospace';
   ctx.textAlign='right';
   for(let i=0;i<=scaleSteps;i++){
     const p=minP+(maxP-minP)*(i/scaleSteps);
     const y=toY(p);
     // เส้น grid จางๆ
-    ctx.strokeStyle='rgba(255,255,255,0.05)';
+    ctx.strokeStyle='rgba(255,255,255,0.07)';
     ctx.lineWidth=0.5;
     ctx.setLineDash([]);
     ctx.beginPath();
@@ -906,7 +906,7 @@ function drawSparkline(ticker, data, currentPrice){
     ctx.stroke();
     // ตัวเลขราคา
     const label=p>=1000?p.toFixed(0):p>=100?p.toFixed(1):p.toFixed(2);
-    ctx.fillStyle='rgba(160,180,200,0.7)';
+    ctx.fillStyle='rgba(190,210,230,0.9)';
     ctx.fillText(label, W-2, y+3);
   }
   ctx.restore();
@@ -921,52 +921,54 @@ function drawSparkline(ticker, data, currentPrice){
   ctx.restore();
 
   // ── วาดเส้นแนวรับ/ต้าน ──
-  // track used Y positions to avoid overlapping labels
   const usedLabelY=[];
   function drawLevel(price, color, label){
     if(!price||price<=0) return;
     const y=toY(price);
     if(y<PAD_T||y>H-PAD_B+2) return;
+    const isPrimary=label==='S1'||label==='R1';
     // ── เส้นทึบ ──
     ctx.save();
     ctx.setLineDash([]);
-    ctx.lineWidth=label==='S1'||label==='R1'?2:1.5;
+    ctx.lineWidth=isPrimary?2.5:1.8;
     ctx.strokeStyle=color;
-    ctx.globalAlpha=label==='S1'||label==='R1'?1:0.7;
+    ctx.globalAlpha=isPrimary?1:0.75;
     ctx.beginPath();
     ctx.moveTo(0,y);ctx.lineTo(CHART_W,y);
     ctx.stroke();
     ctx.restore();
 
-    // ── Label กำกับชื่อ ──
+    // ── Label กำกับชื่อ + ราคา ──
     ctx.save();
     ctx.setLineDash([]);
     ctx.globalAlpha=1;
-    ctx.font='bold 9px IBM Plex Mono,monospace';
+    ctx.font='bold 10px IBM Plex Mono,monospace';
     ctx.textAlign='left';
     let labelY=y-2;
-    if(labelY-8<PAD_T) labelY=y+9;
+    if(labelY-10<PAD_T) labelY=y+12;
     for(const uy of usedLabelY){
-      if(Math.abs(labelY-uy)<9) labelY=uy+9;
+      if(Math.abs(labelY-uy)<12) labelY=uy+12;
     }
     usedLabelY.push(labelY);
 
     const isRes=label.startsWith('R');
-    const bgAlpha=isRes?'rgba(0,180,80,0.35)':'rgba(180,0,0,0.35)';
-    const textColor=isRes?'rgba(0,255,120,1)':'rgba(255,80,80,1)';
-    const lw=ctx.measureText(label).width+8;
-    ctx.fillStyle=bgAlpha;
+    const bgColor=isRes?'rgba(0,160,70,0.75)':'rgba(180,20,20,0.75)';
+    const textColor='#fff';
+    const priceStr=price>=1000?price.toFixed(0):price>=100?price.toFixed(1):price.toFixed(2);
+    const fullLabel=`${label} ${priceStr}`;
+    const lw=ctx.measureText(fullLabel).width+10;
+    ctx.fillStyle=bgColor;
     ctx.beginPath();
-    ctx.roundRect(3,labelY-9,lw,12,2);
+    ctx.roundRect(3,labelY-11,lw,14,3);
     ctx.fill();
     ctx.fillStyle=textColor;
-    ctx.fillText(label, 6, labelY);
+    ctx.fillText(fullLabel, 7, labelY);
     ctx.restore();
   }
-  drawLevel(r2,'rgba(0,200,100,0.55)','R2');
-  drawLevel(r1,'rgba(0,255,120,1)','R1');
-  drawLevel(s1,'rgba(255,50,50,1)','S1');
-  drawLevel(s2,'rgba(255,60,60,0.55)','S2');
+  drawLevel(r2,'rgba(0,220,110,0.65)','R2');
+  drawLevel(r1,'rgba(0,255,130,1)','R1');
+  drawLevel(s1,'rgba(255,60,60,1)','S1');
+  drawLevel(s2,'rgba(255,80,80,0.65)','S2');
 
   // ── เส้นราคา ──
   const pts=prices.map((p,i)=>({x:i/(n-1)*CHART_W, y:toY(p)}));
@@ -975,12 +977,12 @@ function drawSparkline(ticker, data, currentPrice){
   // ── Gradient fill สวยแบบ reference ──
   const grad=ctx.createLinearGradient(0,0,0,H);
   if(isUp){
-    grad.addColorStop(0,'rgba(0,230,118,0.55)');
-    grad.addColorStop(0.5,'rgba(0,180,80,0.25)');
+    grad.addColorStop(0,'rgba(0,255,140,0.7)');
+    grad.addColorStop(0.5,'rgba(0,220,100,0.35)');
     grad.addColorStop(1,'rgba(0,0,0,0)');
   } else {
-    grad.addColorStop(0,'rgba(255,68,102,0.55)');
-    grad.addColorStop(0.5,'rgba(200,40,60,0.25)');
+    grad.addColorStop(0,'rgba(255,80,110,0.7)');
+    grad.addColorStop(0.5,'rgba(220,50,80,0.35)');
     grad.addColorStop(1,'rgba(0,0,0,0)');
   }
   ctx.beginPath();
@@ -994,43 +996,45 @@ function drawSparkline(ticker, data, currentPrice){
   ctx.beginPath();
   ctx.moveTo(pts[0].x,pts[0].y);
   pts.forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.strokeStyle=isUp?'rgba(0,230,118,0.25)':'rgba(255,68,102,0.25)';
-  ctx.lineWidth=6;ctx.lineJoin='round';ctx.stroke();
+  ctx.strokeStyle=isUp?'rgba(0,255,140,0.45)':'rgba(255,80,110,0.45)';
+  ctx.lineWidth=8;ctx.lineJoin='round';ctx.stroke();
 
   // ── เส้นกราฟหลัก ──
   ctx.beginPath();
   ctx.moveTo(pts[0].x,pts[0].y);
   pts.forEach(p=>ctx.lineTo(p.x,p.y));
-  ctx.strokeStyle=isUp?'#00e676':'#ff4466';
-  ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+  ctx.strokeStyle=isUp?'#00ff8c':'#ff5577';
+  ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
 
   // จุดราคาปัจจุบัน + glow
   const last=pts[pts.length-1];
-  ctx.beginPath();ctx.arc(last.x,last.y,7,0,Math.PI*2);
-  ctx.fillStyle=isUp?'rgba(0,230,118,0.2)':'rgba(255,68,102,0.2)';ctx.fill();
-  ctx.beginPath();ctx.arc(last.x,last.y,3.5,0,Math.PI*2);
-  ctx.fillStyle=isUp?'#00e676':'#ff4466';ctx.fill();
+  ctx.beginPath();ctx.arc(last.x,last.y,9,0,Math.PI*2);
+  ctx.fillStyle=isUp?'rgba(0,255,140,0.3)':'rgba(255,80,110,0.3)';ctx.fill();
+  ctx.beginPath();ctx.arc(last.x,last.y,5,0,Math.PI*2);
+  ctx.fillStyle=isUp?'#00ff8c':'#ff5577';ctx.fill();
+  ctx.beginPath();ctx.arc(last.x,last.y,2.5,0,Math.PI*2);
+  ctx.fillStyle='#fff';ctx.fill();
 
   // ── Current price label บน scale ──
   const cur=currentPrice||prices[prices.length-1];
   const curY=toY(cur);
   ctx.save();
   // เส้น dashed ราคาปัจจุบัน
-  ctx.setLineDash([2,4]);
-  ctx.lineWidth=0.8;
-  ctx.strokeStyle='rgba(255,255,255,0.3)';
+  ctx.setLineDash([3,4]);
+  ctx.lineWidth=1.2;
+  ctx.strokeStyle=isUp?'rgba(0,255,140,0.5)':'rgba(255,80,110,0.5)';
   ctx.beginPath();
   ctx.moveTo(0,curY);ctx.lineTo(CHART_W,curY);
   ctx.stroke();
   // กล่องราคาปัจจุบันบน scale
   const curLabel=cur>=1000?cur.toFixed(0):cur>=100?cur.toFixed(1):cur.toFixed(2);
-  ctx.font='bold 8px IBM Plex Mono,monospace';
-  const lw=ctx.measureText(curLabel).width+6;
-  ctx.fillStyle=isUp?'rgba(0,230,118,0.85)':'rgba(255,68,102,0.85)';
-  ctx.fillRect(CHART_W+1,curY-7,SCALE_W-3,12);
+  ctx.font='bold 9px IBM Plex Mono,monospace';
+  const lw2=ctx.measureText(curLabel).width+8;
+  ctx.fillStyle=isUp?'rgba(0,255,140,0.95)':'rgba(255,80,110,0.95)';
+  ctx.fillRect(CHART_W+1,curY-8,SCALE_W-3,14);
   ctx.fillStyle='#000';
   ctx.textAlign='center';
-  ctx.fillText(curLabel,CHART_W+1+lw/2+2,curY+3);
+  ctx.fillText(curLabel,CHART_W+1+(SCALE_W-4)/2,curY+4);
   ctx.restore();
 }
 
@@ -1489,7 +1493,8 @@ function _getLevels(t,p){
   function getLvlVal(id,fallback){
     const el=document.getElementById(id+'-'+t);
     if(!el) return fallback;
-    const v=parseFloat(el.textContent.replace(/[^0-9.]/g,''));
+    const parts=el.textContent.trim().split(/\s+/);
+    const v=parseFloat(parts[parts.length-1]);
     return isNaN(v)||v<=0?fallback:v;
   }
   const fb=getS(p,t), fr=getR(p);
@@ -2251,7 +2256,19 @@ async function startup(){
   await new Promise(r=>setTimeout(r,500));
   // 3. Load sparkline + volume + MA (uses daily candle API, separate from quote)
   await loadAllExtras();
-  // 4. เริ่มเช็ค zone alert หลัง startup เสร็จ
+  // 4. initialize zone states ก่อน เพื่อกัน popup ตอนเริ่ม
+  stocks.forEach(s=>{
+    const lvl=_getLevels(s.t,s.p);
+    const levels=[
+      {name:'S1',val:lvl.s1,type:'s'},{name:'S2',val:lvl.s2,type:'s'},{name:'S3',val:lvl.s3,type:'s'},
+      {name:'R1',val:lvl.r1,type:'r'},{name:'R2',val:lvl.r2,type:'r'},{name:'R3',val:lvl.r3,type:'r'},
+    ];
+    levels.forEach(lv=>{
+      if(!lv.val||lv.val<=0) return;
+      const cur=lv.type==='s'?(s.p<=lv.val?'below':'above'):(s.p>=lv.val?'above':'below');
+      zoneAlertState[s.t+'_'+lv.name]=cur;
+    });
+  });
   zoneAlertReady=true;
 }
 
