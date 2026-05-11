@@ -678,7 +678,7 @@ function buildRangeBar(price, s1, r1, ticker){
     </div>
     <div class="range-labels">
       <span class="range-lbl-s">S1 แนวรับ</span>
-      <span class="range-lbl-mid" id="price-pos-${ticker}" style="color:var(--text2);font-size:9px">${pos.toFixed(0)}% จาก S1</span>
+      <span class="range-lbl-mid" id="price-pos-${ticker}" style="color:var(--text2);font-size:9px">${s1&&s1>0?((price-s1)/s1*100).toFixed(1):'—'}% จาก S1</span>
       <span class="range-lbl-r">R1 แนวต้าน</span>
     </div>
   </div>`;
@@ -692,7 +692,7 @@ function updateRangeBar(ticker, price, s1, r1){
   const zoneTag=document.getElementById('prox-'+ticker);
   if(zoneTag){zoneTag.textContent=zone.ztxt||zone.txt;zoneTag.className='zone-tag '+(zone.zone||'mid');}
   const posLabel=document.getElementById('price-pos-'+ticker);
-  if(posLabel) posLabel.textContent=pos.toFixed(0)+'% จาก S1';
+  if(posLabel) posLabel.textContent=(s1&&s1>0?((price-s1)/s1*100).toFixed(1):'—')+'% จาก S1';
   // update card border
   const card=document.getElementById('card-'+ticker);
   if(card){card.style.borderLeft=`3px solid ${zone.border}`;card.dataset.near=pos<=35||pos>=65?'yes':'no';}
@@ -777,6 +777,12 @@ async function setIndicator(t,mode,btn){
     if(el&&levels[k]!=null)el.innerHTML=`<span class="level-tag">${k.toUpperCase()}</span>${fmt(levels[k])}`;
   });
   updateRangeBar(t, s.p, levels.s1, levels.r1);
+  // Bug fix #3: explicitly sync card-top badge after indicator recalc
+  const zone=getRangeZone(s.p, levels.s1, levels.r1);
+  const badge=document.getElementById('badge-'+t);
+  if(badge){badge.textContent=zone.txt;badge.className='badge '+(zone.cls==='accent'?'green':zone.cls);}
+  const card=document.getElementById('card-'+t);
+  if(card) card.style.borderLeft=`3px solid ${zone.border}`;
   // redraw sparkline with updated levels
   const cachedCandle=candleCache[t];
   if(cachedCandle) drawSparkline(t, cachedCandle.data, s.p);
@@ -1574,8 +1580,9 @@ function checkZoneAlert(ticker, price, s1, r1){
   // pulse animation บน card
   const pos=getRangePos(price,lvl.s1,lvl.r1);
   card.classList.remove('zone-alert-s','zone-alert-r');
-  if(pos<=10) card.classList.add('zone-alert-s');
-  else if(pos>=90) card.classList.add('zone-alert-r');
+  // Bug fix #5: pulse red if below S1 OR near S1 (pos<=15), pulse green if near R1 (pos>=85)
+  if(price<=lvl.s1||pos<=15) card.classList.add('zone-alert-s');
+  else if(pos>=85) card.classList.add('zone-alert-r');
 }
 
 function updateCard(s){
@@ -1605,7 +1612,7 @@ function updateAlerts(){
     if(!hasPivot||!s1||!r1||r1<=s1) return false;
     if(s.p<=s1) return false;
     const pos=getRangePos(s.p,s1,r1);
-    return pos<=10||pos>=90;
+    return pos<=15||pos>=85;
   }).sort((a,b)=>{
     const la=_getLevels(a.t,a.p),lb=_getLevels(b.t,b.p);
     return getRangePos(a.p,la.s1,la.r1)-getRangePos(b.p,lb.s1,lb.r1);
@@ -1948,7 +1955,9 @@ function wsConnect(){
         const s=stocks.find(x=>x.t===t);
         if(!s) return;
         const prev=liveCache[t]?.price||s.p||price;
-        const chg=s.p>0?+((price-s.p)/s.p*100).toFixed(2):0;
+        // Bug fix #1: use prevClose from ohlcCache for accurate daily % change
+        const prevClose=ohlcCache[t]?.prevC||s.p||price;
+        const chg=prevClose>0?+((price-prevClose)/prevClose*100).toFixed(2):0;
         // flash detection (tick direction)
         const dir=price>prev?'up':price<prev?'dn':'flat';
         liveCache[t]={price,prevPrice:prev,dir};
