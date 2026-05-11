@@ -14,6 +14,17 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .live-badge{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:5px;}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+/* ── Zone alert animations ── */
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(255,68,102,0)}50%{box-shadow:0 0 0 6px rgba(255,68,102,0.25)}}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,0)}50%{box-shadow:0 0 0 6px rgba(0,230,118,0.2)}}
+.card.zone-alert-s{animation:pulse-red 1.6s ease-in-out infinite;}
+.card.zone-alert-r{animation:pulse-green 1.6s ease-in-out infinite;}
+/* ── Toast notification ── */
+#toast-container{position:fixed;bottom:20px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
+.toast{font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 14px;border-radius:8px;pointer-events:auto;opacity:0;transform:translateX(20px);transition:all 0.3s ease;max-width:280px;line-height:1.5;}
+.toast.show{opacity:1;transform:translateX(0);}
+.toast.toast-s{background:rgba(20,5,10,0.97);border:1px solid rgba(255,68,102,0.6);color:#ff8899;}
+.toast.toast-r{background:rgba(5,15,10,0.97);border:1px solid rgba(0,230,118,0.5);color:#66ffaa;}
 .summary{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .chip{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text2);}
 .chip .val{font-size:18px;font-weight:600;display:block;color:var(--text);}
@@ -182,6 +193,11 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .sort-btn.active{background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);}
 .view-btn{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all 0.15s;}
 .view-btn.active{background:rgba(168,85,247,0.1);border-color:var(--purple);color:var(--purple);}
+/* ── Pin button ── */
+.pin-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:var(--bg4);color:var(--dim);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;line-height:1;padding:0;}
+.pin-btn:hover{border-color:var(--yellow);color:var(--yellow);}
+.pin-btn.pinned{border-color:rgba(255,215,0,0.6);background:rgba(255,215,0,0.12);color:var(--yellow);}
+.card.pinned{border-top:2px solid rgba(255,215,0,0.5);}
 </style>
 </head>
 <body>
@@ -245,6 +261,8 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 
 <div class="grid" id="grid"></div>
 <div id="heatmap" style="display:none;padding:8px 0"></div>
+
+<div id="toast-container"></div>
 
 <script>
 const FINNHUB_KEY='d802m6hr01qj3ct8r57gd802m6hr01qj3ct8r580';
@@ -659,9 +677,9 @@ function buildRangeBar(price, s1, r1, ticker){
       <div class="range-needle" id="pbar-${ticker}" style="left:${pos}%"></div>
     </div>
     <div class="range-labels">
-      <span class="range-lbl-s">▲ แนวรับ</span>
+      <span class="range-lbl-s">S1 แนวรับ</span>
       <span class="range-lbl-mid" id="price-pos-${ticker}" style="color:var(--text2);font-size:9px">${pos.toFixed(0)}% จาก S1</span>
-      <span class="range-lbl-r">แนวต้าน ▼</span>
+      <span class="range-lbl-r">R1 แนวต้าน</span>
     </div>
   </div>`;
 }
@@ -901,18 +919,47 @@ function drawSparkline(ticker, data, currentPrice){
   ctx.restore();
 
   // ── วาดเส้นแนวรับ/ต้าน ──
+  // track used Y positions to avoid overlapping labels
+  const usedLabelY=[];
   function drawLevel(price, color, label){
     if(!price||price<=0) return;
     const y=toY(price);
-    if(y<0||y>H) return;
+    if(y<PAD_T||y>H-PAD_B+2) return;
     ctx.save();
     ctx.setLineDash([3,4]);
     ctx.lineWidth=1;
     ctx.strokeStyle=color;
-    ctx.globalAlpha=0.7;
+    ctx.globalAlpha=0.75;
     ctx.beginPath();
     ctx.moveTo(0,y);ctx.lineTo(CHART_W,y);
     ctx.stroke();
+    ctx.restore();
+
+    // ── Label กำกับชื่อ ──
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=1;
+    ctx.font='bold 8px IBM Plex Mono,monospace';
+    ctx.textAlign='left';
+    // หาตำแหน่ง y ที่ไม่ทับกัน
+    let labelY=y-2;
+    // ถ้าใกล้ขอบบน ให้ขยับลง
+    if(labelY-8<PAD_T) labelY=y+9;
+    // ตรวจทับกับ label ก่อนหน้า
+    for(const uy of usedLabelY){
+      if(Math.abs(labelY-uy)<9) labelY=uy+9;
+    }
+    usedLabelY.push(labelY);
+
+    // พื้นหลัง label เล็กๆ
+    const isRes=label.startsWith('R');
+    const bgAlpha=isRes?'rgba(0,180,80,0.18)':'rgba(255,68,102,0.18)';
+    const textColor=isRes?'rgba(0,230,118,0.95)':'rgba(255,100,80,0.95)';
+    const lw=ctx.measureText(label).width+6;
+    ctx.fillStyle=bgAlpha;
+    ctx.fillRect(3, labelY-8, lw, 10);
+    ctx.fillStyle=textColor;
+    ctx.fillText(label, 6, labelY);
     ctx.restore();
   }
   drawLevel(r2,'rgba(0,200,100,0.6)','R2');
@@ -1095,6 +1142,40 @@ window.addEventListener('resize',()=>{
 });
 
 // ═══════════════════════════════════════════════════════
+// PIN SYSTEM
+// ═══════════════════════════════════════════════════════
+const pinnedSet=new Set();
+
+function togglePin(ticker){
+  const card=document.getElementById('card-'+ticker);
+  const btn=document.getElementById('pin-'+ticker);
+  if(!card||!btn) return;
+  if(pinnedSet.has(ticker)){
+    pinnedSet.delete(ticker);
+    card.classList.remove('pinned');
+    card.dataset.pinned='0';
+    btn.classList.remove('pinned');
+    btn.title='ปักมุด';
+  } else {
+    pinnedSet.add(ticker);
+    card.classList.add('pinned');
+    card.dataset.pinned='1';
+    btn.classList.add('pinned');
+    btn.title='เอาออกจากมุด';
+  }
+  reorderPinned();
+}
+
+function reorderPinned(){
+  const grid=document.getElementById('grid');
+  const cards=[...grid.querySelectorAll('.card')];
+  // แยก pinned vs unpinned รักษาลำดับเดิม
+  const pinned=cards.filter(c=>c.dataset.pinned==='1');
+  const rest=cards.filter(c=>c.dataset.pinned!=='1');
+  [...pinned,...rest].forEach(c=>grid.appendChild(c));
+}
+
+// ═══════════════════════════════════════════════════════
 // SORT & VIEW
 // ═══════════════════════════════════════════════════════
 let currentSort='chg', currentView='grid', sortAsc=false;
@@ -1126,6 +1207,7 @@ function sortGrid(mode, btn){
     return sortAsc?va-vb:vb-va;
   });
   cards.forEach(c=>grid.appendChild(c));
+  reorderPinned();
   if(currentView==='heat') renderHeatmap();
 }
 
@@ -1139,28 +1221,77 @@ function setView(mode, btn){
   else { grid.style.display='none'; heat.style.display='block'; renderHeatmap(); }
 }
 
+// ── Sector definitions ──────────────────────────────────────────────────────
+const sectorMap={
+  'เซมิคอนดักเตอร์':['NVDA','AMD','INTC','AVGO','TSM','ASML','MU','ARM','SNDK','NVTS','CRDO','AEHR','AAOI'],
+  'ซอฟต์แวร์ / คลาวด์':['MSFT','GOOGL','AAPL','META','AMZN','PLTR','NOW','CRWD','RBRK','AXON','NFLX'],
+  'AI Infrastructure':['ANET','VRT','NBIS','CRWV','IREN','OSS','SPGI'],
+  'อวกาศ / กลาโหม':['RKLB','ASTS','KTOS','AVEX','ONDS','IONQ','OKLO'],
+  'ชีวเทค / สุขภาพ':['LLY','NVO','ISRG','TMDX','HIMS','TEM'],
+  'การเงิน / ฟินเทค':['JPM','HOOD','SOFI','MP'],
+  'พลังงาน / วัตถุดิบ':['XOM','EOSE','SLNH'],
+};
+
+function getTileBg(chg){
+  const maxAbs=Math.max(...stocks.map(s=>Math.abs(s.c)||0.01));
+  const intensity=Math.min(1,Math.abs(chg)/maxAbs);
+  if(chg>0){const g=Math.round(80+intensity*150);return`rgb(0,${g},60)`;}
+  else if(chg<0){const r=Math.round(120+intensity*135);return`rgb(${r},20,40)`;}
+  return'rgb(40,42,60)';
+}
+
 function renderHeatmap(){
   const heat=document.getElementById('heatmap');
-  const sorted=[...stocks].sort((a,b)=>b.c-a.c);
-  const maxAbs=Math.max(...sorted.map(s=>Math.abs(s.c)||0.01));
-  heat.innerHTML=`<div class="heatmap-grid">${sorted.map(s=>{
-    const pct=s.c/maxAbs;
-    const intensity=Math.min(1,Math.abs(pct));
-    let bg;
-    if(s.c>0){
-      const g=Math.round(80+intensity*150);
-      bg=`rgba(0,${g},80,${0.4+intensity*0.55})`;
-    } else if(s.c<0){
-      const r=Math.round(80+intensity*175);
-      bg=`rgba(${r},30,50,${0.4+intensity*0.55})`;
-    } else { bg='rgba(40,40,60,0.7)'; }
-    const size=Math.max(60, Math.min(130, 60+Math.abs(s.c)*3));
-    return`<div class="heat-tile" style="background:${bg};min-height:${size}px" onclick="goCard('${s.t}')">
-      <div class="heat-ticker">${s.t}</div>
-      <div class="heat-chg">${s.c>=0?'+':''}${s.c}%</div>
-      <div class="heat-price">${s.p>0?'$'+s.p.toFixed(s.p<10?3:s.p<100?2:0):'—'}</div>
-    </div>`;
-  }).join('')}</div>`;
+  const tickerSector={};
+  Object.entries(sectorMap).forEach(([sec,tickers])=>tickers.forEach(t=>{tickerSector[t]=sec;}));
+  const groups={};
+  Object.keys(sectorMap).forEach(s=>{groups[s]=[];});
+  stocks.forEach(s=>{
+    const sec=tickerSector[s.t]||'อื่นๆ';
+    if(!groups[sec]) groups[sec]=[];
+    groups[sec].push(s);
+  });
+  Object.values(groups).forEach(arr=>arr.sort((a,b)=>parseMcap(b.mktcap||'0')-parseMcap(a.mktcap||'0')));
+
+  let html='';
+  Object.entries(groups).forEach(([secName,arr])=>{
+    if(!arr.length) return;
+    const avg=arr.reduce((sum,s)=>sum+s.c,0)/arr.length;
+    const avgColor=avg>0?'#00e676':avg<0?'#ff4466':'#888';
+    const avgSign=avg>=0?'+':'';
+
+    html+=`<div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg3);border-radius:6px 6px 0 0;border:1px solid var(--border);border-bottom:none">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--text2)">${secName}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${avgColor}">${avgSign}${avg.toFixed(2)}%</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:0 0 6px 6px">`;
+
+    arr.forEach(s=>{
+      const bg=getTileBg(s.c);
+      const mcap=parseMcap(s.mktcap||'0');
+      const norm=Math.max(0,Math.min(1,(Math.log10(mcap||1e9)-9)/(Math.log10(5e12)-9)));
+      const sz=Math.round(52+norm*100);
+      const chgSign=s.c>=0?'+':'';
+      const priceStr=s.p>0?'$'+s.p.toFixed(s.p<10?3:s.p<100?2:s.p<1000?1:0):'—';
+
+      html+=`<div onclick="goCard('${s.t}')" title="${s.n}"
+        style="background:${bg};width:${sz}px;height:${sz}px;border-radius:6px;
+               display:flex;flex-direction:column;justify-content:center;align-items:center;
+               cursor:pointer;overflow:hidden;flex-shrink:0;
+               transition:filter .12s"
+        onmouseover="this.style.filter='brightness(1.3)'"
+        onmouseout="this.style.filter='brightness(1)'">
+        <div style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:#fff;font-size:${sz>=110?14:sz>=80?12:sz>=60?10:9}px;text-align:center;padding:0 2px;line-height:1.1">${s.t}</div>
+        ${sz>=58?`<div style="font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.85);font-size:${sz>=90?12:10}px;line-height:1.2">${chgSign}${s.c}%</div>`:''}
+        ${sz>=80?`<div style="font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.4);font-size:9px">${priceStr}</div>`:''}
+      </div>`;
+    });
+
+    html+=`</div></div>`;
+  });
+
+  heat.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1184,6 +1315,7 @@ function buildGrid(){
     card.className='card';card.id='card-'+s.t;
     card.dataset.t=s.t;card.dataset.n=s.n.toUpperCase();
     card.dataset.dir=s.c>=0?'up':'dn';card.dataset.near=near<=35||near>=65?'yes':'no';
+    card.dataset.pinned='0';
     card.style.borderLeft=`3px solid ${zone.border}`;
     card.innerHTML=`
       <div class="card-top">
@@ -1191,9 +1323,12 @@ function buildGrid(){
           <div class="ticker">${s.t}<span class="badge ${zone.cls==='accent'?'green':zone.cls}" id="badge-${s.t}">${zone.txt}</span></div>
           <div class="company">${s.n}</div>
         </div>
-        <div>
-          <div class="price ${cc}" id="price-${s.t}">$${fmt(s.p)}</div>
-          <div class="chg ${cc}" id="chg-${s.t}">${s.c>0?'+':''}${s.c}%</div>
+        <div style="display:flex;align-items:flex-start;gap:6px">
+          <div>
+            <div class="price ${cc}" id="price-${s.t}">$${fmt(s.p)}</div>
+            <div class="chg ${cc}" id="chg-${s.t}">${s.c>0?'+':''}${s.c}%</div>
+          </div>
+          <button class="pin-btn" id="pin-${s.t}" title="ปักมุด" onclick="togglePin('${s.t}')">📌</button>
         </div>
       </div>
       <div class="sparkline-wrap" id="spark-wrap-${s.t}">
@@ -1353,8 +1488,63 @@ function _getLevels(t,p){
   const s1el=document.getElementById('s1-'+t),r1el=document.getElementById('r1-'+t);
   const s1=s1el?parseFloat(s1el.textContent.replace(/[^0-9.]/g,'')):getS(p,t).s1;
   const r1=r1el?parseFloat(r1el.textContent.replace(/[^0-9.]/g,'')):getR(p).r1;
-  return{s1:s1||getS(p,t).s1, r1:r1||getR(p).r1};
+  // hasPivot = true เมื่อโหลด OHLC จริงแล้ว (ไม่ใช่ค่าประมาณ)
+  const hasPivot=!!(ohlcCache[t]||sup0[t]);
+  return{s1:s1||getS(p,t).s1, r1:r1||getR(p).r1, hasPivot};
 }
+// ═══════════════════════════════════════════════════════
+// ZONE ALERT — กระพริบ + popup + เสียง
+// ═══════════════════════════════════════════════════════
+const zoneAlertState={};// ticker -> 's'|'r'|'mid'|null
+
+function playAlertSound(type){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    if(type==='s'){
+      o.frequency.setValueAtTime(520,ctx.currentTime);
+      o.frequency.setValueAtTime(380,ctx.currentTime+0.12);
+    } else {
+      o.frequency.setValueAtTime(660,ctx.currentTime);
+      o.frequency.setValueAtTime(880,ctx.currentTime+0.12);
+    }
+    g.gain.setValueAtTime(0.18,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.35);
+    o.start(ctx.currentTime);o.stop(ctx.currentTime+0.35);
+  }catch(e){}
+}
+
+function showToast(ticker, type, price, level){
+  const container=document.getElementById('toast-container');
+  const isS=type==='s';
+  const div=document.createElement('div');
+  div.className=`toast toast-${type}`;
+  div.innerHTML=`${isS?'🔴':'🟢'} <strong>${ticker}</strong> ${isS?'ใกล้แนวรับ S1':'ใกล้แนวต้าน R1'}<br><span style="opacity:0.7">ราคา $${price.toFixed?price.toFixed(2):price} · ${isS?'S1':'R1'} $${level.toFixed?level.toFixed(2):level}</span>`;
+  div.onclick=()=>{goCard(ticker);div.remove();}
+  container.appendChild(div);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>div.classList.add('show')));
+  setTimeout(()=>{div.classList.remove('show');setTimeout(()=>div.remove(),350);},5000);
+}
+
+function checkZoneAlert(ticker, price, s1, r1){
+  const pos=getRangePos(price,s1,r1);
+  const newZone=pos<=35?'s':pos>=65?'r':'mid';
+  const prev=zoneAlertState[ticker]||'mid';
+  zoneAlertState[ticker]=newZone;
+  const card=document.getElementById('card-'+ticker);
+  if(!card) return;
+  // อัปเดต pulse animation
+  card.classList.remove('zone-alert-s','zone-alert-r');
+  if(newZone==='s') card.classList.add('zone-alert-s');
+  else if(newZone==='r') card.classList.add('zone-alert-r');
+  // แจ้งเตือนเฉพาะตอนเพิ่งเข้าโซนใหม่
+  if(newZone!=='mid' && newZone!==prev){
+    playAlertSound(newZone);
+    showToast(ticker, newZone, price, newZone==='s'?s1:r1);
+  }
+}
+
 function updateCard(s){
   const card=document.getElementById('card-'+s.t);if(!card)return;
   const cc=s.c>0?'up':s.c<0?'dn':'flat';
@@ -1368,6 +1558,9 @@ function updateCard(s){
   const {s1,r1}=_getLevels(s.t,s.p);
   updateRangeBar(s.t,s.p,s1,r1);
   card.dataset.dir=s.c>=0?'up':'dn';
+  const pos=getRangePos(s.p,s1,r1);
+  card.dataset.near=pos<=35||pos>=65?'yes':'no';
+  checkZoneAlert(s.t,s.p,s1,r1);
   updateAlerts();
   if(currentView==='heat') renderHeatmap();
 }
@@ -1375,9 +1568,11 @@ function updateCard(s){
 function updateAlerts(){
   const near=stocks.filter(s=>{
     if(s.p<=0) return false;
-    const {s1,r1}=_getLevels(s.t,s.p);
+    const {s1,r1,hasPivot}=_getLevels(s.t,s.p);
+    if(!hasPivot||!s1||!r1||r1<=s1) return false;
+    if(s.p<=s1) return false;
     const pos=getRangePos(s.p,s1,r1);
-    return pos<=25||pos>=80;
+    return pos<=25||pos>=75;
   }).sort((a,b)=>{
     const la=_getLevels(a.t,a.p),lb=_getLevels(b.t,b.p);
     return getRangePos(a.p,la.s1,la.r1)-getRangePos(b.p,lb.s1,lb.r1);
@@ -1389,8 +1584,12 @@ function updateAlerts(){
   list.innerHTML=near.map(s=>{
     const {s1,r1}=_getLevels(s.t,s.p);
     const pos=getRangePos(s.p,s1,r1);
-    const nearR=pos>=80;
-    return`<div class="alert-chip ${nearR?'warn':'crit'}" onclick="goCard('${s.t}')">${nearR?'🔴 R1':'🟢 S1'} ${s.t} ${pos.toFixed(0)}%</div>`;
+    const nearS=pos<=25;
+    const distS=((s.p-s1)/s.p*100).toFixed(1);
+    const distR=((r1-s.p)/s.p*100).toFixed(1);
+    const label=nearS?`🔴 S1 -${distS}%`:`🟢 R1 +${distR}%`;
+    const cls=nearS?'crit':'warn';
+    return`<div class="alert-chip ${cls}" onclick="goCard('${s.t}')">${label} ${s.t}</div>`;
   }).join('');
 }
 function toggleAlertList(){const l=document.getElementById('alertList');l.style.display=l.style.display==='none'?'flex':'none';}
@@ -1661,7 +1860,14 @@ async function doAI(t,btn){
   const fmt2=v=>v!=null?v.toFixed(2):'N/A';
   const cls=v=>v==null?'ind-neut':v>0?'ind-bull':'ind-bear';
 
-  el.innerHTML=`<div class="ind-summary">
+  el.innerHTML=`
+<div style="background:var(--bg3);border-radius:7px;padding:10px 12px;margin-bottom:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;">
+  <div style="color:var(--red);font-size:11px;font-weight:600;margin-bottom:8px;letter-spacing:1px">🛡️ SUPPORT / RESISTANCE</div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--dim)">แนวรับ S1</span><span style="color:var(--red);font-weight:600">$${s1v?.toFixed?.(2)||s1v}</span></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--dim)">แนวต้าน R1</span><span style="color:var(--green);font-weight:600">$${r1v?.toFixed?.(2)||r1v}</span></div>
+  <div style="display:flex;justify-content:space-between;"><span style="color:var(--dim)">ห่างจาก S1</span><span style="color:${s1v&&price>0&&(((price-s1v)/price)*100)<5?'var(--red)':'var(--yellow)'};font-weight:600">${s1v&&price>0?(((price-s1v)/price)*100).toFixed(1)+'%':'N/A'}</span></div>
+</div>
+<div class="ind-summary">
 <strong style="color:var(--accent)">⚡ สรุปภาพรวม ${s.t}</strong><br>
 แนวโน้มโดยรวม: <strong>${overallTrend}</strong> (${bullCount} bullish / ${bearCount} bearish signals)<br>
 RSI ${rsi||'N/A'} ${rsiTxt} — MACD ${macdBull?'โมเมนตัมขึ้น':'โมเมนตัมลง'}<br>
