@@ -2316,7 +2316,7 @@ function wsDisconnect(){
 }
 
 // Fallback HTTP poll (used when WebSocket fails or market closed)
-let httpPollTimer=null;
+let httpPollTimer=null; // setInterval handle
 async function fallbackPoll(){
   if(!isLive) return;
   const st=document.getElementById('statusbar');
@@ -2358,16 +2358,19 @@ async function toggleLive(){
   if(isLive){
     isLive=false;
     wsDisconnect();
-    clearTimeout(httpPollTimer);
+    clearInterval(httpPollTimer);
     btn.textContent='▶ Live';btn.style.color='var(--green)';
     document.getElementById('statusbar').innerHTML='⏸ หยุด Live';
   } else {
     isLive=true;
     btn.textContent='⏸ Stop';btn.style.color='var(--red)';
-    document.getElementById('statusbar').innerHTML='🔄 กำลังเชื่อม WebSocket...';
-    // Initial HTTP fetch for immediate data, then switch to WS
+    document.getElementById('statusbar').innerHTML='🔄 กำลังดึงราคา...';
+    // ดึงราคาทันที แล้ววนซ้ำทุก 15 วินาที
     await fallbackPoll();
-    wsConnect();
+    clearInterval(httpPollTimer);
+    httpPollTimer=setInterval(async()=>{ if(isLive) await fallbackPoll(); },15000);
+    // ลอง WebSocket ด้วย (ถ้า browser รองรับ)
+    try{ wsConnect(); }catch(e){}
   }
 }
 
