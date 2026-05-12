@@ -1940,8 +1940,21 @@ async function doAI(t,btn){
   const sarTrend=ema20&&price>ema20?'Bullish 🟢':'Bearish 🔴';
 
   // ── Pivot levels ──
-  const s1v=parseFloat((document.getElementById('s1-'+t)||{}).textContent?.replace(/[^0-9.]/g,'')||0)||getS(price,t).s1;
-  const r1v=parseFloat((document.getElementById('r1-'+t)||{}).textContent?.replace(/[^0-9.]/g,'')||0)||getR(price).r1;
+  // ดึง S1/R1 จาก indicator cache หรือคำนวณจากราคาจริง
+  const _sp=getS(price,t), _rp=getR(price);
+  // ดึงค่าจาก DOM โดยตัด label text (S1/R1) ออก
+  function getDomLvl(id){
+    const el=document.getElementById(id+'-'+t);
+    if(!el) return 0;
+    // ลบ label span ออกแล้วเอาแค่ตัวเลข
+    const txt=el.textContent.replace(/^[A-Z0-9]+/,'').replace(/[^0-9.]/g,'');
+    return parseFloat(txt)||0;
+  }
+  const _s1dom=getDomLvl('s1');
+  const _r1dom=getDomLvl('r1');
+  // ใช้ค่าจาก DOM เฉพาะเมื่อ valid (S1 < ราคา < R1 และอยู่ใน range ±50%)
+  const s1v=(_s1dom>0&&_s1dom<price&&_s1dom>price*0.5)?_s1dom:_sp.s1;
+  const r1v=(_r1dom>0&&_r1dom>price&&_r1dom<price*1.5)?_r1dom:_rp.r1;
 
   // ── Volume analysis ──
   const volToday=vols[vols.length-1]||0;
@@ -1968,14 +1981,7 @@ async function doAI(t,btn){
   const fmt2=v=>v!=null?v.toFixed(2):'N/A';
   const cls=v=>v==null?'ind-neut':v>0?'ind-bull':'ind-bear';
 
-  el.innerHTML=`
-<div style="background:var(--bg3);border-radius:7px;padding:10px 12px;margin-bottom:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;">
-  <div style="color:var(--red);font-size:11px;font-weight:600;margin-bottom:8px;letter-spacing:1px">🛡️ SUPPORT / RESISTANCE</div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--dim)">แนวรับ S1</span><span style="color:var(--red);font-weight:600">$${s1v?.toFixed?.(2)||s1v}</span></div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--dim)">แนวต้าน R1</span><span style="color:var(--green);font-weight:600">$${r1v?.toFixed?.(2)||r1v}</span></div>
-  <div style="display:flex;justify-content:space-between;"><span style="color:var(--dim)">ห่างจาก S1</span><span style="color:${s1v&&price>0&&(((price-s1v)/price)*100)<5?'var(--red)':'var(--yellow)'};font-weight:600">${s1v&&price>0?(((price-s1v)/price)*100).toFixed(1)+'%':'N/A'}</span></div>
-</div>
-<div class="ind-summary">
+  el.innerHTML=`<div class="ind-summary">
 <strong style="color:var(--accent)">⚡ สรุปภาพรวม ${s.t}</strong><br>
 แนวโน้มโดยรวม: <strong>${overallTrend}</strong> (${bullCount} bullish / ${bearCount} bearish signals)<br>
 RSI ${rsi||'N/A'} ${rsiTxt} — MACD ${macdBull?'โมเมนตัมขึ้น':'โมเมนตัมลง'}<br>
