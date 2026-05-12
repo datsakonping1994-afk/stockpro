@@ -1123,7 +1123,7 @@ function updateRSICard(ticker, rsi){
 }
 
 async function loadCardExtras(ticker, currentPrice){
-  const data=await fetchCandles(ticker,60);
+  const data=await fetchCandles(ticker,210);
   if(!data) return;
   drawSparkline(ticker,data,currentPrice);
   renderVolume(ticker,data);
