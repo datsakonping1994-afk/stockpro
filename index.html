@@ -2317,19 +2317,22 @@ async function fetchLiveNews(ticker){
   }catch{return null;}
 }
 
-// ── MyMemory Translation (ฟรี ไม่ต้อง key) ──
+// ── DeepL Translation (ฟรี 1M คำ/เดือน) ──
+const DEEPL_KEY='d831548e-7d81-4805-9a64-c1d066974eb7:fx';
 const _translateCache={};
 async function translateTH(text){
   if(!text) return text;
   const key=text.slice(0,80);
   if(_translateCache[key]) return _translateCache[key];
   try{
-    const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0,500))}&langpair=en|th`);
+    const r=await fetch('https://api-free.deepl.com/v2/translate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'DeepL-Auth-Key '+DEEPL_KEY},
+      body:JSON.stringify({text:[text.slice(0,500)],target_lang:'TH',source_lang:'EN'})
+    });
     if(!r.ok) return text;
     const d=await r.json();
-    const translated=d?.responseData?.translatedText||text;
-    // ถ้าแปลได้น้อยกว่า 50% ของต้นฉบับ ใช้ภาษาอังกฤษแทน
-    if(translated.length < text.length*0.3) return text;
+    const translated=d?.translations?.[0]?.text||text;
     _translateCache[key]=translated;
     return translated;
   }catch{return text;}
