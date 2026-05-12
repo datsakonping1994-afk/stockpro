@@ -802,11 +802,15 @@ async function fetchCandles(ticker, days=60){
   if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-300000&&(candleCache[ticker].days||0)>=days) return candleCache[ticker].data;
   // ใช้ Yahoo Finance v8 chart API (ฟรี ไม่ต้องใช้ key)
   try{
-    const range=days<=30?'1mo':days<=90?'3mo':days<=150?'6mo':'1y';
+    const range=days<=30?'1mo':days<=90?'3mo':days<=150?'6mo':days<=210?'1y':'2y';
     const yahooUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
-    const proxies=[`https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`];
+    const proxies=[
+      `https://thingproxy.freeboard.io/fetch/${yahooUrl}`,
+      `https://proxy.cors.sh/${yahooUrl}`,
+      `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
+    ];
     let r=null;
-    for(const p of proxies){try{r=await fetch(p);if(r.ok)break;}catch{}}
+    for(const p of proxies){try{r=await fetch(p,{headers:{'x-cors-api-key':'temp_' + Date.now()}});if(r&&r.ok)break;}catch{r=null;}}
     if(!r||!r.ok) return null;
     const d=await r.json();
     const res=d?.chart?.result?.[0];
@@ -1124,7 +1128,7 @@ function updateRSICard(ticker, rsi){
 }
 
 async function loadCardExtras(ticker, currentPrice){
-  const data=await fetchCandles(ticker,210);
+  const data=await fetchCandles(ticker,260);
   if(!data) return;
   drawSparkline(ticker,data,currentPrice);
   renderVolume(ticker,data);
