@@ -704,18 +704,23 @@ function getRangePos(price, s1, r1){
   const pos=(price-s1)/(r1-s1)*100;
   return Math.max(2,Math.min(98,pos));
 }
+function _nearThreshold(price){
+  // ขั้นบันได: ราคาต่ำ threshold กว้าง, ราคาสูง threshold แคบ
+  if(price<50)   return{close:5,very:2};   // หุ้นราคาต่ำ < $50
+  if(price<500)  return{close:3,very:1.5}; // หุ้นราคากลาง $50-$500
+  return{close:2,very:1};                  // หุ้นราคาสูง > $500
+}
 function getRangeZone(price, s1, r1){
   if(!s1||!r1) return{cls:'mid',txt:'—',border:'var(--dim)'};
-  const pos=(price-s1)/(r1-s1);
-  // คำนวณ % ห่างจาก S1 และ R1
   const pctFromS1=s1>0?((price-s1)/s1*100):999;
   const pctFromR1=r1>0?((r1-price)/r1*100):999;
-  if(price<=s1)        return{cls:'red', txt:'🔴 ต่ำกว่าแนวรับ', border:'var(--red)',   zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
-  if(pctFromS1<=2)     return{cls:'red', txt:'🔴 ใกล้แนวรับมาก', border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
-  if(pctFromS1<=5)     return{cls:'red', txt:'🔴 ใกล้แนวรับ',    border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
-  if(pctFromR1<=2)     return{cls:'green',txt:'🟢 ใกล้แนวต้านมาก',border:'var(--green)',zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
-  if(pctFromR1<=5)     return{cls:'green',txt:'🟢 ใกล้แนวต้าน',  border:'var(--green)',zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
-  return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลาง S1–R1'};
+  const th=_nearThreshold(price);
+  if(price<=s1)              return{cls:'red',   txt:'🔴 ต่ำกว่าแนวรับ',   border:'var(--red)',    zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
+  if(pctFromS1<=th.very)     return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก',   border:'var(--red)',    zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
+  if(pctFromS1<=th.close)    return{cls:'red',   txt:'🔴 ใกล้แนวรับ',      border:'var(--red)',    zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
+  if(pctFromR1<=th.very)     return{cls:'green', txt:'🟢 ใกล้แนวต้านมาก',  border:'var(--green)',  zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
+  if(pctFromR1<=th.close)    return{cls:'green', txt:'🟢 ใกล้แนวต้าน',     border:'var(--green)',  zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
+  return{cls:'accent', txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลาง S1–R1'};
 }
 
 function buildRangeBar(price, s1, r1, ticker){
@@ -1466,7 +1471,7 @@ function buildGrid(){
     card.className='card';card.id='card-'+s.t;
     card.dataset.t=s.t;card.dataset.n=s.n.toUpperCase();
     card.dataset.dir=s.c>=0?'up':'dn';
-    {const lv=_getLevels(s.t,s.p);const _pct=lv.s1>0?((s.p-lv.s1)/lv.s1*100):999;card.dataset.near=(_pct<=5||s.p<=lv.s1)?'yes':'no';}
+    {const lv=_getLevels(s.t,s.p);const _th=_nearThreshold(s.p);const _pct=lv.s1>0?((s.p-lv.s1)/lv.s1*100):999;const _pctR=lv.r1>0?((lv.r1-s.p)/lv.r1*100):999;card.dataset.near=(_pct<=_th.close||_pctR<=_th.close||s.p<=lv.s1)?'yes':'no';}
     card.dataset.pinned='0';
     card.style.borderLeft=`3px solid ${zone.border}`;
     card.innerHTML=`
@@ -1816,7 +1821,7 @@ function updateCard(s){
   updateRangeBar(s.t,s.p,s1,r1);
   card.dataset.dir=s.c>=0?'up':'dn';
   const pos=getRangePos(s.p,s1,r1);
-  {const _pct2=s1>0?((s.p-s1)/s1*100):999;card.dataset.near=(_pct2<=5||s.p<=s1)?'yes':'no';}
+  {const _th2=_nearThreshold(s.p);const _pct2=s1>0?((s.p-s1)/s1*100):999;const _pctR2=r1>0?((r1-s.p)/r1*100):999;card.dataset.near=(_pct2<=_th2.close||_pctR2<=_th2.close||s.p<=s1)?'yes':'no';}
   checkZoneAlert(s.t,s.p,s1,r1);
   updateAlerts();
   if(currentView==='heat') renderHeatmap();
@@ -1827,11 +1832,11 @@ function updateAlerts(){
     if(s.p<=0) return false;
     const {s1,r1,hasPivot}=_getLevels(s.t,s.p);
     if(!hasPivot||!s1||!r1||r1<=s1) return false;
-    // รวมกรณีราคาต่ำกว่าหรือเท่ากับ S1 ด้วย (ไม่ exclude)
     if(s.p<=s1) return true;
-    const pos=getRangePos(s.p,s1,r1);
-    const pct=s1>0?((s.p-s1)/s1*100):999;
-    return pct<=5||pos>=85;
+    const th=_nearThreshold(s.p);
+    const pctS=s1>0?((s.p-s1)/s1*100):999;
+    const pctR=r1>0?((r1-s.p)/r1*100):999;
+    return pctS<=th.close||pctR<=th.close;
   }).sort((a,b)=>{
     const la=_getLevels(a.t,a.p),lb=_getLevels(b.t,b.p);
     return getRangePos(a.p,la.s1,la.r1)-getRangePos(b.p,lb.s1,lb.r1);
@@ -2319,16 +2324,16 @@ async function fallbackPoll(){
   if(!isLive) return;
   const st=document.getElementById('statusbar');
   let ok=0;
-  for(let i=0;i<stocks.length;i+=4){
-    const batch=stocks.slice(i,i+4);
-    await Promise.all(batch.map(async s=>{
-
-      const d=await fetchOne(s.t);
-      if(d){s.p=d.price;s.c=d.change;ok++;updateCard(s);
-        if(tickerIndicator[s.t]){const btn=document.querySelector(`#indselector-${s.t} .ind-btn.active`);if(btn)setIndicator(s.t,tickerIndicator[s.t],btn);}
-      }
-    }));
-    await new Promise(r=>setTimeout(r,600));
+  for(let i=0;i<stocks.length;i++){
+    if(!isLive) break;
+    const s=stocks[i];
+    const d=await fetchOne(s.t);
+    if(d){s.p=d.price;s.c=d.change;ok++;updateCard(s);
+      if(tickerIndicator[s.t]){const btn=document.querySelector(`#indselector-${s.t} .ind-btn.active`);if(btn)setIndicator(s.t,tickerIndicator[s.t],btn);}
+      // อัปเดต status ทุกตัวเพื่อให้เห็น progress
+      st.innerHTML=`🟡 HTTP · กำลังดึง ${ok}/${i+1} ตัว...`;
+    }
+    await new Promise(r=>setTimeout(r,1100)); // 51 ตัว × 1.1s = ~56s ไม่เกิน 60 calls/min
   }
   const now=new Date().toLocaleTimeString('th-TH');
   document.getElementById('updateTime').textContent=now;
