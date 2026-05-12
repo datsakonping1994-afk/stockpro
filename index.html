@@ -138,6 +138,18 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .rr-key{font-size:10px;color:var(--text2);font-family:'IBM Plex Mono',monospace;}
 .rr-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;}
 .tresult{background:var(--bg3);border-radius:6px;padding:7px 9px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);line-height:1.7;white-space:pre-line;}
+.buy-popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
+.buy-popup{background:var(--bg2);border:1px solid rgba(0,230,118,0.4);border-radius:12px;padding:18px;max-width:340px;width:100%;font-family:'IBM Plex Mono',monospace;box-shadow:0 0 30px rgba(0,230,118,0.15);}
+.buy-popup-title{font-size:15px;font-weight:700;color:var(--green);margin-bottom:12px;}
+.buy-popup-row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:12px;}
+.buy-popup-label{color:var(--dim);}
+.buy-popup-val{font-weight:600;color:var(--text);}
+.buy-popup-divider{border:none;border-top:1px solid var(--border);margin:10px 0;}
+.buy-popup-summary{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:12px;}
+.buy-popup-btns{display:flex;gap:8px;}
+.buy-popup-btns button{flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;}
+.buy-popup-goto{background:rgba(0,230,118,0.15);border:1px solid rgba(0,230,118,0.3)!important;color:var(--green);}
+.buy-popup-close{background:var(--bg3);color:var(--dim);}
 .ai-btn{width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(168,85,247,0.1));border:1px solid rgba(0,212,255,0.3);color:var(--accent);padding:7px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;margin-bottom:8px;}
 .ai-result{font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-line;}
 .mnews-item{background:var(--bg3);border-radius:7px;padding:9px 12px;margin-bottom:6px;}
@@ -1601,6 +1613,71 @@ function showToast(ticker, type, levelName, price, level){
   container.appendChild(div);
   requestAnimationFrame(()=>requestAnimationFrame(()=>div.classList.add('show')));
   setTimeout(()=>{div.classList.remove('show');setTimeout(()=>div.remove(),350);},5000);
+  // ถ้าเป็นสัญญาณแนวรับ ตรวจสอบเงื่อนไขซื้อ
+  if(isS) checkBuySignal(ticker, price, level);
+}
+
+// ── Buy Signal Popup — เงื่อนไข B ──
+const _buyAlerted=new Set(); // ป้องกันแจ้งซ้ำ
+function checkBuySignal(ticker, price, s1){
+  if(_buyAlerted.has(ticker)) return;
+  const rsi=rsiData[ticker]||50;
+  const lvl=_getLevels(ticker,price);
+  const pctFromS1=s1>0?((price-s1)/s1*100):99;
+  // เงื่อนไข: ห่าง S1 < 5% + RSI < 50
+  if(pctFromS1>5||rsi>=55) return;
+  _buyAlerted.add(ticker);
+  setTimeout(()=>_buyAlerted.delete(ticker), 300000); // reset หลัง 5 นาที
+  showBuySignalPopup(ticker, price, s1, rsi, lvl);
+}
+
+function showBuySignalPopup(ticker, price, s1, rsi, lvl){
+  const s=stocks.find(x=>x.t===ticker);if(!s)return;
+  const r1=lvl.r1||price*1.05;
+  const r2=lvl.r2||price*1.10;
+  const risk=price-s1;
+  const reward1=r1-price;
+  const reward2=r2-price;
+  const rr1=risk>0?(reward1/risk).toFixed(1):'N/A';
+  const rr2=risk>0?(reward2/risk).toFixed(1):'N/A';
+  const entryLow=(price*0.998).toFixed(2);
+  const entryHigh=(price*1.005).toFixed(2);
+
+  // เสียงสัญญาณซื้อ (สามโน้ต)
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [[520,0],[660,0.15],[880,0.30]].forEach(([freq,t])=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=freq;
+      g.gain.setValueAtTime(0.15,ctx.currentTime+t);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+t+0.2);
+      o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+0.25);
+    });
+  }catch(e){}
+
+  const overlay=document.createElement('div');
+  overlay.className='buy-popup-overlay';
+  overlay.innerHTML=`
+    <div class="buy-popup">
+      <div class="buy-popup-title">🔔 สัญญาณซื้อ ${ticker}</div>
+      <div class="buy-popup-row"><span class="buy-popup-label">💰 ราคาปัจจุบัน</span><span class="buy-popup-val">$${price.toFixed(2)}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">📍 ห่าง S1</span><span class="buy-popup-val" style="color:var(--green)">${((price-s1)/s1*100).toFixed(1)}%</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">📊 RSI</span><span class="buy-popup-val" style="color:${rsi<40?'var(--green)':'var(--yellow)'}">${rsi} ${rsi<40?'(ใกล้ oversold)':'(ปกติ)'}</span></div>
+      <hr class="buy-popup-divider">
+      <div class="buy-popup-row"><span class="buy-popup-label">🎯 จุดเข้าซื้อ</span><span class="buy-popup-val">$${entryLow} - $${entryHigh}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🛡️ Stop Loss</span><span class="buy-popup-val" style="color:var(--red)">$${s1.toFixed(2)} (S1)</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🎯 Target 1</span><span class="buy-popup-val" style="color:var(--green)">$${r1.toFixed(2)} (R1) · R:R ${rr1}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🎯 Target 2</span><span class="buy-popup-val" style="color:var(--green)">$${r2.toFixed(2)} (R2) · R:R ${rr2}</span></div>
+      <hr class="buy-popup-divider">
+      <div class="buy-popup-summary">ราคาเข้าใกล้แนวรับ S1 และ RSI ยังไม่ overbought — สัญญาณเบื้องต้นน่าสนใจ<br><span style="color:var(--dim);font-size:10px">*ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน*</span></div>
+      <div class="buy-popup-btns">
+        <button class="buy-popup-goto" onclick="document.querySelector('.buy-popup-overlay').remove();goCard('${ticker}')">📊 ดูหุ้น</button>
+        <button class="buy-popup-close" onclick="document.querySelector('.buy-popup-overlay').remove()">✕ ปิด</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
 }
 
 function checkZoneAlert(ticker, price, s1, r1){
