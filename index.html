@@ -712,22 +712,15 @@ function getRangePos(price, s1, r1){
   const pos=(price-s1)/(r1-s1)*100;
   return Math.max(2,Math.min(98,pos));
 }
-function _nearThreshold(price){
-  // ขั้นบันได: ราคาต่ำ threshold กว้าง, ราคาสูง threshold แคบ
-  if(price<50)   return{close:5,very:2};   // หุ้นราคาต่ำ < $50
-  if(price<500)  return{close:3,very:1.5}; // หุ้นราคากลาง $50-$500
-  return{close:2,very:1};                  // หุ้นราคาสูง > $500
-}
+function _nearThreshold(price){ return{}; } // ไม่ใช้แล้ว
 function getRangeZone(price, s1, r1){
   if(!s1||!r1) return{cls:'mid',txt:'—',border:'var(--dim)'};
-  const pctFromS1=s1>0?((price-s1)/s1*100):999;
-  const pctFromR1=r1>0?((r1-price)/r1*100):999;
-  const th=_nearThreshold(price);
-  if(price<=s1)              return{cls:'red',   txt:'🔴 ต่ำกว่าแนวรับ',   border:'var(--red)',    zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
-  if(pctFromS1<=th.very)     return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก',   border:'var(--red)',    zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
-  if(pctFromS1<=th.close)    return{cls:'red',   txt:'🔴 ใกล้แนวรับ',      border:'var(--red)',    zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
-  if(pctFromR1<=th.very)     return{cls:'green', txt:'🟢 ใกล้แนวต้านมาก',  border:'var(--green)',  zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
-  if(pctFromR1<=th.close)    return{cls:'green', txt:'🟢 ใกล้แนวต้าน',     border:'var(--green)',  zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
+  const pos=(price-s1)/(r1-s1);
+  if(price<=s1)  return{cls:'red',   txt:'🔴 ต่ำกว่าแนวรับ', border:'var(--red)',   zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
+  if(pos<=0.15)  return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก', border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
+  if(pos<=0.35)  return{cls:'red',   txt:'🔴 ใกล้แนวรับ',    border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
+  if(pos>=0.85)  return{cls:'green', txt:'🟢 ใกล้แนวต้านมาก',border:'var(--green)', zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
+  if(pos>=0.65)  return{cls:'green', txt:'🟢 ใกล้แนวต้าน',   border:'var(--green)', zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
   return{cls:'accent', txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลาง S1–R1'};
 }
 
@@ -1499,7 +1492,7 @@ function buildGrid(){
     card.className='card';card.id='card-'+s.t;
     card.dataset.t=s.t;card.dataset.n=s.n.toUpperCase();
     card.dataset.dir=s.c>=0?'up':'dn';
-    {const lv=_getLevels(s.t,s.p);const _th=_nearThreshold(s.p);const _pct=lv.s1>0?((s.p-lv.s1)/lv.s1*100):999;const _pctR=lv.r1>0?((lv.r1-s.p)/lv.r1*100):999;card.dataset.near=(_pct<=_th.close||_pctR<=_th.close||s.p<=lv.s1)?'yes':'no';}
+    {const lv=_getLevels(s.t,s.p);const _pos=lv.s1&&lv.r1&&lv.r1>lv.s1?(s.p-lv.s1)/(lv.r1-lv.s1):0.5;card.dataset.near=(_pos<=0.35||_pos>=0.65||s.p<=lv.s1)?'yes':'no';}
     card.dataset.pinned='0';
     card.style.borderLeft=`3px solid ${zone.border}`;
     card.innerHTML=`
@@ -1850,7 +1843,7 @@ function updateCard(s){
   updateRangeBar(s.t,s.p,s1,r1);
   card.dataset.dir=s.c>=0?'up':'dn';
   const pos=getRangePos(s.p,s1,r1);
-  {const _th2=_nearThreshold(s.p);const _pct2=s1>0?((s.p-s1)/s1*100):999;const _pctR2=r1>0?((r1-s.p)/r1*100):999;card.dataset.near=(_pct2<=_th2.close||_pctR2<=_th2.close||s.p<=s1)?'yes':'no';}
+  {const _pos2=s1&&r1&&r1>s1?(s.p-s1)/(r1-s1):0.5;card.dataset.near=(_pos2<=0.35||_pos2>=0.65||s.p<=s1)?'yes':'no';}
   checkZoneAlert(s.t,s.p,s1,r1);
   updateAlerts();
   if(currentView==='heat') renderHeatmap();
@@ -1863,11 +1856,9 @@ function updateAlerts(){
     if(s.p<=0) return;
     const {s1,r1,hasPivot}=_getLevels(s.t,s.p);
     if(!hasPivot||!s1||!r1||r1<=s1) return;
-    const th=_nearThreshold(s.p);
-    const pctS=s1>0?((s.p-s1)/s1*100):999;
-    const pctR=r1>0?((r1-s.p)/r1*100):999;
-    if(s.p<=s1||pctS<=th.close) nearS.push(s);
-    else if(pctR<=th.close) nearR.push(s);
+    const pos=(s.p-s1)/(r1-s1);
+    if(s.p<=s1||pos<=0.35) nearS.push(s);
+    else if(pos>=0.65) nearR.push(s);
   });
   // sort S: ใกล้ที่สุดก่อน (pctS น้อยสุด)
   nearS.sort((a,b)=>{
