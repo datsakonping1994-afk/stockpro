@@ -799,14 +799,15 @@ async function setIndicator(t,mode,btn){
 const candleCache={};
 
 async function fetchCandles(ticker, days=60){
-  if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-300000) return candleCache[ticker].data;
+  if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-300000&&(candleCache[ticker].days||0)>=days) return candleCache[ticker].data;
   // ใช้ Yahoo Finance v8 chart API (ฟรี ไม่ต้องใช้ key)
   try{
     const range=days<=30?'1mo':days<=90?'3mo':days<=150?'6mo':'1y';
     const yahooUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
-    const url=`https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`;
-    const r=await fetch(url);
-    if(!r.ok) return null;
+    const proxies=[`https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`];
+    let r=null;
+    for(const p of proxies){try{r=await fetch(p);if(r.ok)break;}catch{}}
+    if(!r||!r.ok) return null;
     const d=await r.json();
     const res=d?.chart?.result?.[0];
     if(!res||!res.timestamp||res.timestamp.length<5) return null;
@@ -824,7 +825,7 @@ async function fetchCandles(ticker, days=60){
     }
     if(c.length<5) return null;
     const data={c,h,l,o,v,t};
-    candleCache[ticker]={data,ts:Date.now()};
+    candleCache[ticker]={data,ts:Date.now(),days};
     return data;
   }catch{return null;}
 }
