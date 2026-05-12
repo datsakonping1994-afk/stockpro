@@ -2325,9 +2325,9 @@ async function translateTH(text){
   const key=text.slice(0,80);
   if(_translateCache[key]) return _translateCache[key];
   try{
-    const r=await fetch('https://api-free.deepl.com/v2/translate',{
+    const r=await fetch('https://yahoo-proxy.datsakonping1994.workers.dev/translate',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'DeepL-Auth-Key '+DEEPL_KEY},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({text:[text.slice(0,500)],target_lang:'TH',source_lang:'EN'})
     });
     if(!r.ok) return text;
