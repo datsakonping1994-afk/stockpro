@@ -1488,6 +1488,16 @@ function switchTab(el,contentId){
   if(contentId.startsWith('news-')){
     renderNewsTab(contentId.replace('news-',''));
   }
+  // auto-run AI analysis when AI tab opened
+  if(contentId.startsWith('ai-')){
+    const ticker=contentId.replace('ai-','');
+    const btn=document.getElementById('aibtn-'+ticker);
+    const result=document.getElementById('airesult-'+ticker);
+    // รันอัตโนมัติถ้ายังไม่มีผล
+    if(btn&&result&&result.textContent.trim()==='กดปุ่มด้านบนเพื่อวิเคราะห์'){
+      doAI(ticker,btn);
+    }
+  }
 }
 
 function calcTrade(t){
