@@ -1102,7 +1102,7 @@ function renderMA(ticker, data, currentPrice){
     if(c.length<n) return null;
     return c.slice(-n).reduce((a,b)=>a+b,0)/n;
   };
-  const mas=[{n:20,label:'MA20',color:'#ffd700'},{n:50,label:'MA50',color:'#00bcd4'},{n:200,label:'MA200',color:'#e040fb'}];
+  const mas=[{n:20,label:'MA20',color:'#ffd700'},{n:50,label:'MA50',color:'#00bcd4'}];
   el.innerHTML=mas.map(m=>{
     const v=maVal(m.n);
     if(!v) return `<span class="ma-chip na"><span class="ma-dot" style="background:${m.color}"></span>${m.label} —</span>`;
@@ -1776,7 +1776,11 @@ function goCard(t){
 }
 function setFilter(f){
   currentFilter=f;
-  // Fix 5: active state บนปุ่ม filter
+  // เคลียร์ search box เมื่อกด "ทั้งหมด"
+  if(f==='all'){
+    const sb=document.getElementById('searchBox');
+    if(sb) sb.value='';
+  }
   ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.outline='none';
