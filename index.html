@@ -207,12 +207,12 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 </div>
 <div class="summary">
   <div class="chip"><span class="val" id="totalCnt">51</span>หุ้น</div>
-  <div class="chip"><span class="val up" id="upCnt">—</span>บวก</div>
-  <div class="chip"><span class="val dn" id="dnCnt">—</span>ลบ</div>
-  <div class="chip"><span class="val" style="color:var(--yellow)" id="nearCnt">—</span>ใกล้แนวรับ</div>
+  <div class="chip" onclick="setFilter('up')" style="cursor:pointer"><span class="val up" id="upCnt">—</span>บวก</div>
+  <div class="chip" onclick="setFilter('dn')" style="cursor:pointer"><span class="val dn" id="dnCnt">—</span>ลบ</div>
+  <div class="chip" onclick="setFilter('near')" style="cursor:pointer;border-color:rgba(255,215,0,0.3)"><span class="val" style="color:var(--yellow)" id="nearCnt">—</span>ใกล้แนวรับ</div>
 </div>
 <div id="alertPanel" class="alert-panel">
-  <div class="alert-h"><span>⚠ ใกล้แนวรับ</span><span style="font-size:12px;color:var(--dim);cursor:pointer" onclick="toggleAlertList()">▼</span></div>
+  <div class="alert-h"><span>⚠ ใกล้แนวรับ — กดชื่อหุ้นเพื่อ scroll ไป</span><span style="font-size:12px;color:var(--dim);cursor:pointer" onclick="toggleAlertList()">▼</span></div>
   <div class="alert-list" id="alertList"></div>
 </div>
 <div class="controls">
@@ -224,7 +224,6 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <button class="btn" style="color:var(--yellow)" id="filterNearBtn" onclick="setFilter('near')">⚠ แนวรับ</button>
   <button class="btn" style="color:#ff9966;border-color:rgba(255,153,102,0.3)" onclick="togglePanel('newsPanel')">📰 ข่าวทุกหุ้น</button>
   <button class="btn" style="color:var(--purple);border-color:rgba(168,85,247,0.3)" onclick="toggleEarnings()">📅 Earnings</button>
-  <button class="btn" id="refreshAllBtn" style="color:#fff;background:rgba(0,212,255,0.12);border-color:rgba(0,212,255,0.5);font-weight:600" onclick="refreshAll()">🔄 รีเฟรชทุกอย่าง</button>
 </div>
 <div class="sort-row">
   <span class="sort-lbl">SORT:</span>
@@ -236,6 +235,8 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <span class="sort-lbl">VIEW:</span>
   <button class="view-btn active" id="view-grid" onclick="setView('grid',this)">⊞ Cards</button>
   <button class="view-btn" id="view-heat" onclick="setView('heat',this)">🔥 Heatmap</button>
+  <span style="margin-left:6px;color:var(--border)">|</span>
+  <button class="btn" id="refreshAllBtn" style="padding:3px 10px;font-size:11px;color:#fff;background:rgba(0,212,255,0.12);border-color:rgba(0,212,255,0.5);font-weight:600" onclick="refreshAll()">🔄 รีเฟรช</button>
 </div>
 <div class="statusbar" id="statusbar">กด ▶ Live เพื่อดึงราคา Real-Time จาก Finnhub WebSocket · <span id="wsTickCnt" style="color:var(--accent)">0</span> ticks</div>
 
@@ -2311,7 +2312,7 @@ async function refreshAll(){
   document.getElementById('updateTime').textContent=now;
   st.innerHTML=`✅ รีเฟรชครบทุกอย่าง · ราคา ${priceOk} ตัว · ${now}`;
   btn.disabled=false;
-  btn.textContent='🔄 รีเฟรชทุกอย่าง';
+  btn.textContent='🔄 รีเฟรช';
   btn.style.opacity='1';
 }
 
