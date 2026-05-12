@@ -2353,42 +2353,31 @@ async function translateTH(text){
 }
 
 async function translateNewsItems(items){
-  // แปลเป็น batch ครั้งละ 1 API call เพื่อประหยัด quota
+  // Batch translate using object array - no index mismatch bug
   try{
-    const headlines=items.map(n=>n.h);
-    const summaries=items.map(n=>n.x?n.x.slice(0,300):'');
-    const allTexts=[...headlines,...summaries].filter(t=>t);
-    const batchText=allTexts.map((t,i)=>`[${i+1}] ${t}`).join('\n');
-
+    const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
     const r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
+        max_tokens:4000,
         messages:[{
           role:'user',
-          content:`แปลข้อความต่อไปนี้ทั้งหมดเป็นภาษาไทยสำหรับบริบทข่าวการเงินและหุ้น ตอบในรูปแบบ JSON array เท่านั้น ไม่ต้องมี markdown หรือคำอธิบาย เช่น ["แปล1","แปล2",...]\n\n${batchText}`
+          content:`แปลข้อความข่าวการเงินต่อไปนี้เป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ object เท่านั้น ห้ามมี markdown หรือคำอธิบาย รูปแบบ: [{"h":"หัวข้อแปล","x":"สรุปแปล"},...] input: ${JSON.stringify(toTranslate)}`
         }]
       })
     });
-
     if(r.ok){
       const d=await r.json();
       const raw=d?.content?.[0]?.text?.trim()||'';
       const clean=raw.replace(/```json|```/g,'').trim();
       const arr=JSON.parse(clean);
-      if(Array.isArray(arr)&&arr.length===allTexts.length){
-        let idx=0;
-        return items.map(n=>{
-          const thH=arr[idx++]||n.h;
-          const thX=n.x?(arr[idx++]||n.x):'';
-          if(!n.x) idx++; // skip empty summary slot
-          return {...n,h:thH,x:thX};
-        });
+      if(Array.isArray(arr)&&arr.length===items.length){
+        return items.map((n,i)=>({...n,h:arr[i]?.h||n.h,x:arr[i]?.x||n.x}));
       }
     }
-  }catch{}
+  }catch(e){console.warn('Batch translate failed, fallback:',e);}
   // fallback: แปลทีละชิ้น
   return await Promise.all(items.map(async n=>{
     const [thH,thX]=await Promise.all([
