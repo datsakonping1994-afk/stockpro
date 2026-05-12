@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="th">
 <head>
 <meta charset="UTF-8">
@@ -183,58 +182,58 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .atr-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);color:#c084fc;margin-bottom:8px;display:inline-block;}
 .ind-loading{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);text-align:center;padding:8px 0;}
 
+
 /* ── Indicator Analysis styles ── */
-.ind-analysis{font-family:‘IBM Plex Mono’,monospace;font-size:11px;line-height:1.7;}
-.ind-section{margin-bottom:10px;padding:8px 10px;background:var(–bg3);border-radius:7px;}
+.ind-analysis{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;}
+.ind-section{margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:7px;}
 .ind-section-title{font-size:11px;font-weight:600;margin-bottom:6px;letter-spacing:0.5px;}
 .ind-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:11px;}
-.ind-label{color:var(–dim);}
+.ind-label{color:var(--dim);}
 .ind-val{font-weight:600;}
-.ind-bull{color:var(–green);}.ind-bear{color:var(–red);}.ind-neut{color:var(–yellow);}
-.ind-summary{background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);border-radius:7px;padding:10px;font-size:12px;line-height:1.7;color:var(–text2);margin-top:8px;}
+.ind-bull{color:var(--green);}.ind-bear{color:var(--red);}.ind-neut{color:var(--yellow);}
+.ind-summary{background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);border-radius:7px;padding:10px;font-size:12px;line-height:1.7;color:var(--text2);margin-top:8px;}
 
 /* ── Heatmap ── */
 .heatmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:4px;}
 .heat-tile{border-radius:8px;padding:8px 6px;text-align:center;cursor:pointer;transition:opacity 0.15s;position:relative;overflow:hidden;}
 .heat-tile:hover{opacity:0.85;}
-.heat-ticker{font-family:‘IBM Plex Mono’,monospace;font-size:13px;font-weight:600;color:#fff;}
-.heat-chg{font-family:‘IBM Plex Mono’,monospace;font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;}
-.heat-price{font-family:‘IBM Plex Mono’,monospace;font-size:9px;color:rgba(255,255,255,0.55);margin-top:2px;}
+.heat-ticker{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#fff;}
+.heat-chg{font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;}
+.heat-price{font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(255,255,255,0.55);margin-top:2px;}
 
 /* ── Sort bar ── */
 .sort-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
-.sort-lbl{font-family:‘IBM Plex Mono’,monospace;font-size:10px;color:var(–dim);}
-.sort-btn{font-family:‘IBM Plex Mono’,monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;border:1px solid var(–border);background:var(–bg3);color:var(–dim);transition:all 0.15s;}
-.sort-btn:hover{border-color:var(–accent);color:var(–accent);}
-.sort-btn.active{background:rgba(0,212,255,0.1);border-color:var(–accent);color:var(–accent);}
-.view-btn{font-family:‘IBM Plex Mono’,monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;border:1px solid var(–border);background:var(–bg3);color:var(–dim);transition:all 0.15s;}
-.view-btn.active{background:rgba(168,85,247,0.1);border-color:var(–purple);color:var(–purple);}
+.sort-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}
+.sort-btn{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all 0.15s;}
+.sort-btn:hover{border-color:var(--accent);color:var(--accent);}
+.sort-btn.active{background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);}
+.view-btn{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all 0.15s;}
+.view-btn.active{background:rgba(168,85,247,0.1);border-color:var(--purple);color:var(--purple);}
 /* ── Pin button ── */
-.pin-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(–border);background:var(–bg4);color:var(–dim);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;line-height:1;padding:0;}
-.pin-btn:hover{border-color:var(–yellow);color:var(–yellow);}
-.pin-btn.pinned{border-color:rgba(255,215,0,0.6);background:rgba(255,215,0,0.12);color:var(–yellow);}
+.pin-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:var(--bg4);color:var(--dim);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;line-height:1;padding:0;}
+.pin-btn:hover{border-color:var(--yellow);color:var(--yellow);}
+.pin-btn.pinned{border-color:rgba(255,215,0,0.6);background:rgba(255,215,0,0.12);color:var(--yellow);}
 .card.pinned{border-top:2px solid rgba(255,215,0,0.5);}
 /* ── Onboarding overlay ── */
 #onboarding-overlay{display:none!important;}
 #onboarding-overlay.hidden{display:none;}
-.onboard-box{background:var(–bg2);border:1px solid rgba(0,212,255,0.3);border-radius:16px;padding:28px 24px;max-width:400px;width:100%;box-shadow:0 0 60px rgba(0,212,255,0.12),0 0 120px rgba(0,212,255,0.06);}
-.onboard-logo{font-family:‘IBM Plex Mono’,monospace;font-size:20px;font-weight:700;color:var(–accent);letter-spacing:3px;margin-bottom:6px;}
-.onboard-sub{font-size:13px;color:var(–dim);margin-bottom:22px;line-height:1.5;}
-.onboard-step{font-family:‘IBM Plex Mono’,monospace;font-size:11px;color:var(–text2);margin-bottom:14px;background:var(–bg3);border:1px solid var(–border);border-radius:8px;padding:12px 14px;line-height:1.8;}
-.onboard-step a{color:var(–accent);text-decoration:none;}
+.onboard-box{background:var(--bg2);border:1px solid rgba(0,212,255,0.3);border-radius:16px;padding:28px 24px;max-width:400px;width:100%;box-shadow:0 0 60px rgba(0,212,255,0.12),0 0 120px rgba(0,212,255,0.06);}
+.onboard-logo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);letter-spacing:3px;margin-bottom:6px;}
+.onboard-sub{font-size:13px;color:var(--dim);margin-bottom:22px;line-height:1.5;}
+.onboard-step{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);margin-bottom:14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;line-height:1.8;}
+.onboard-step a{color:var(--accent);text-decoration:none;}
 .onboard-step a:hover{text-decoration:underline;}
-.onboard-label{font-family:‘IBM Plex Mono’,monospace;font-size:11px;color:var(–dim);margin-bottom:6px;letter-spacing:1px;}
-.onboard-input{width:100%;background:var(–bg4);border:1px solid rgba(0,212,255,0.3);color:var(–text);padding:10px 14px;border-radius:8px;font-family:‘IBM Plex Mono’,monospace;font-size:13px;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:10px;}
-.onboard-input:focus{border-color:var(–accent);box-shadow:0 0 0 2px rgba(0,212,255,0.1);}
-.onboard-input::placeholder{color:var(–dim);}
-.onboard-err{font-family:‘IBM Plex Mono’,monospace;font-size:11px;color:var(–red);min-height:16px;margin-bottom:8px;}
-.onboard-btn{width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,212,255,0.08));border:1px solid rgba(0,212,255,0.5);color:var(–accent);padding:11px;border-radius:8px;cursor:pointer;font-family:‘IBM Plex Mono’,monospace;font-size:13px;font-weight:600;letter-spacing:1px;transition:all 0.2s;}
+.onboard-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-bottom:6px;letter-spacing:1px;}
+.onboard-input{width:100%;background:var(--bg4);border:1px solid rgba(0,212,255,0.3);color:var(--text);padding:10px 14px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;box-sizing:border-box;margin-bottom:10px;}
+.onboard-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,0.1);}
+.onboard-input::placeholder{color:var(--dim);}
+.onboard-err{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--red);min-height:16px;margin-bottom:8px;}
+.onboard-btn{width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,212,255,0.08));border:1px solid rgba(0,212,255,0.5);color:var(--accent);padding:11px;border-radius:8px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;letter-spacing:1px;transition:all 0.2s;}
 .onboard-btn:hover{background:rgba(0,212,255,0.2);box-shadow:0 0 20px rgba(0,212,255,0.2);}
 .onboard-btn:disabled{opacity:0.4;cursor:not-allowed;}
-.onboard-change{font-family:‘IBM Plex Mono’,monospace;font-size:10px;color:var(–dim);cursor:pointer;padding:2px 6px;border-radius:3px;border:1px solid var(–border);background:transparent;transition:all 0.15s;}
-.onboard-change:hover{border-color:var(–accent);color:var(–accent);}
+.onboard-change{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);cursor:pointer;padding:2px 6px;border-radius:3px;border:1px solid var(--border);background:transparent;transition:all 0.15s;}
+.onboard-change:hover{border-color:var(--accent);color:var(--accent);}
 </style>
-
 </head>
 <body>
 
@@ -286,7 +285,6 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <div class="statusbar" id="statusbar">กด ▶ Live เพื่อดึงราคา Real-Time · <span id="wsTickCnt" style="color:var(--accent)">0</span> ticks</div>
 
 <!-- All News Panel -->
-
 <div id="newsPanel" class="panel" style="border:1px solid rgba(255,153,102,0.25)">
   <div class="panel-hdr">
     <span class="panel-title" style="color:#ff9966">📰 ข่าวทุกหุ้น</span>
@@ -299,8 +297,8 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <div id="newsFeed" style="max-height:500px;overflow-y:auto;"></div>
 </div>
 
-<!-- Earnings Panel -->
 
+<!-- Earnings Panel -->
 <div id="earningsPanel" class="panel" style="border:1px solid rgba(168,85,247,0.25)">
   <div class="panel-hdr"><span class="panel-title" style="color:var(--purple)">📅 Earnings Calendar</span><button class="btn" style="padding:3px 8px;font-size:10px" onclick="toggleEarnings()">✕</button></div>
   <div id="earningsBody"></div>
@@ -772,32 +770,17 @@ async function fetchOHLC(ticker){
   const cached=ohlcCache[ticker];
   if(cached&&cached._c===cycle) return cached;
   try{
-    // ดึง yesterday's candle จาก Finnhub /stock/candle เพื่อคำนวณ Pivot ที่ถูกต้อง
-    const now=Math.floor(Date.now()/1000);
-    const from=now-7*86400; // ย้อนหลัง 7 วัน เผื่อวันหยุด
-    const url=`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from}&to=${now}&token=${FINNHUB_KEY}`;
-    const r=await fetch(url,{mode:'cors'});
-    if(r.ok){
-      const d=await r.json();
-      if(d.s==='ok'&&d.c&&d.c.length>=2){
-        // ใช้ candle วันก่อนหน้าล่าสุด (index -2) สำหรับ Pivot
-        const n=d.c.length;
-        const H=d.h[n-2], L=d.l[n-2], C=d.c[n-2], O=d.o[n-2];
-        const prevC=d.c[n-3]||C;
-        const tr=Math.max(H-L,Math.abs(H-prevC),Math.abs(L-prevC));
-        const ohlc={H,L,C,O,prevC,atr:tr>0?tr:C*0.015,_c:cycle};
-        ohlcCache[ticker]=ohlc;
-        return ohlc;
-      }
-    }
-    // fallback: ใช้ /quote (today H/L ไม่แม่นยำ แต่ดีกว่า mock)
-    const r2=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
-    if(!r2.ok) return cached||null;
-    const d2=await r2.json();
-    if(!d2||!d2.c||d2.c<=0) return cached||null;
-    const H=d2.h>0?d2.h:d2.c, L=d2.l>0?d2.l:d2.c, C=d2.pc>0?d2.pc:d2.c, O=d2.o>0?d2.o:d2.c, prevC=d2.pc>0?d2.pc:d2.c;
-    const tr=Math.max(H-L,Math.abs(H-prevC),Math.abs(L-prevC));
-    const ohlc={H,L,C,O,prevC,atr:tr>0?tr:C*0.015,_c:cycle};
+    // ใช้ /quote — pc=prevClose (ราคาปิดเมื่อวาน) ใช้เป็น C สำหรับ Classic Pivot
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
+    if(!r.ok) return cached||null;
+    const d=await r.json();
+    if(!d||(!d.c&&!d.pc)) return cached||null;
+    // ใช้ pc เป็น Close สำหรับ Pivot (ราคาปิดเมื่อวาน = ถูกต้องสำหรับ Classic Pivot)
+    const C=d.pc>0?d.pc:(d.c>0?d.c:0);
+    if(C<=0) return cached||null;
+    const H=d.h>0?d.h:C, L=d.l>0?d.l:C, O=d.o>0?d.o:C;
+    const tr=Math.max(H-L,Math.abs(H-C),Math.abs(L-C));
+    const ohlc={H,L,C,O,prevC:C,atr:tr>0?tr:C*0.015,_c:cycle};
     ohlcCache[ticker]=ohlc;
     return ohlc;
   }catch{return cached||null;}
@@ -2684,6 +2667,5 @@ async function startup(){
 // Start directly (onboarding removed)
 startup();
 </script>
-
 </body>
 </html>
