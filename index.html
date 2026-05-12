@@ -218,10 +218,10 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <div class="controls">
   <input type="text" class="search" id="searchBox" placeholder="ค้นหา..." oninput="filterCards()">
   <button class="btn" style="color:var(--green);border-color:rgba(0,230,118,0.3)" id="liveBtn" onclick="toggleLive()">▶ Live</button>
-  <button class="btn" onclick="setFilter('all')">ทั้งหมด</button>
-  <button class="btn up" onclick="setFilter('up')">▲ บวก</button>
-  <button class="btn dn" onclick="setFilter('dn')">▼ ลบ</button>
-  <button class="btn" style="color:var(--yellow)" onclick="setFilter('near')">⚠ แนวรับ</button>
+  <button class="btn" id="filterAllBtn" onclick="setFilter('all')">ทั้งหมด</button>
+  <button class="btn up" id="filterUpBtn" onclick="setFilter('up')">▲ บวก</button>
+  <button class="btn dn" id="filterDnBtn" onclick="setFilter('dn')">▼ ลบ</button>
+  <button class="btn" style="color:var(--yellow)" id="filterNearBtn" onclick="setFilter('near')">⚠ แนวรับ</button>
   <button class="btn" style="color:#ff9966;border-color:rgba(255,153,102,0.3)" onclick="togglePanel('newsPanel')">📰 ข่าวทุกหุ้น</button>
   <button class="btn" style="color:var(--purple);border-color:rgba(168,85,247,0.3)" onclick="toggleEarnings()">📅 Earnings</button>
   <button class="btn" id="refreshAllBtn" style="color:#fff;background:rgba(0,212,255,0.12);border-color:rgba(0,212,255,0.5);font-weight:600" onclick="refreshAll()">🔄 รีเฟรชทุกอย่าง</button>
@@ -265,6 +265,8 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <div id="toast-container"></div>
 
 <script>
+// ⚠️ WARNING: API key นี้มองเห็นได้ใน browser — อย่า deploy ไฟล์นี้บน server สาธารณะ
+// หากต้องการความปลอดภัยจริง ให้ proxy ผ่าน backend ของตัวเอง
 const FINNHUB_KEY='d802m6hr01qj3ct8r57gd802m6hr01qj3ct8r580';
 const stocks=[
   {t:"RKLB",n:"Rocket Lab",p:105.47,c:34.22,pe:null,mktcap:"38.4B",rev:"32%",earn:"8 พ.ค. 2026"},
@@ -1213,6 +1215,17 @@ function parseMcap(str){
 }
 
 function sortGrid(mode, btn){
+  // Fix 1: ถ้ากด sort ขณะที่ near filter ทำงานอยู่ ให้ reset filter กลับเป็น all ก่อน
+  if(currentFilter==='near'){
+    currentFilter='all';
+    ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.outline='none';
+    });
+    const allBtn=document.getElementById('filterAllBtn');
+    if(allBtn) allBtn.style.outline='1px solid currentColor';
+    document.querySelectorAll('.card').forEach(c=>c.classList.remove('hidden'));
+  }
   document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(currentSort===mode) sortAsc=!sortAsc; else { currentSort=mode; sortAsc=false; }
@@ -1651,14 +1664,48 @@ function goCard(t){
   filterCards();
   setTimeout(()=>document.getElementById('card-'+t)?.scrollIntoView({behavior:'smooth',block:'center'}),100);
 }
-function setFilter(f){currentFilter=f;filterCards();}
+function setFilter(f){
+  currentFilter=f;
+  // Fix 5: active state บนปุ่ม filter
+  ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.outline='none';
+  });
+  const map={all:'filterAllBtn',up:'filterUpBtn',dn:'filterDnBtn',near:'filterNearBtn'};
+  const activeBtn=document.getElementById(map[f]);
+  if(activeBtn) activeBtn.style.outline='1px solid currentColor';
+  filterCards();
+}
 function filterCards(){
-  document.querySelectorAll('.card').forEach(c=>{
-    const q=document.getElementById('searchBox').value.toUpperCase().trim();
+  const q=document.getElementById('searchBox').value.toUpperCase().trim();
+  const grid=document.getElementById('grid');
+  const cards=[...document.querySelectorAll('.card')];
+
+  cards.forEach(c=>{
     const match=!q||c.dataset.t.includes(q)||c.dataset.n?.includes(q);
     const ok=currentFilter==='all'||(currentFilter==='up'&&c.dataset.dir==='up')||(currentFilter==='dn'&&c.dataset.dir==='dn')||(currentFilter==='near'&&c.dataset.near==='yes');
     c.classList.toggle('hidden',!match||!ok);
   });
+
+  // Fix 1+2: เมื่อกรอง "ใกล้แนวรับ" ให้เรียงการ์ดจากใกล้ S1/R1 มากสุดขึ้นก่อน แล้ว reorderPinned
+  if(currentFilter==='near'){
+    const sorted=cards.slice().sort((a,b)=>{
+      const hidA=a.classList.contains('hidden'), hidB=b.classList.contains('hidden');
+      if(hidA&&!hidB) return 1;
+      if(!hidA&&hidB) return -1;
+      const ta=a.dataset.t, tb=b.dataset.t;
+      const sa=stocks.find(x=>x.t===ta), sb=stocks.find(x=>x.t===tb);
+      if(!sa||!sb) return 0;
+      const la=_getLevels(ta,sa.p), lb=_getLevels(tb,sb.p);
+      const posA=getRangePos(sa.p,la.s1,la.r1);
+      const posB=getRangePos(sb.p,lb.s1,lb.r1);
+      const distA=posA<=50?posA:100-posA;
+      const distB=posB<=50?posB:100-posB;
+      return distA-distB;
+    });
+    sorted.forEach(c=>grid.appendChild(c));
+    reorderPinned(); // Fix 2: pinned cards ต้องอยู่บนสุดแม้ตอน near filter
+  }
 }
 function togglePanel(id){
   const p=document.getElementById(id);
@@ -1767,8 +1814,8 @@ async function doAI(t,btn){
   btn.disabled=true;btn.textContent='⏳ กำลังคำนวณ...';
   el.innerHTML='';
 
-  // ── ดึง candle data ──
-  const data=candleCache[t]?.data||await fetchCandles(t,200);
+  // ── ดึง candle data — Fix 4: เพิ่มเป็น 260 วัน เพื่อให้ EMA200 คำนวณได้จริง ──
+  const data=candleCache[t]?.data?.c?.length>=200 ? candleCache[t].data : await fetchCandles(t,260);
   const closes=data?.c||[];
   const highs=data?.h||[];
   const lows=data?.l||[];
@@ -1799,12 +1846,22 @@ async function doAI(t,btn){
   const ema20cross=ema20&&ema50?(ema20>ema50?'Golden Cross 🟢':'Death Cross 🔴'):null;
   const ema50cross=ema50&&ema200?(ema50>ema200?'Bullish 🟢':'Death Cross 🔴'):null;
 
-  // ── MACD ──
+  // ── MACD — Fix 3: คำนวณ Signal Line จริงด้วย EMA9 ของ MACD line ──
   const macd12=ema(closes,12);
   const macd26=ema(closes,26);
   const macdLine=macd12&&macd26?+(macd12-macd26).toFixed(3):null;
-  const macdSignal=macdLine?+(macdLine*0.85).toFixed(3):null; // simplified
-  const macdBull=macdLine>0;
+  // คำนวณ Signal Line (EMA 9 ของ MACD line แต่ละวัน)
+  let macdSignal=null;
+  if(closes.length>=35){
+    const macdSeries=[];
+    for(let i=25;i<closes.length;i++){
+      const e12=ema(closes.slice(0,i+1),12);
+      const e26=ema(closes.slice(0,i+1),26);
+      if(e12&&e26) macdSeries.push(e12-e26);
+    }
+    if(macdSeries.length>=9) macdSignal=+ema(macdSeries,9).toFixed(3);
+  }
+  const macdBull=macdLine!=null?(macdSignal!=null?macdLine>macdSignal:macdLine>0):false;
 
   // ── Bollinger Bands ──
   const bbMid=sma(closes,20);
@@ -2173,14 +2230,7 @@ async function refreshNewsTab(ticker){
   await renderNewsTab(ticker);
 }
 
-// Auto-refresh all open news tabs every 5 minutes
-newsRefreshTimer=setInterval(async()=>{
-  document.querySelectorAll('.tab-pane.active[id^="news-"]').forEach(pane=>{
-    const t=pane.id.replace('news-','');
-    delete liveNewsCache[t];
-    renderNewsTab(t);
-  });
-},300000);
+// Auto-refresh all open news tabs every 5 minutes — Fix 6: ย้ายไปใน startup() เพื่อให้แน่ใจว่า DOM พร้อมแล้ว
 
 document.getElementById('updateTime').textContent=new Date().toLocaleTimeString('th-TH');
 buildGrid();
@@ -2266,6 +2316,14 @@ async function refreshAll(){
 }
 
 async function startup(){
+  // Fix 6: เริ่ม news timer หลัง buildGrid เพื่อให้ DOM card พร้อมแล้วก่อน
+  newsRefreshTimer=setInterval(async()=>{
+    document.querySelectorAll('.tab-pane.active[id^="news-"]').forEach(pane=>{
+      const t=pane.id.replace('news-','');
+      delete liveNewsCache[t];
+      renderNewsTab(t);
+    });
+  },300000);
   // 1. Start live prices (HTTP fetch first, then WS)
   toggleLive();
   // 2. Wait 3s for prices to arrive, then load indicators
