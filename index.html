@@ -1854,7 +1854,7 @@ async function renderAllNews(forceRefresh=false){
     await Promise.all(batch.map(async s=>{
 
       const cacheKey=s.t;
-      let items=(!forceRefresh&&allNewsCache[cacheKey]&&(now-allNewsCache[cacheKey].ts<600000))?allNewsCache[cacheKey].items:null;
+      let items=(!forceRefresh&&allNewsCache[cacheKey]&&allNewsCache[cacheKey].translated&&(now-allNewsCache[cacheKey].ts<600000))?allNewsCache[cacheKey].items:null;
       if(!items){
         try{
           const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${s.t}&from=${fromStr}&to=${toStr}&token=${FINNHUB_KEY}`,{mode:'cors'});
@@ -1869,7 +1869,7 @@ async function renderAllNews(forceRefresh=false){
                   u:n.url,x:n.summary?.slice(0,120)||''
                 }));
               items=await translateNewsItems(rawItems);
-              allNewsCache[cacheKey]={items,ts:now};
+              allNewsCache[cacheKey]={items,ts:now,translated:true};
             }
           }
         }catch{}
@@ -2362,14 +2362,14 @@ async function renderNewsTab(ticker){
   pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังโหลดข่าว...</div>`;
   const cached=liveNewsCache[ticker];
   const now=Date.now();
-  let items=cached&&(now-cached.ts<300000)?cached.items:null;
+  // ใช้ cache เฉพาะที่แปลแล้ว (translated:true)
+  let items=cached&&cached.translated&&(now-cached.ts<300000)?cached.items:null;
   if(!items){
     const raw=await fetchLiveNews(ticker);
     if(raw){
-      // แปลภาษาไทยก่อน cache
       pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังแปลภาษา...</div>`;
       items=await translateNewsItems(raw);
-      liveNewsCache[ticker]={items,ts:now};
+      liveNewsCache[ticker]={items,ts:now,translated:true};
     } else items=newsData[ticker]||[];
   }
   if(!items.length){
