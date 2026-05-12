@@ -779,14 +779,32 @@ async function fetchOHLC(ticker){
   const cached=ohlcCache[ticker];
   if(cached&&cached._c===cycle) return cached;
   try{
-    // /quote: c=price, h=dayHigh, l=dayLow, o=open, pc=prevClose, dp=%change
-    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`);
-    if(!r.ok) return cached||null;
-    const d=await r.json();
-    if(!d||!d.c||d.c<=0) return cached||null;
-    const H=d.h>0?d.h:d.c, L=d.l>0?d.l:d.c, C=d.c, O=d.o>0?d.o:d.c, prevC=d.pc>0?d.pc:d.c;
-    const tr=Math.max(H-L, Math.abs(H-prevC), Math.abs(L-prevC));
-    const ohlc={H,L,C,O,prevC, atr:tr>0?tr:C*0.015, _c:cycle};
+    // ดึง yesterday's candle จาก Finnhub /stock/candle เพื่อคำนวณ Pivot ที่ถูกต้อง
+    const now=Math.floor(Date.now()/1000);
+    const from=now-7*86400; // ย้อนหลัง 7 วัน เผื่อวันหยุด
+    const url=`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from}&to=${now}&token=${FINNHUB_KEY}`;
+    const r=await fetch(url,{mode:'cors'});
+    if(r.ok){
+      const d=await r.json();
+      if(d.s==='ok'&&d.c&&d.c.length>=2){
+        // ใช้ candle วันก่อนหน้าล่าสุด (index -2) สำหรับ Pivot
+        const n=d.c.length;
+        const H=d.h[n-2], L=d.l[n-2], C=d.c[n-2], O=d.o[n-2];
+        const prevC=d.c[n-3]||C;
+        const tr=Math.max(H-L,Math.abs(H-prevC),Math.abs(L-prevC));
+        const ohlc={H,L,C,O,prevC,atr:tr>0?tr:C*0.015,_c:cycle};
+        ohlcCache[ticker]=ohlc;
+        return ohlc;
+      }
+    }
+    // fallback: ใช้ /quote (today H/L ไม่แม่นยำ แต่ดีกว่า mock)
+    const r2=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
+    if(!r2.ok) return cached||null;
+    const d2=await r2.json();
+    if(!d2||!d2.c||d2.c<=0) return cached||null;
+    const H=d2.h>0?d2.h:d2.c, L=d2.l>0?d2.l:d2.c, C=d2.pc>0?d2.pc:d2.c, O=d2.o>0?d2.o:d2.c, prevC=d2.pc>0?d2.pc:d2.c;
+    const tr=Math.max(H-L,Math.abs(H-prevC),Math.abs(L-prevC));
+    const ohlc={H,L,C,O,prevC,atr:tr>0?tr:C*0.015,_c:cycle};
     ohlcCache[ticker]=ohlc;
     return ohlc;
   }catch{return cached||null;}
