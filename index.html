@@ -215,7 +215,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .pin-btn.pinned{border-color:rgba(255,215,0,0.6);background:rgba(255,215,0,0.12);color:var(--yellow);}
 .card.pinned{border-top:2px solid rgba(255,215,0,0.5);}
 /* ── Onboarding overlay ── */
-#onboarding-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);}
+#onboarding-overlay{display:none!important;}
 #onboarding-overlay.hidden{display:none;}
 .onboard-box{background:var(--bg2);border:1px solid rgba(0,212,255,0.3);border-radius:16px;padding:28px 24px;max-width:400px;width:100%;box-shadow:0 0 60px rgba(0,212,255,0.12),0 0 120px rgba(0,212,255,0.06);}
 .onboard-logo{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);letter-spacing:3px;margin-bottom:6px;}
@@ -236,27 +236,10 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 </style>
 </head>
 <body>
-<!-- ── Onboarding: Finnhub API Key ── -->
-<div id="onboarding-overlay">
-  <div class="onboard-box">
-    <div class="onboard-logo">◈ STOCK PRO</div>
-    <div class="onboard-sub">ต้องการ Finnhub API Key เพื่อดึงราคาหุ้น Real-Time</div>
-    <div class="onboard-step">
-      <b>1.</b> ไปที่ <a href="https://finnhub.io" target="_blank">finnhub.io</a> แล้วสมัครฟรี<br>
-      <b>2.</b> เข้า Dashboard → กด <b>Get API Key</b><br>
-      <b>3.</b> กด <b>Create Key</b> แล้ว Copy มาวางด้านล่าง
-    </div>
-    <div class="onboard-label">FINNHUB API KEY</div>
-    <input class="onboard-input" id="onboard-key-input" type="text" placeholder="d1abc123xyz..." autocomplete="off" spellcheck="false">
-    <div class="onboard-err" id="onboard-err"></div>
-    <button class="onboard-btn" id="onboard-submit-btn" onclick="onboardSubmit()">▶ เริ่มใช้งาน</button>
-  </div>
-</div>
 
 <div class="hdr">
   <div class="logo">◈ STOCK PRO</div>
   <div style="display:flex;align-items:center;gap:8px">
-    <button class="onboard-change" onclick="showOnboarding()" title="เปลี่ยน API Key">🔑 Key</button>
     <div class="live-badge"><div class="dot"></div><span id="updateTime">—</span></div>
   </div>
 </div>
@@ -321,71 +304,12 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <div id="toast-container"></div>
 
 <script>
-// ── Onboarding: Finnhub API Key ─────────────────────────────────────────────
+// ── Onboarding removed — start directly ─────────────────────────────────────
 const LS_KEY='finnhub_api_key';
-let FINNHUB_KEY=localStorage.getItem(LS_KEY)||'';
-
-function showOnboarding(){
-  const overlay=document.getElementById('onboarding-overlay');
-  const input=document.getElementById('onboard-key-input');
-  const err=document.getElementById('onboard-err');
-  overlay.classList.remove('hidden');
-  if(FINNHUB_KEY) input.value=FINNHUB_KEY;
-  err.textContent='';
-  setTimeout(()=>input.focus(),100);
-}
-
-function hideOnboarding(){
-  document.getElementById('onboarding-overlay').classList.add('hidden');
-}
-
-async function onboardSubmit(){
-  const input=document.getElementById('onboard-key-input');
-  const err=document.getElementById('onboard-err');
-  const btn=document.getElementById('onboard-submit-btn');
-  const key=(input.value||'').trim();
-  if(!key){err.textContent='⚠ กรุณาใส่ API Key';return;}
-  btn.disabled=true;btn.textContent='⏳ กำลังตรวจสอบ...';err.textContent='';
-  // Test key with a single lightweight quote call
-  try{
-    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
-    const d=await r.json();
-    if(!r.ok||d.error){
-      err.textContent='❌ Key ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
-      btn.disabled=false;btn.textContent='▶ เริ่มใช้งาน';
-      return;
-    }
-  }catch{
-    // network error — accept key anyway (offline dev mode)
-    // ไม่แสดง warning เพื่อลด noise ใน console
-  }
-  localStorage.setItem(LS_KEY,key);
-  FINNHUB_KEY=key;
-  btn.disabled=false;btn.textContent='▶ เริ่มใช้งาน';
-  hideOnboarding();
-  // If first load, kick off startup
-  if(!_appStarted){_appStarted=true;startup();}
-}
-
-// Allow Enter key to submit
-document.addEventListener('DOMContentLoaded',()=>{
-  const inp=document.getElementById('onboard-key-input');
-  if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter') onboardSubmit();});
-});
-
-let _appStarted=false;
-
-// Show onboarding if no key saved; otherwise start immediately
-if(!FINNHUB_KEY){
-  // overlay already visible by default
-} else {
-  // Hide overlay and start normally
-  document.addEventListener('DOMContentLoaded',()=>{
-    const overlay=document.getElementById('onboarding-overlay');
-    if(overlay) overlay.classList.add('hidden');
-  });
-  _appStarted=true;
-}
+let FINNHUB_KEY=localStorage.getItem(LS_KEY)||'d81ijs1r01qrojfbo240d81ijs1r01qrojfbo24g';
+function showOnboarding(){}
+function hideOnboarding(){}
+let _appStarted=true;
 const stocks=[
   {t:"RKLB",n:"Rocket Lab",p:105.47,c:34.22,pe:null,mktcap:"38.4B",rev:"32%",earn:"8 พ.ค. 2026"},
   {t:"EOSE",n:"Eos Energy",p:8.01,c:25.94,pe:null,mktcap:"0.8B",rev:"120%",earn:null},
@@ -1543,7 +1467,8 @@ function buildGrid(){
     const card=document.createElement('div');
     card.className='card';card.id='card-'+s.t;
     card.dataset.t=s.t;card.dataset.n=s.n.toUpperCase();
-    card.dataset.dir=s.c>=0?'up':'dn';card.dataset.near=near<=35||near>=65?'yes':'no';
+    card.dataset.dir=s.c>=0?'up':'dn';
+    {const lv=_getLevels(s.t,s.p);const po=getRangePos(s.p,lv.s1,lv.r1);card.dataset.near=(po<=35||po>=65||s.p<=lv.s1)?'yes':'no';}
     card.dataset.pinned='0';
     card.style.borderLeft=`3px solid ${zone.border}`;
     card.innerHTML=`
@@ -1893,7 +1818,7 @@ function updateCard(s){
   updateRangeBar(s.t,s.p,s1,r1);
   card.dataset.dir=s.c>=0?'up':'dn';
   const pos=getRangePos(s.p,s1,r1);
-  card.dataset.near=pos<=35||pos>=65?'yes':'no';
+  card.dataset.near=(pos<=35||pos>=65||s.p<=s1)?'yes':'no';
   checkZoneAlert(s.t,s.p,s1,r1);
   updateAlerts();
   if(currentView==='heat') renderHeatmap();
@@ -1904,7 +1829,8 @@ function updateAlerts(){
     if(s.p<=0) return false;
     const {s1,r1,hasPivot}=_getLevels(s.t,s.p);
     if(!hasPivot||!s1||!r1||r1<=s1) return false;
-    if(s.p<=s1) return false;
+    // รวมกรณีราคาต่ำกว่าหรือเท่ากับ S1 ด้วย (ไม่ exclude)
+    if(s.p<=s1) return true;
     const pos=getRangePos(s.p,s1,r1);
     return pos<=25||pos>=85;
   }).sort((a,b)=>{
@@ -2475,67 +2401,38 @@ async function fetchLiveNews(ticker){
   }catch{return null;}
 }
 
-// ── Claude API Translation (แทน DeepL) ──
+// ── Google Translate (ฟรี ไม่มี CORS ไม่ต้องมี key) ──
 const _translateCache={};
 async function translateTH(text){
   if(!text) return text;
-  const key=text.slice(0,80);
-  if(_translateCache[key]) return _translateCache[key];
+  const cacheKey=text.slice(0,80);
+  if(_translateCache[cacheKey]) return _translateCache[cacheKey];
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{
-          role:'user',
-          content:`แปลข้อความต่อไปนี้เป็นภาษาไทยให้เป็นธรรมชาติ สำหรับบริบทข่าวการเงินและหุ้น ตอบเฉพาะคำแปลเท่านั้น ไม่ต้องมีคำอธิบายเพิ่มเติม:\n\n${text.slice(0,500)}`
-        }]
-      })
-    });
+    const url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=th&dt=t&q='+encodeURIComponent(text.slice(0,500));
+    const r=await fetch(url);
     if(!r.ok) return text;
     const d=await r.json();
-    const translated=d?.content?.[0]?.text?.trim()||text;
-    _translateCache[key]=translated;
+    const translated=d?.[0]?.map(x=>x?.[0]||'').join('')||text;
+    _translateCache[cacheKey]=translated;
     return translated;
   }catch{return text;}
 }
 
 async function translateNewsItems(items){
-  // Batch translate using object array - no index mismatch bug
+  // แปลทีละข่าว batch ด้วย Google Translate ฟรี
   try{
-    const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:4000,
-        messages:[{
-          role:'user',
-          content:`แปลข้อความข่าวการเงินต่อไปนี้เป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ object เท่านั้น ห้ามมี markdown หรือคำอธิบาย รูปแบบ: [{"h":"หัวข้อแปล","x":"สรุปแปล"},...] input: ${JSON.stringify(toTranslate)}`
-        }]
-      })
-    });
-    if(r.ok){
-      const d=await r.json();
-      const raw=d?.content?.[0]?.text?.trim()||'';
-      const clean=raw.replace(/```json|```/g,'').trim();
-      const arr=JSON.parse(clean);
-      if(Array.isArray(arr)&&arr.length===items.length){
-        return items.map((n,i)=>({...n,h:arr[i]?.h||n.h,x:arr[i]?.x||n.x}));
-      }
-    }
-  }catch(e){console.warn('Batch translate failed, fallback:',e);}
-  // fallback: แปลทีละชิ้น
-  return await Promise.all(items.map(async n=>{
-    const [thH,thX]=await Promise.all([
-      translateTH(n.h),
-      n.x?translateTH(n.x.slice(0,300)):Promise.resolve('')
-    ]);
-    return {...n,h:thH,x:thX};
-  }));
+    const results=await Promise.all(items.map(async n=>{
+      const [thH,thX]=await Promise.all([
+        translateTH(n.h||''),
+        n.x?translateTH(n.x.slice(0,300)):Promise.resolve('')
+      ]);
+      return {...n,h:thH,x:thX};
+    }));
+    return results;
+  }catch(e){
+    console.warn('translateNewsItems failed:',e);
+    return items;
+  }
 }
 
 async function renderNewsTab(ticker){
@@ -2617,6 +2514,7 @@ async function applyIndicatorAll(mode='classic'){
     await new Promise(r=>setTimeout(r,250));
   }
   document.getElementById('statusbar').innerHTML=`✅ Classic Pivot โหลดครบ · ${new Date().toLocaleTimeString('th-TH')}`;
+  updateAlerts();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2718,8 +2616,8 @@ async function startup(){
   zoneAlertReady=true;
 }
 
-// Only auto-start if key was already saved (onboarding was skipped)
-if(_appStarted) startup();
+// Start directly (onboarding removed)
+startup();
 </script>
 </body>
 </html>
