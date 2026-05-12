@@ -1630,9 +1630,7 @@ function updateAlerts(){
     const {s1,r1}=_getLevels(s.t,s.p);
     const pos=getRangePos(s.p,s1,r1);
     const nearS=pos<=10;
-    const distS=((s.p-s1)/s.p*100).toFixed(1);
-    const distR=((r1-s.p)/s.p*100).toFixed(1);
-    const label=nearS?`🔴 S1 -${distS}%`:`🟢 R1 +${distR}%`;
+    const label=nearS?`🔴 S1 $${s1.toFixed(2)}`:`🟢 R1 $${r1.toFixed(2)}`;
     const cls=nearS?'crit':'warn';
     return`<div class="alert-chip ${cls}" onclick="goCard('${s.t}')">${label} ${s.t}</div>`;
   }).join('');
