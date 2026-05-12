@@ -318,11 +318,12 @@ const stocks=[
   {t:"AXON",n:"Axon Enterprise",p:403.54,c:-5.47,pe:null,mktcap:"30.6B",rev:"34%",earn:"7 พ.ค. 2026"},
   {t:"TMDX",n:"Transmedics",p:67.84,c:-6.94,pe:null,mktcap:"2.4B",rev:"88%",earn:null},
   {t:"CRWV",n:"CoreWeave",p:114.15,c:-11.40,pe:null,mktcap:"43.2B",rev:"420%",earn:"ส.ค. 2026"},
+  {t:"MELI",n:"MercadoLibre",p:1561.22,c:-11.38,pe:43.1,mktcap:"78.9B",rev:"49%",earn:"ส.ค. 2026"},
 ];
 
-const rsiData={AXON:62.4,CRWD:52.9,RBRK:35.9,NOW:58.3,PLTR:48.2,NVDA:61.7,MSFT:60.1,SPGI:55.4,META:53.2,ISRG:52.8,NVO:41.3,GOOGL:67.2,AAPL:68.9,NFLX:49.5,TMDX:44.1,LLY:42.6,TSM:46.3,AMZN:48.7,XOM:38.2,OSS:32.1,ASML:50.6,SOFI:45.9,JPM:44.3,EOSE:38.7,MU:43.1,INTC:36.8,AVGO:49.2,AMD:41.5,HOOD:52.3,ANET:46.7,HIMS:39.4,ONDS:33.2,MP:37.8,SNDK:42.1,CRDO:44.8,VRT:40.3,NBIS:45.1,NVTS:35.6,AEHR:31.2,SLNH:28.4,CRWV:44.6,IREN:38.9,RKLB:47.3,KTOS:43.8,TEM:41.2,ASTS:46.9,AVEX:35.1,IONQ:38.4,OKLO:55.7,AAOI:42.0,ARM:58.6};
+const rsiData={AXON:62.4,CRWD:52.9,RBRK:35.9,NOW:58.3,PLTR:48.2,NVDA:61.7,MSFT:60.1,SPGI:55.4,META:53.2,ISRG:52.8,NVO:41.3,GOOGL:67.2,AAPL:68.9,NFLX:49.5,TMDX:44.1,LLY:42.6,TSM:46.3,AMZN:48.7,XOM:38.2,OSS:32.1,ASML:50.6,SOFI:45.9,JPM:44.3,EOSE:38.7,MU:43.1,INTC:36.8,AVGO:49.2,AMD:41.5,HOOD:52.3,ANET:46.7,HIMS:39.4,ONDS:33.2,MP:37.8,SNDK:42.1,CRDO:44.8,VRT:40.3,NBIS:45.1,NVTS:35.6,AEHR:31.2,SLNH:28.4,CRWV:44.6,IREN:38.9,RKLB:47.3,KTOS:43.8,TEM:41.2,ASTS:46.9,AVEX:35.1,IONQ:38.4,OKLO:55.7,AAOI:42.0,ARM:58.6,MELI:48.2};
 
-const sup0={AAPL:275,GOOGL:375,MSFT:405,NVDA:204,META:590,AMZN:258,AXON:385,CRWD:498,RBRK:58,NOW:85,PLTR:125,SPGI:410,ISRG:430,NFLX:82,AVGO:405,AMD:420,MU:680,INTC:115,ANET:130,ARM:200,NVO:43,LLY:900,XOM:138,ASML:1500,RKLB:90,ASTS:68,OKLO:65,IONQ:44,KTOS:52,TEM:44,CRWV:105,NBIS:165,IREN:55,CRDO:175,VRT:315,NVTS:16,HOOD:70,SOFI:14,JPM:285,HIMS:24,EOSE:7.0,OSS:14,ONDS:8,MP:62,SNDK:1440,AEHR:88,SLNH:1.6,AVEX:22,TMDX:63,TSM:395,AAOI:135};
+const sup0={AAPL:275,GOOGL:375,MSFT:405,NVDA:204,META:590,AMZN:258,AXON:385,CRWD:498,RBRK:58,NOW:85,PLTR:125,SPGI:410,ISRG:430,NFLX:82,AVGO:405,AMD:420,MU:680,INTC:115,ANET:130,ARM:200,NVO:43,LLY:900,XOM:138,ASML:1500,RKLB:90,ASTS:68,OKLO:65,IONQ:44,KTOS:52,TEM:44,CRWV:105,NBIS:165,IREN:55,CRDO:175,VRT:315,NVTS:16,HOOD:70,SOFI:14,JPM:285,HIMS:24,EOSE:7.0,OSS:14,ONDS:8,MP:62,SNDK:1440,AEHR:88,SLNH:1.6,AVEX:22,TMDX:63,TSM:395,AAOI:135,MELI:1537};
 
 const newsData={
   AXON:[
@@ -603,6 +604,12 @@ const newsData={
     {h:"Credo Technology flat +0.11% — 800G interconnect sampling ดี",s:"Google Finance",d:"9 พ.ค.",u:"",x:"Credo ผลิต AEC (Active Electrical Cable) และ SerDes IP สำหรับ 800G AI data center เป็นตลาดที่โตเร็วมาก"},
     {h:"Credo ชนะ design win ใน Meta Next-Gen AI cluster",s:"Barron's",d:"6 พ.ค.",u:"",x:"Meta เลือก Credo AEC cables สำหรับ AI data center รุ่นใหม่ที่ใช้ NVIDIA H100/H200 GPUs จำนวน 200,000+ units"},
     {h:"Earnings Q4 FY2026 — คาด EPS $0.18 รายได้ $80M +65%",s:"Seeking Alpha",d:"4 พ.ค.",u:"",x:"Credo กำลังเติบโตเร็วมากใน SerDes chiplet และ AEC ซึ่งเป็น essential component ของ AI networking ที่แพงขึ้น"},
+  ],
+  MELI:[
+    {h:"MELI ร่วง -11.38% — Q1 2026 EPS miss แม้รายได้ทะลุ $8.85B +49% YoY",s:"Motley Fool",d:"9 พ.ค.",u:"",x:"รายได้ beat consensus แต่ EPS $8.23 ต่ำกว่าคาด $9.37 เพราะลงทุน free shipping และ credit portfolio ใน Brazil"},
+    {h:"Michael Burry ซื้อ MELI หลัง earnings ร่วง — เข้าในระดับ $1,600",s:"Bloomberg",d:"8 พ.ค.",u:"",x:"Burry เปิดเผยผ่าน Substack ว่าซื้อ full position ใน MELI ที่ราคา $1,600s มองว่า margin compression เป็นแค่ชั่วคราว"},
+    {h:"Morgan Stanley ลด PT $2,450 จาก $2,600 — คง Overweight",s:"TipRanks",d:"8 พ.ค.",u:"",x:"Morgan Stanley ยังเชื่อใน long-term story แต่ปรับ PT ลงเพราะ near-term margin pressure จาก Brazil free shipping investment"},
+    {h:"MercadoLibre GMV +36% Global — Brazil +38%, Mexico +28%",s:"Seeking Alpha",d:"7 พ.ค.",u:"",x:"Mercado Pago fintech revenue +51% YoY credit card book กำลัง mature ใน 3 ตลาดหลัก สร้าง recurring revenue stream"},
   ],
   TEM:[
     {h:"Tempus AI ขึ้น +0.79% — AI genomics clinical trial pipeline แข็งแกร่ง",s:"Google Finance",d:"9 พ.ค.",u:"",x:"Tempus ใช้ AI วิเคราะห์ genomics data เพื่อ match ผู้ป่วยมะเร็งกับ clinical trial ที่เหมาะสมที่สุด"},
