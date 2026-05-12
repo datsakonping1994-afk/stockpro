@@ -802,7 +802,7 @@ async function fetchCandles(ticker, days=60){
   if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-300000) return candleCache[ticker].data;
   // ใช้ Yahoo Finance v8 chart API (ฟรี ไม่ต้องใช้ key)
   try{
-    const range=days<=30?'1mo':days<=90?'3mo':'6mo';
+    const range=days<=30?'1mo':days<=90?'3mo':days<=150?'6mo':'1y';
     const yahooUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
     const url=`https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`;
     const r=await fetch(url);
