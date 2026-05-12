@@ -2325,34 +2325,77 @@ async function fetchLiveNews(ticker){
   }catch{return null;}
 }
 
-// ── DeepL Translation (ฟรี 1M คำ/เดือน) ──
-const DEEPL_KEY='d831548e-7d81-4805-9a64-c1d066974eb7:fx';
+// ── Claude API Translation (แทน DeepL) ──
 const _translateCache={};
 async function translateTH(text){
   if(!text) return text;
   const key=text.slice(0,80);
   if(_translateCache[key]) return _translateCache[key];
   try{
-    const r=await fetch('https://yahoo-proxy.datsakonping1994.workers.dev/translate',{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:[text.slice(0,500)],target_lang:'TH',source_lang:'EN'})
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{
+          role:'user',
+          content:`แปลข้อความต่อไปนี้เป็นภาษาไทยให้เป็นธรรมชาติ สำหรับบริบทข่าวการเงินและหุ้น ตอบเฉพาะคำแปลเท่านั้น ไม่ต้องมีคำอธิบายเพิ่มเติม:\n\n${text.slice(0,500)}`
+        }]
+      })
     });
     if(!r.ok) return text;
     const d=await r.json();
-    const translated=d?.translations?.[0]?.text||text;
+    const translated=d?.content?.[0]?.text?.trim()||text;
     _translateCache[key]=translated;
     return translated;
   }catch{return text;}
 }
 
 async function translateNewsItems(items){
+  // แปลเป็น batch ครั้งละ 1 API call เพื่อประหยัด quota
+  try{
+    const headlines=items.map(n=>n.h);
+    const summaries=items.map(n=>n.x?n.x.slice(0,300):'');
+    const allTexts=[...headlines,...summaries].filter(t=>t);
+    const batchText=allTexts.map((t,i)=>`[${i+1}] ${t}`).join('\n');
+
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{
+          role:'user',
+          content:`แปลข้อความต่อไปนี้ทั้งหมดเป็นภาษาไทยสำหรับบริบทข่าวการเงินและหุ้น ตอบในรูปแบบ JSON array เท่านั้น ไม่ต้องมี markdown หรือคำอธิบาย เช่น ["แปล1","แปล2",...]\n\n${batchText}`
+        }]
+      })
+    });
+
+    if(r.ok){
+      const d=await r.json();
+      const raw=d?.content?.[0]?.text?.trim()||'';
+      const clean=raw.replace(/```json|```/g,'').trim();
+      const arr=JSON.parse(clean);
+      if(Array.isArray(arr)&&arr.length===allTexts.length){
+        let idx=0;
+        return items.map(n=>{
+          const thH=arr[idx++]||n.h;
+          const thX=n.x?(arr[idx++]||n.x):'';
+          if(!n.x) idx++; // skip empty summary slot
+          return {...n,h:thH,x:thX};
+        });
+      }
+    }
+  }catch{}
+  // fallback: แปลทีละชิ้น
   return await Promise.all(items.map(async n=>{
-    const [thH, thX]=await Promise.all([
+    const [thH,thX]=await Promise.all([
       translateTH(n.h),
       n.x?translateTH(n.x.slice(0,300)):Promise.resolve('')
     ]);
-    return {...n, h:thH, x:thX};
+    return {...n,h:thH,x:thX};
   }));
 }
 
