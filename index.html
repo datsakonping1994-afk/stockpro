@@ -832,6 +832,7 @@ async function fetchCandles(ticker, days=60){
     const range=days<=30?'1mo':days<=90?'3mo':days<=150?'6mo':days<=210?'1y':'2y';
     const yahooUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}`;
     const proxies=[
+      `https://yahoo-proxy.datsakonping1994.workers.dev/?url=${encodeURIComponent(yahooUrl)}`,
       `https://thingproxy.freeboard.io/fetch/${yahooUrl}`,
       `https://proxy.cors.sh/${yahooUrl}`,
       `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
