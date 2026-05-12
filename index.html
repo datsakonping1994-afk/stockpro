@@ -250,8 +250,14 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <div class="chip" onclick="setFilter('near')" style="cursor:pointer;border-color:rgba(255,215,0,0.3)"><span class="val" style="color:var(--yellow)" id="nearCnt">—</span>ใกล้แนวรับ</div>
 </div>
 <div id="alertPanel" class="alert-panel">
-  <div class="alert-h"><span>⚠ ใกล้แนวรับ — กดชื่อหุ้นเพื่อ scroll ไป</span><span style="font-size:12px;color:var(--dim);cursor:pointer" onclick="toggleAlertList()">▼</span></div>
-  <div class="alert-list" id="alertList"></div>
+  <div class="alert-h" style="margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim)">กดชื่อหุ้นเพื่อ scroll ไป</span>
+    <span style="font-size:12px;color:var(--dim);cursor:pointer" onclick="toggleAlertList()">▼</span>
+  </div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);letter-spacing:1px;margin-bottom:4px" id="alertSLabel">🔴 ใกล้แนวรับ</div>
+  <div class="alert-list" id="alertListS" style="margin-bottom:8px"></div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--green);letter-spacing:1px;margin-bottom:4px" id="alertRLabel">🟢 ใกล้แนวต้าน</div>
+  <div class="alert-list" id="alertListR"></div>
 </div>
 <div class="controls">
   <input type="text" class="search" id="searchBox" placeholder="ค้นหา..." oninput="filterCards()">
@@ -1828,31 +1834,64 @@ function updateCard(s){
 }
 
 function updateAlerts(){
-  const near=stocks.filter(s=>{
-    if(s.p<=0) return false;
+  const nearS=[],nearR=[];
+  stocks.forEach(s=>{
+    if(s.p<=0) return;
     const {s1,r1,hasPivot}=_getLevels(s.t,s.p);
-    if(!hasPivot||!s1||!r1||r1<=s1) return false;
-    if(s.p<=s1) return true;
+    if(!hasPivot||!s1||!r1||r1<=s1) return;
     const th=_nearThreshold(s.p);
     const pctS=s1>0?((s.p-s1)/s1*100):999;
     const pctR=r1>0?((r1-s.p)/r1*100):999;
-    return pctS<=th.close||pctR<=th.close;
-  }).sort((a,b)=>{
-    const la=_getLevels(a.t,a.p),lb=_getLevels(b.t,b.p);
-    return getRangePos(a.p,la.s1,la.r1)-getRangePos(b.p,lb.s1,lb.r1);
+    if(s.p<=s1||pctS<=th.close) nearS.push(s);
+    else if(pctR<=th.close) nearR.push(s);
   });
-  document.getElementById('nearCnt').textContent=near.length;
-  const panel=document.getElementById('alertPanel'),list=document.getElementById('alertList');
-  if(!near.length){panel.classList.remove('show');return;}
+  // sort S: ใกล้ที่สุดก่อน (pctS น้อยสุด)
+  nearS.sort((a,b)=>{
+    const la=_getLevels(a.t,a.p),lb=_getLevels(b.t,b.p);
+    return ((a.p-la.s1)/la.s1)-((b.p-lb.s1)/lb.s1);
+  });
+  // sort R: ใกล้ที่สุดก่อน (pctR น้อยสุด)
+  nearR.sort((a,b)=>{
+    const la=_getLevels(a.t,a.p),lb=_getLevels(b.t,b.p);
+    return ((la.r1-a.p)/la.r1)-((lb.r1-b.p)/lb.r1);
+  });
+  const total=nearS.length+nearR.length;
+  document.getElementById('nearCnt').textContent=total;
+  const panel=document.getElementById('alertPanel');
+  if(!total){panel.classList.remove('show');return;}
   panel.classList.add('show');
-  list.innerHTML=near.map(s=>{
-    const {s1,r1}=_getLevels(s.t,s.p);
-    const pos=getRangePos(s.p,s1,r1);
-    const nearS=pos<=25;
-    const label=nearS?`🔴 S1 $${s1.toFixed(2)}`:`🟢 R1 $${r1.toFixed(2)}`;
-    const cls=nearS?'crit':'warn';
-    return`<div class="alert-chip ${cls}" onclick="goCard('${s.t}')">${label} ${s.t}</div>`;
-  }).join('');
+  // S section
+  const listS=document.getElementById('alertListS');
+  const sLabel=document.getElementById('alertSLabel');
+  if(nearS.length){
+    sLabel.style.display='block';
+    listS.style.display='flex';
+    listS.innerHTML=nearS.map(s=>{
+      const {s1}=_getLevels(s.t,s.p);
+      const pct=s1>0?((s.p-s1)/s1*100).toFixed(1):0;
+      return`<div class="alert-chip crit" onclick="goCard('${s.t}')">🔴 ${s.t} <span style="opacity:0.7">${pct}%</span></div>`;
+    }).join('');
+  } else {
+    sLabel.style.display='none';
+    listS.style.display='none';
+    listS.innerHTML='';
+  }
+  // R section
+  const listR=document.getElementById('alertListR');
+  const rLabel=document.getElementById('alertRLabel');
+  if(nearR.length){
+    rLabel.style.display='block';
+    listR.style.display='flex';
+    listR.innerHTML=nearR.map(s=>{
+      const {r1}=_getLevels(s.t,s.p);
+      const pct=r1>0?((r1-s.p)/r1*100).toFixed(1):0;
+      return`<div class="alert-chip warn" style="background:rgba(0,230,118,0.1);border-color:rgba(0,230,118,0.3);color:var(--green)" onclick="goCard('${s.t}')">🟢 ${s.t} <span style="opacity:0.7">${pct}%</span></div>`;
+    }).join('');
+  } else {
+    rLabel.style.display='none';
+    listR.style.display='none';
+    listR.innerHTML='';
+  }
 }
 function toggleAlertList(){const l=document.getElementById('alertList');l.style.display=l.style.display==='none'?'flex':'none';}
 function goCard(t){
