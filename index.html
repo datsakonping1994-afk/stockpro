@@ -1981,16 +1981,38 @@ async function doAI(t,btn){
   const fmt2=v=>v!=null?v.toFixed(2):'N/A';
   const cls=v=>v==null?'ind-neut':v>0?'ind-bull':'ind-bear';
 
+  // ── คำอธิบายแต่ละ indicator ──
+  const rsiDesc=rsi>=70?'overbought ระวังพักตัว':rsi<=30?'oversold มีโอกาสเด้ง':'ยังไม่ overbought มีที่วิ่งต่อ';
+  const macdDesc=macdBull?'โมเมนตัมขึ้น = แรงซื้อยังอยู่':'โมเมนตัมลง = แรงซื้ออ่อนลง';
+  const emaDesc=ema20cross?.includes('Golden')?'เส้นสั้นตัดเส้นยาวขึ้น = สัญญาณบวก':ema20cross?.includes('Death')?'เส้นสั้นตัดเส้นยาวลง = สัญญาณลบ':'ข้อมูลไม่พอ';
+  const ema50Desc=ema50cross?.includes('Bullish')?'แนวโน้มระยาวยังเป็นบวก':ema50cross?.includes('Death')?'แนวโน้มระยาวเป็นลบ':'ข้อมูลไม่พอ';
+  const bbDesc=bbZone?.includes('บนแถบบน')?'ราคาวิ่งแรง อาจพักตัวระยะสั้น':bbZone?.includes('บนแถบล่าง')?'ราคาอ่อนแอ อาจเด้งกลับ':'ราคาอยู่ในช่วงปกติ';
+  const volDesc=volRatio>=1.5?`คนซื้อเยอะกว่าปกติ ${volRatio}x = แรงซื้อแข็ง`:volRatio<=0.7?'ปริมาณซื้อขายน้อย = ระวัง':'ปริมาณซื้อขายปกติ';
+  const obvDesc=obvTrend.includes('🟢')?'เงินไหลเข้าหุ้นต่อเนื่อง':'เงินไหลออกจากหุ้น ระวัง';
+
+  // ── สรุปภาพรวม ──
+  const bullBear=`(${bullCount} bullish / ${bearCount} bearish)`;
+  const overallDesc=bullPct>=60?`สัญญาณบวกเกือบทั้งหมด ${bullBear}`:bullPct<=40?`สัญญาณลบมากกว่า ${bullBear}`:`สัญญาณผสม ${bullBear}`;
+
+  // ── คำแนะนำ stop loss ──
+  const stopDesc=s1v?` ควรระวัง stop loss ที่ $${s1v?.toFixed?.(2)||s1v}`:'';
+  const bbWarning=bbZone?.includes('บนแถบบน')?' แต่ราคาวิ่งขึ้นเร็ว Bollinger บนแถบบนบ่งบอกว่าอาจพักสั้นๆ ก่อนวิ่งต่อ':'';
+
+  const row=(icon,label,val,desc)=>`<div style="display:flex;gap:6px;margin-bottom:5px;"><span>${icon}</span><span><strong>${label}</strong> ${val}${desc?` — <span style="color:var(--dim)">${desc}</span>`:''}</span></div>`;
+
   el.innerHTML=`<div class="ind-summary">
-<strong style="color:var(--accent)">⚡ สรุปภาพรวม ${s.t}</strong><br>
-แนวโน้มโดยรวม: <strong>${overallTrend}</strong> (${bullCount} bullish / ${bearCount} bearish signals)<br>
-RSI ${rsi||'N/A'} ${rsiTxt} — MACD ${macdBull?'โมเมนตัมขึ้น':'โมเมนตัมลง'}<br>
-EMA 20/50: ${ema20cross||'N/A'} — EMA 50/200: ${ema50cross||'N/A'}<br>
-Bollinger: ${bbZone||'N/A'} — ความผันผวน${bbWidth>5?'สูง':'ต่ำ'}<br>
-Volume: ${volTxt} (${volRatio}x avg)<br>
-OBV: ${obvTrend}<br>
-<br>
-<strong>แนวรับ:</strong> $${s1v?.toFixed?.(2)||s1v} | <strong>แนวต้าน:</strong> $${r1v?.toFixed?.(2)||r1v}<br>
+<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:10px">📊 สรุป ${s.t}</div>
+${row('•','แนวโน้ม:',overallTrend,overallDesc)}
+${rsi?row('•',`RSI ${rsi}`,'',rsiDesc):''}
+${ema20cross?row('•','EMA',ema20cross,emaDesc):''}
+${ema50cross?row('•','EMA 50/200',ema50cross,ema50Desc):''}
+${bbZone?row('•','Bollinger',bbZone,bbDesc):''}
+${row('•',`Volume ${volRatio}x`,'',volDesc)}
+${row('•','OBV',obvTrend.replace(/ 🟢| 🔴/,''),obvDesc)}
+<div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px;">
+<strong>แนวรับ</strong> <span style="color:var(--red)">$${s1v?.toFixed?.(2)||s1v}</span> | <strong>แนวต้าน</strong> <span style="color:var(--green)">$${r1v?.toFixed?.(2)||r1v}</span>
+</div>
+<div style="color:var(--text2);margin-bottom:6px"><strong>สรุป:</strong> ${overallDesc}${bbWarning}${stopDesc}</div>
 <span style="color:var(--dim);font-size:10px">*ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน*</span>
 </div>`;
 
