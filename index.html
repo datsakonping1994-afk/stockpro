@@ -150,6 +150,10 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .buy-popup-btns button{flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;}
 .buy-popup-goto{background:rgba(0,230,118,0.15);border:1px solid rgba(0,230,118,0.3)!important;color:var(--green);}
 .buy-popup-close{background:var(--bg3);color:var(--dim);}
+.card-status-dot{position:absolute;bottom:6px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--dim);transition:background 0.3s;}
+.card-status-dot.loading{background:var(--yellow);animation:blink 1s infinite;}
+.card-status-dot.ready{background:var(--green);}
+.card{position:relative;}
 .ai-btn{width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(168,85,247,0.1));border:1px solid rgba(0,212,255,0.3);color:var(--accent);padding:7px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;margin-bottom:8px;}
 .ai-result{font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-line;}
 .mnews-item{background:var(--bg3);border-radius:7px;padding:9px 12px;margin-bottom:6px;}
@@ -1164,6 +1168,9 @@ async function loadCardExtras(ticker, currentPrice){
   renderMA(ticker,data,currentPrice);
   const rsi=calcRSI(data.c);
   if(rsi!==null) updateRSICard(ticker,rsi);
+  // อัปเดตจุดสถานะเป็นพร้อมใช้งาน
+  const dot=document.getElementById('dot-'+ticker);
+  if(dot){dot.className='card-status-dot ready';dot.title='พร้อมใช้งาน';}
 }
 
 // Fix 2: Lazy load — ใช้ IntersectionObserver โหลดเฉพาะ card ที่มองเห็น
@@ -1504,7 +1511,8 @@ function buildGrid(){
           <button class="ai-btn" id="aibtn-${s.t}" onclick="doAI('${s.t}',this)">⚡ วิเคราะห์ด้วย AI</button>
           <div class="ai-result" id="airesult-${s.t}" style="color:var(--dim);font-size:11px">กดปุ่มด้านบนเพื่อวิเคราะห์</div>
         </div>
-      </div>`;
+      </div>
+      <div class="card-status-dot loading" id="dot-${s.t}" title="กำลังโหลด..."></div>`;
     grid.appendChild(card);
     setTimeout(()=>calcTrade(s.t),100);
   });
