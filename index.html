@@ -1143,25 +1143,42 @@ function updateRSICard(ticker, rsi){
 }
 
 async function loadCardExtras(ticker, currentPrice){
-  const data=await fetchCandles(ticker,260);
+  // Sparkline ใช้แค่ 60 วัน — เร็วกว่า 3x
+  const data=await fetchCandles(ticker,60);
   if(!data) return;
   drawSparkline(ticker,data,currentPrice);
   renderVolume(ticker,data);
   renderMA(ticker,data,currentPrice);
-  // calculate and update RSI from daily closes
   const rsi=calcRSI(data.c);
   if(rsi!==null) updateRSICard(ticker,rsi);
 }
 
-async function loadAllExtras(){
-  for(let i=0;i<stocks.length;i+=3){
-    const batch=stocks.slice(i,i+3);
-    await Promise.all(batch.map(s=>{
+// Fix 2: Lazy load — ใช้ IntersectionObserver โหลดเฉพาะ card ที่มองเห็น
+const _sparkObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(!entry.isIntersecting) return;
+    const wrap=entry.target;
+    const ticker=wrap.id.replace('spark-wrap-','');
+    const s=stocks.find(x=>x.t===ticker);
+    if(!s) return;
+    // โหลดเฉพาะถ้ายังไม่มี cache
+    if(!candleCache[ticker]){
+      loadCardExtras(ticker, s.p);
+    } else {
+      drawSparkline(ticker, candleCache[ticker].data, s.p);
+      renderVolume(ticker, candleCache[ticker].data);
+      renderMA(ticker, candleCache[ticker].data, s.p);
+    }
+    _sparkObserver.unobserve(wrap);
+  });
+},{rootMargin:'200px', threshold:0.01});
 
-      return loadCardExtras(s.t,s.p);
-    }));
-    await new Promise(r=>setTimeout(r,250));
-  }
+async function loadAllExtras(){
+  // Lazy load — register observer แทนการโหลดทุกตัวพร้อมกัน
+  stocks.forEach(s=>{
+    const wrap=document.getElementById('spark-wrap-'+s.t);
+    if(wrap) _sparkObserver.observe(wrap);
+  });
 }
 
 // Redraw sparklines on resize
