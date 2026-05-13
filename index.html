@@ -297,14 +297,21 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 </style>
 </head>
 <body>
-<!-- Login Screen -->
+<!-- API Key Screen -->
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
     <div class="login-logo">◈ STOCK PRO</div>
     <div class="login-sub">Real-time Stock Dashboard</div>
-    <input class="login-input" id="loginEmail" type="email" placeholder="Email" autocomplete="email">
-    <input class="login-input" id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div style="font-size:12px;color:var(--dim);margin-bottom:14px;text-align:left;line-height:1.6;">
+      ใส่ Finnhub API Key เพื่อดึงข้อมูลราคาหุ้น<br>
+      <a href="https://finnhub.io/register" target="_blank" style="color:var(--accent);font-size:11px;">สมัครฟรีที่ finnhub.io</a>
+    </div>
+    <input class="login-input" id="apiKeyInput" type="text" placeholder="Finnhub API Key (เช่น d1abc...)" autocomplete="off" onkeydown="if(event.key==='Enter')doApiKeyLogin()">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin-bottom:14px;cursor:pointer;">
+      <input type="checkbox" id="rememberKey" checked style="accent-color:var(--accent);">
+      จำ Key ไว้ในเครื่อง
+    </label>
+    <button class="login-btn" id="loginBtn" onclick="doApiKeyLogin()">เริ่มใช้งาน</button>
     <div class="login-error" id="loginError"></div>
   </div>
 </div>
@@ -313,7 +320,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <div class="hdr">
   <div class="logo">◈ STOCK PRO</div>
   <div style="display:flex;align-items:center;gap:8px">
-    <button class="logout-btn" id="logoutBtn" onclick="doLogout()" style="display:none">⎋ ออก</button>
+    <button class="logout-btn" id="logoutBtn" onclick="doLogout()" style="display:none">⎋ เปลี่ยน Key</button>
   <div class="live-badge"><div class="dot"></div><span id="updateTime">—</span></div>
   </div>
 </div>
@@ -399,7 +406,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <script>
 // ── Merged: best features from all versions ──────────────────────────────────
 // ⚠️ WARNING: API keys เหล่านี้มองเห็นได้ใน browser — อย่า deploy บน server สาธารณะ
-const FINNHUB_KEY='proxy'; // Key moved to Cloudflare Worker
+let FINNHUB_KEY=''; // Set by user on startup
 // ANTHROPIC_KEY moved to Cloudflare Worker (anthropic-proxy.datsakonping1994.workers.dev)
 const stocks=[
   {t:"RKLB",n:"Rocket Lab",p:105.47,c:34.22,pe:null,mktcap:"38.4B",rev:"32%",earn:"8 พ.ค. 2026"},
@@ -860,7 +867,7 @@ async function fetchOHLC(ticker){
   if(cached&&cached._c===cycle) return cached;
   try{
     // ใช้ /quote — pc=prevClose (ราคาปิดเมื่อวาน) ใช้เป็น C สำหรับ Classic Pivot
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/quote?symbol=${ticker}`,{mode:'cors'});
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
     if(!r.ok) return cached||null;
     const d=await r.json();
     if(!d||(!d.c&&!d.pc)) return cached||null;
@@ -974,7 +981,7 @@ function _genMockCandles(ticker, currentPrice, days=60){
 }
 
 async function fetchCandles(ticker, days=60){
-  if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-300000&&(candleCache[ticker].days||0)>=days) return candleCache[ticker].data;
+  if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-900000&&(candleCache[ticker].days||0)>=days) return candleCache[ticker].data;
   // ใช้ Yahoo Finance v8 chart API (ฟรี ไม่ต้องใช้ key)
   try{
     const range=days<=30?'1mo':days<=90?'3mo':days<=150?'6mo':days<=210?'1y':'2y';
@@ -2207,12 +2214,12 @@ async function renderAllNews(forceRefresh=false){
   const fromDate=new Date(); fromDate.setDate(fromDate.getDate()-14);
   const fromStr=fromDate.toISOString().slice(0,10);
   feed.innerHTML='';
-  for(let i=0;i<stocks.length;i+=4){
-    const batch=stocks.slice(i,i+4);
+  for(let i=0;i<stocks.length;i+=2){
+    const batch=stocks.slice(i,i+2);
     await Promise.all(batch.map(async s=>{
 
       const cacheKey=s.t;
-      let items=(!forceRefresh&&allNewsCache[cacheKey]&&allNewsCache[cacheKey].translated&&(now-allNewsCache[cacheKey].ts<180000))?allNewsCache[cacheKey].items:null;
+      let items=(!forceRefresh&&allNewsCache[cacheKey]&&allNewsCache[cacheKey].translated&&(now-allNewsCache[cacheKey].ts<600000))?allNewsCache[cacheKey].items:null;
       if(!items){
         try{
           const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${s.t}&from=${fromStr}&to=${toStr}&token=${FINNHUB_KEY}`,{mode:'cors'});
@@ -2246,7 +2253,7 @@ async function renderAllNews(forceRefresh=false){
         feed.appendChild(item);
       });
     }));
-    await new Promise(r=>setTimeout(r,150));
+    await new Promise(r=>setTimeout(r,600));
   }
   if(timeEl) timeEl.textContent='อัปเดต '+new Date().toLocaleTimeString('th-TH');
   if(!feed.children.length) feed.innerHTML='<div style="color:var(--dim);font-size:12px;padding:20px;text-align:center">ไม่มีข่าว</div>';
@@ -2609,10 +2616,7 @@ let _wsReconnectCount=0;
 
 let _wsKey = null;
 async function _fetchWsKey(){
-  try{
-    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/ws-key');
-    if(r.ok){ const d=await r.json(); _wsKey=d.key; }
-  }catch{}
+  _wsKey = FINNHUB_KEY; // ใช้ key ที่ user ใส่โดยตรง
 }
 function wsConnect(){
   if(ws&&ws.readyState<=1) return;
@@ -2825,7 +2829,7 @@ async function _fetchYahooPrice(ticker){
 
 async function _fetchFinnhubPrice(ticker){
   try{
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/quote?symbol=${ticker}`,{mode:'cors'});
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
     if(!r.ok) return null;
     const d=await r.json();
     const price=d.c>0?d.c:(d.pc>0?d.pc:0);
@@ -3004,7 +3008,7 @@ async function fetchLiveNews(ticker){
   try{
     const to=new Date(),from=new Date();
     from.setDate(from.getDate()-7);
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/company-news?symbol=${ticker}&from=${from.toISOString().slice(0,10)}&to=${to.toISOString().slice(0,10)}`,{mode:'cors'});
+    const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from.toISOString().slice(0,10)}&to=${to.toISOString().slice(0,10)}&token=${FINNHUB_KEY}`,{mode:'cors'});
     if(!r.ok) return null;
     const items=await r.json();
     if(!Array.isArray(items)) return null;
@@ -3564,48 +3568,42 @@ async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
   }catch(e){ console.warn('Gemini error:', e); return null; }
 }
 
-// SUPABASE AUTH — ใช้ fetch โดยตรง ไม่ต้องพึ่ง CDN
-// Auth ผ่าน Cloudflare Worker (ป้องกัน CORS)
-const _SUPA_URL = 'https://anthropic-proxy.datsakonping1994.workers.dev';
-const _SUPA_KEY = 'proxy'; // Worker จัดการ key เอง
-let _supaToken = null;
 
-async function doLogin(){
-  const email=document.getElementById('loginEmail').value.trim();
-  const password=document.getElementById('loginPassword').value;
+// ── API Key Login ──
+async function doApiKeyLogin(){
+  const key=document.getElementById('apiKeyInput').value.trim();
   const btn=document.getElementById('loginBtn');
   const errEl=document.getElementById('loginError');
   errEl.textContent='';
-  if(!email||!password){errEl.textContent='กรุณากรอก email และ password';return;}
-  btn.disabled=true;btn.textContent='⏳ กำลังเข้าสู่ระบบ...';
+  if(!key){errEl.textContent='กรุณาใส่ Finnhub API Key';return;}
+  btn.disabled=true;btn.textContent='⏳ กำลังตรวจสอบ...';
   try{
-    const r=await fetch(_SUPA_URL+'/auth/v1/token?grant_type=password',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','apikey':_SUPA_KEY,'Authorization':'Bearer '+_SUPA_KEY},
-      body:JSON.stringify({email,password})
-    });
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
     const d=await r.json();
-    if(!r.ok||d.error){
-      const msg=d.error_description||d.message||'Login failed';
-      errEl.textContent=msg.includes('Invalid login')?'❌ email หรือ password ไม่ถูกต้อง':'❌ '+msg;
-      btn.disabled=false;btn.textContent='เข้าสู่ระบบ';
-    }else{
-      _supaToken=d.access_token;
-      try{localStorage.setItem('_sp_token',_supaToken);}catch{}
-      _showApp();
+    if(d.error||!r.ok){
+      errEl.textContent='❌ API Key ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+      btn.disabled=false;btn.textContent='เริ่มใช้งาน';
+      return;
     }
-  }catch(e){errEl.textContent='❌ '+e.message;btn.disabled=false;btn.textContent='เข้าสู่ระบบ';}
+    FINNHUB_KEY=key;
+    if(document.getElementById('rememberKey').checked){
+      try{localStorage.setItem('_fh_key',key);}catch{}
+    }
+    _showApp();
+  }catch(e){
+    errEl.textContent='❌ '+e.message;
+    btn.disabled=false;btn.textContent='เริ่มใช้งาน';
+  }
 }
 
 async function doLogout(){
-  try{if(_supaToken) await fetch(_SUPA_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':_SUPA_KEY,'Authorization':'Bearer '+_supaToken}});}catch{}
-  _supaToken=null;
-  try{localStorage.removeItem('_sp_token');}catch{}
+  FINNHUB_KEY='';
+  try{localStorage.removeItem('_fh_key');}catch{}
   document.getElementById('mainApp').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('loginPassword').value='';
+  document.getElementById('apiKeyInput').value='';
   document.getElementById('loginBtn').disabled=false;
-  document.getElementById('loginBtn').textContent='เข้าสู่ระบบ';
+  document.getElementById('loginBtn').textContent='เริ่มใช้งาน';
   document.getElementById('logoutBtn').style.display='none';
   if(typeof isLive!=='undefined'&&isLive) toggleLive();
 }
@@ -3621,13 +3619,14 @@ function _showApp(){
   }
 }
 
-// ตรวจ session ที่มีอยู่
+// ตรวจ key ที่บันทึกไว้
 (async()=>{
   try{
-    const token=localStorage.getItem('_sp_token');
-    if(token){
-      const r=await fetch(_SUPA_URL+'/auth/v1/user',{headers:{'apikey':_SUPA_KEY,'Authorization':'Bearer '+token}});
-      if(r.ok){_supaToken=token;_showApp();return;}
+    const key=localStorage.getItem('_fh_key');
+    if(key){
+      const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
+      const d=await r.json();
+      if(!d.error&&r.ok){FINNHUB_KEY=key;_showApp();return;}
     }
   }catch{}
 })();
