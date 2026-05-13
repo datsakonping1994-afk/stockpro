@@ -55,7 +55,34 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .price{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;text-align:right;}
 .chg{font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;margin-top:2px;}
 /* Sparkline */
-.sparkline-wrap{padding:0 14px 0;margin-top:-2px;position:relative;height:90px;}
+.sparkline-wrap{padding:0 14px 0;margin-top:-2px;position:relative;height:90px;cursor:pointer;}
+.sparkline-wrap:hover::after{content:'🔍';position:absolute;top:4px;right:18px;font-size:14px;opacity:0.6;}
+/* ── Full Chart Modal ── */
+.chart-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9998;display:flex;align-items:center;justify-content:center;padding:12px;}
+.chart-modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;padding:16px;box-shadow:0 0 40px rgba(0,212,255,0.1);}
+.chart-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.chart-modal-title{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--accent);}
+.chart-modal-close{font-size:18px;color:var(--dim);cursor:pointer;padding:2px 8px;border-radius:4px;background:var(--bg3);border:1px solid var(--border);}
+.chart-modal-close:hover{color:var(--text);}
+.chart-tf-row{display:flex;gap:5px;margin-bottom:10px;}
+.chart-tf-btn{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all 0.15s;}
+.chart-tf-btn:hover{border-color:var(--accent);color:var(--accent);}
+.chart-tf-btn.active{border-color:var(--accent);background:rgba(0,212,255,0.1);color:var(--accent);}
+.chart-canvas-wrap{position:relative;height:220px;background:var(--bg3);border-radius:8px;overflow:hidden;margin-bottom:8px;}
+.chart-main-canvas{width:100%;height:100%;display:block;}
+.chart-vol-wrap{height:50px;background:var(--bg3);border-radius:8px;overflow:hidden;margin-bottom:8px;}
+.chart-vol-canvas{width:100%;height:100%;display:block;}
+.chart-info-row{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);flex-wrap:wrap;gap:4px;}
+.chart-crosshair-info{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);min-height:16px;margin-bottom:6px;}
+/* ── AI Market Summary ── */
+.ai-summary-panel{background:var(--bg2);border:1px solid rgba(168,85,247,0.3);border-radius:10px;padding:14px;margin-bottom:12px;display:none;}
+.ai-summary-panel.show{display:block;}
+.ai-summary-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.ai-summary-title{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--purple);}
+.ai-summary-body{font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;}
+.ai-summary-btn{background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(0,212,255,0.1));border:1px solid rgba(168,85,247,0.4);color:#c084fc;padding:7px 14px;border-radius:7px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;transition:all 0.2s;}
+.ai-summary-btn:hover{background:rgba(168,85,247,0.2);}
+.ai-summary-btn:disabled{opacity:0.5;cursor:not-allowed;}
 .sparkline-canvas{width:100%;height:90px;display:block;}
 .spark-vol-bar{position:absolute;bottom:0;background:rgba(0,212,255,0.15);border-radius:1px 1px 0 0;transition:height 0.3s;}
 /* Volume row */
@@ -290,6 +317,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <button class="btn" style="color:var(--yellow)" id="filterNearBtn" onclick="setFilter('near')">⚠ แนวรับ</button>
   <button class="btn" style="color:#ff9966;border-color:rgba(255,153,102,0.3)" onclick="togglePanel('newsPanel')">📰 ข่าวทุกหุ้น</button>
   <button class="btn" style="color:var(--purple);border-color:rgba(168,85,247,0.3)" onclick="toggleEarnings()">📅 Earnings</button>
+  <button class="ai-summary-btn" id="aiSummaryBtn" onclick="runAIMarketSummary()">🤖 AI Summary</button>
 </div>
 <div class="sort-row">
   <span class="sort-lbl">SORT:</span>
@@ -324,6 +352,18 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <div id="earningsPanel" class="panel" style="border:1px solid rgba(168,85,247,0.25)">
   <div class="panel-hdr"><span class="panel-title" style="color:var(--purple)">📅 Earnings Calendar</span><button class="btn" style="padding:3px 8px;font-size:10px" onclick="toggleEarnings()">✕</button></div>
   <div id="earningsBody"></div>
+</div>
+
+<!-- AI Market Summary Panel -->
+<div id="aiSummaryPanel" class="ai-summary-panel">
+  <div class="ai-summary-header">
+    <span class="ai-summary-title">🤖 AI Market Summary</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span id="aiSummaryTime" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim)"></span>
+      <button class="btn" style="padding:3px 8px;font-size:10px" onclick="document.getElementById('aiSummaryPanel').classList.remove('show')">✕</button>
+    </div>
+  </div>
+  <div class="ai-summary-body" id="aiSummaryBody">กด "🤖 AI Summary" เพื่อวิเคราะห์ภาพรวมตลาด</div>
 </div>
 
 <div class="grid" id="grid"></div>
@@ -1520,7 +1560,7 @@ function buildGrid(){
           <button class="pin-btn" id="pin-${s.t}" title="ปักมุด" onclick="togglePin('${s.t}')">📌</button>
         </div>
       </div>
-      <div class="sparkline-wrap" id="spark-wrap-${s.t}">
+      <div class="sparkline-wrap" id="spark-wrap-${s.t}" onclick="openChartModal('${s.t}')" title="คลิกเพื่อดูกราฟเต็ม">
         <canvas class="sparkline-canvas" id="spark-${s.t}" height="72"></canvas>
       </div>
       <div class="vol-row" id="vol-row-${s.t}">
@@ -3063,6 +3103,322 @@ async function startup(){
     });
   });
   zoneAlertReady=true;
+}
+
+// ═══════════════════════════════════════════════════════
+// INTERACTIVE CHART MODAL
+// ═══════════════════════════════════════════════════════
+let _chartModal = null;
+let _chartTicker = null;
+let _chartTF = '3M'; // default timeframe
+let _chartDragging = false;
+let _chartStartX = 0;
+let _chartOffsetPct = 0; // pan offset 0-1
+
+const TF_DAYS = {'1D':1,'1W':7,'1M':30,'3M':90,'6M':180,'1Y':260};
+
+async function openChartModal(ticker){
+  _chartTicker = ticker;
+  _chartOffsetPct = 0;
+  const s = stocks.find(x=>x.t===ticker);
+  if(!s) return;
+
+  // สร้าง modal
+  const overlay = document.createElement('div');
+  overlay.className = 'chart-modal-overlay';
+  overlay.id = 'chart-modal-overlay';
+  overlay.innerHTML = `
+    <div class="chart-modal">
+      <div class="chart-modal-header">
+        <div>
+          <div class="chart-modal-title">${ticker} — ${s.n}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);margin-top:2px">
+            <span id="cm-price" style="color:${s.c>=0?'var(--green)':'var(--red)'}">$${s.p?.toFixed(2)||'—'}</span>
+            <span style="margin-left:6px">${s.c>=0?'+':''}${s.c}%</span>
+          </div>
+        </div>
+        <span class="chart-modal-close" onclick="closeChartModal()">✕</span>
+      </div>
+      <div class="chart-tf-row">
+        ${Object.keys(TF_DAYS).map(tf=>`<button class="chart-tf-btn${tf===_chartTF?' active':''}" onclick="switchChartTF('${tf}',this)">${tf}</button>`).join('')}
+      </div>
+      <div class="chart-crosshair-info" id="cm-crosshair">กดค้างเพื่อดูราคา ณ จุดนั้น</div>
+      <div class="chart-canvas-wrap" id="cm-canvas-wrap">
+        <canvas id="cm-canvas" class="chart-main-canvas"></canvas>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px" id="cm-loading">⏳ กำลังโหลดข้อมูล...</div>
+      </div>
+      <div class="chart-vol-wrap">
+        <canvas id="cm-vol-canvas" class="chart-vol-canvas"></canvas>
+      </div>
+      <div class="chart-info-row">
+        <span id="cm-range-info">—</span>
+        <span id="cm-vol-info">—</span>
+        <span style="color:var(--dim)">← swipe →</span>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  overlay.onclick = e=>{ if(e.target===overlay) closeChartModal(); };
+  _chartModal = overlay;
+
+  // touch/mouse events สำหรับ pan
+  const wrap = document.getElementById('cm-canvas-wrap');
+  wrap.addEventListener('touchstart', _chartTouchStart, {passive:true});
+  wrap.addEventListener('touchmove', _chartTouchMove, {passive:true});
+  wrap.addEventListener('touchend', _chartTouchEnd);
+  wrap.addEventListener('mousemove', _chartMouseMove);
+  wrap.addEventListener('mouseleave', ()=>{ document.getElementById('cm-crosshair').textContent='กดค้างเพื่อดูราคา ณ จุดนั้น'; });
+
+  await _renderChartModal();
+}
+
+function closeChartModal(){
+  if(_chartModal){ _chartModal.remove(); _chartModal=null; }
+}
+
+async function switchChartTF(tf, btn){
+  _chartTF = tf;
+  _chartOffsetPct = 0;
+  document.querySelectorAll('.chart-tf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  await _renderChartModal();
+}
+
+async function _renderChartModal(){
+  const ticker = _chartTicker;
+  const days = TF_DAYS[_chartTF];
+  const loadEl = document.getElementById('cm-loading');
+  if(loadEl) loadEl.style.display='flex';
+
+  // ดึง candle data
+  let data = candleCache[ticker]?.data;
+  if(!data || !data.c || data.c.length < 5 || (candleCache[ticker]?.days||0) < days){
+    data = await fetchCandles(ticker, days);
+  }
+  if(loadEl) loadEl.style.display='none';
+  if(!data||!data.c||data.c.length<2) return;
+
+  const canvas = document.getElementById('cm-canvas');
+  const volCanvas = document.getElementById('cm-vol-canvas');
+  if(!canvas||!volCanvas) return;
+
+  const wrap = document.getElementById('cm-canvas-wrap');
+  const W = wrap.offsetWidth||320;
+  const H = 220;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  volCanvas.width=W*dpr; volCanvas.height=50*dpr;
+  volCanvas.style.width=W+'px'; volCanvas.style.height='50px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const vctx = volCanvas.getContext('2d');
+  vctx.scale(dpr,dpr);
+
+  // slice data ตาม timeframe
+  const totalBars = data.c.length;
+  const showBars = Math.min(days, totalBars);
+  const startIdx = Math.max(0, totalBars - showBars);
+  const closes = data.c.slice(startIdx);
+  const highs = (data.h||data.c).slice(startIdx);
+  const lows = (data.l||data.c).slice(startIdx);
+  const vols = (data.v||[]).slice(startIdx);
+  const times = (data.t||[]).slice(startIdx);
+  const n = closes.length;
+
+  // ── วาด price chart ──
+  const pad = {t:16,b:24,l:8,r:48};
+  const chartW = W-pad.l-pad.r;
+  const chartH = H-pad.t-pad.b;
+  const minP = Math.min(...lows)*0.998;
+  const maxP = Math.max(...highs)*1.002;
+  const rangeP = maxP-minP;
+  const xScale = chartW/(n-1);
+  const yScale = chartH/rangeP;
+  const px = (i)=>pad.l+i*xScale;
+  const py = (v)=>pad.t+chartH-(v-minP)*yScale;
+
+  ctx.clearRect(0,0,W,H);
+
+  // grid lines
+  ctx.strokeStyle='rgba(255,255,255,0.05)';
+  ctx.lineWidth=1;
+  for(let i=0;i<4;i++){
+    const y=pad.t+chartH*(i/3);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    const price=maxP-(rangeP*i/3);
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.font=`${9*dpr/dpr}px IBM Plex Mono`;
+    ctx.textAlign='left';
+    ctx.fillText('$'+price.toFixed(1), W-pad.r+4, y+3);
+  }
+
+  // gradient fill
+  const s=stocks.find(x=>x.t===ticker);
+  const isUp=(closes[closes.length-1]||0)>=(closes[0]||0);
+  const grad=ctx.createLinearGradient(0,pad.t,0,pad.t+chartH);
+  grad.addColorStop(0, isUp?'rgba(0,230,118,0.3)':'rgba(255,68,102,0.3)');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(px(0),py(closes[0]));
+  for(let i=1;i<n;i++) ctx.lineTo(px(i),py(closes[i]));
+  ctx.lineTo(px(n-1),pad.t+chartH);
+  ctx.lineTo(px(0),pad.t+chartH);
+  ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+
+  // price line
+  ctx.beginPath();
+  ctx.strokeStyle=isUp?'#00e676':'#ff4466';
+  ctx.lineWidth=2;
+  ctx.moveTo(px(0),py(closes[0]));
+  for(let i=1;i<n;i++) ctx.lineTo(px(i),py(closes[i]));
+  ctx.stroke();
+
+  // current price line
+  const curPrice=s?.p||closes[closes.length-1];
+  const curY=py(curPrice);
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle='rgba(0,212,255,0.5)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.l,curY); ctx.lineTo(W-pad.r,curY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // x-axis dates
+  ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.font=`9px IBM Plex Mono`;
+  ctx.textAlign='center';
+  const labelCount=4;
+  for(let i=0;i<labelCount;i++){
+    const idx=Math.floor(i*(n-1)/(labelCount-1));
+    const t=times[idx];
+    if(t){
+      const d=new Date(t*1000);
+      const label=d.toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+      ctx.fillText(label, px(idx), H-6);
+    }
+  }
+
+  // ── วาด volume bars ──
+  vctx.clearRect(0,0,W,50);
+  const maxVol=Math.max(...vols.filter(v=>v>0))||1;
+  vols.forEach((v,i)=>{
+    const bh=Math.max(1,(v/maxVol)*45);
+    const isUpBar=(closes[i]||0)>=(i>0?closes[i-1]:closes[0]);
+    vctx.fillStyle=isUpBar?'rgba(0,230,118,0.4)':'rgba(255,68,102,0.4)';
+    const bw=Math.max(1,xScale-1);
+    vctx.fillRect(px(i)-bw/2, 50-bh, bw, bh);
+  });
+
+  // อัปเดต info
+  const priceChange=closes[n-1]-closes[0];
+  const pctChange=(priceChange/closes[0]*100).toFixed(2);
+  const rangeEl=document.getElementById('cm-range-info');
+  if(rangeEl) rangeEl.innerHTML=`<span style="color:${priceChange>=0?'var(--green)':'var(--red)'}">$${closes[0]?.toFixed(2)} → $${closes[n-1]?.toFixed(2)} (${priceChange>=0?'+':''}${pctChange}%)</span>`;
+  const avgVol=vols.reduce((a,b)=>a+b,0)/vols.length;
+  const volEl=document.getElementById('cm-vol-info');
+  if(volEl) volEl.textContent=`VOL avg: ${avgVol>=1e6?(avgVol/1e6).toFixed(1)+'M':avgVol>=1e3?(avgVol/1e3).toFixed(0)+'K':avgVol.toFixed(0)}`;
+
+  // เก็บ data สำหรับ crosshair
+  canvas._chartData={closes,highs,lows,times,px,py,n,pad,W,H,dpr};
+}
+
+function _chartMouseMove(e){
+  const canvas=document.getElementById('cm-canvas');
+  if(!canvas||!canvas._chartData) return;
+  const {closes,highs,lows,times,px,py,n,pad} = canvas._chartData;
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left;
+  const idx=Math.round((x-pad.l)/((canvas._chartData.W-pad.l-pad.r)/(n-1)));
+  if(idx<0||idx>=n) return;
+  const t=times[idx];
+  const date=t?new Date(t*1000).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}):'';
+  const info=document.getElementById('cm-crosshair');
+  if(info) info.innerHTML=`<span style="color:var(--accent)">${date}</span> · O:<span style="color:var(--text)">$${(closes[idx]||0).toFixed(2)}</span> H:<span style="color:var(--green)">$${(highs[idx]||0).toFixed(2)}</span> L:<span style="color:var(--red)">$${(lows[idx]||0).toFixed(2)}</span>`;
+}
+
+let _touchStartX=0;
+function _chartTouchStart(e){ _touchStartX=e.touches[0].clientX; }
+function _chartTouchMove(e){ _chartMouseMove({clientX:e.touches[0].clientX, clientY:e.touches[0].clientY}); }
+function _chartTouchEnd(){}
+
+// ═══════════════════════════════════════════════════════
+// AI MARKET SUMMARY
+// ═══════════════════════════════════════════════════════
+async function runAIMarketSummary(){
+  const btn=document.getElementById('aiSummaryBtn');
+  const panel=document.getElementById('aiSummaryPanel');
+  const body=document.getElementById('aiSummaryBody');
+  const timeEl=document.getElementById('aiSummaryTime');
+  if(!btn||!panel||!body) return;
+
+  btn.disabled=true; btn.textContent='⏳ กำลังวิเคราะห์...';
+  panel.classList.add('show');
+  body.textContent='⏳ AI กำลังวิเคราะห์ภาพรวมตลาด...';
+
+  // สรุปข้อมูลหุ้นทุกตัว
+  const up=stocks.filter(s=>s.c>0).length;
+  const dn=stocks.filter(s=>s.c<0).length;
+  const topGainers=stocks.filter(s=>s.c>0).sort((a,b)=>b.c-a.c).slice(0,5);
+  const topLosers=stocks.filter(s=>s.c<0).sort((a,b)=>a.c-b.c).slice(0,5);
+  const nearS=stocks.filter(s=>{
+    const lvl=_getLevels(s.t,s.p);
+    if(!lvl.s1||!lvl.r1) return false;
+    const pos=(s.p-lvl.s1)/(lvl.r1-lvl.s1);
+    return pos<=0.35||s.p<=lvl.s1;
+  });
+  const nearR=stocks.filter(s=>{
+    const lvl=_getLevels(s.t,s.p);
+    if(!lvl.s1||!lvl.r1) return false;
+    const pos=(s.p-lvl.s1)/(lvl.r1-lvl.s1);
+    return pos>=0.65;
+  });
+
+  // RSI extremes
+  const overbought=Object.entries(rsiData).filter(([t,r])=>r>=70).map(([t,r])=>`${t}(${r})`);
+  const oversold=Object.entries(rsiData).filter(([t,r])=>r<=30).map(([t,r])=>`${t}(${r})`);
+
+  const prompt=`วิเคราะห์ภาพรวมตลาดหุ้นจากพอร์ตนี้ (${stocks.length} ตัว) เป็นภาษาไทย กระชับ ตรงประเด็น:
+
+📊 ภาพรวม: บวก ${up} ตัว / ลบ ${dn} ตัว
+🚀 ขึ้นแรง: ${topGainers.map(s=>`${s.t}(+${s.c}%)`).join(', ')||'ไม่มี'}
+📉 ลงแรง: ${topLosers.map(s=>`${s.t}(${s.c}%)`).join(', ')||'ไม่มี'}
+⚠️ ใกล้แนวรับ: ${nearS.map(s=>s.t).join(', ')||'ไม่มี'}
+🎯 ใกล้แนวต้าน: ${nearR.map(s=>s.t).join(', ')||'ไม่มี'}
+🔴 RSI Overbought: ${overbought.join(', ')||'ไม่มี'}
+🟢 RSI Oversold: ${oversold.join(', ')||'ไม่มี'}
+
+กรุณาวิเคราะห์:
+1) ภาพรวมตลาดวันนี้เป็นอย่างไร
+2) หุ้นที่น่าสนใจเข้าซื้อวันนี้ (พร้อมเหตุผล)
+3) หุ้นที่ต้องระวัง (พร้อมเหตุผล)
+4) กลยุทธ์แนะนำสำหรับวันนี้
+
+ลงท้ายด้วย: ⚠️ ข้อมูลเพื่อการศึกษาเท่านั้น`;
+
+  try{
+    const res=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-5',
+        max_tokens:1000,
+        system:'คุณคือ AI นักวิเคราะห์ตลาดหุ้น ตอบเป็นภาษาไทย กระชับ ตรงประเด็น มีประโยชน์',
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    if(!res.ok){ body.textContent='❌ API error '+res.status; return; }
+    const d=await res.json();
+    if(d.type==='error'){ body.textContent='❌ '+d.error?.message; return; }
+    const text=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+    body.textContent=text||'ไม่ได้รับข้อมูล';
+    timeEl.textContent=new Date().toLocaleTimeString('th-TH');
+  }catch(e){
+    body.textContent='❌ '+e.message;
+  }finally{
+    btn.disabled=false; btn.textContent='🤖 AI Summary';
+  }
 }
 
 // Start directly (onboarding removed)
