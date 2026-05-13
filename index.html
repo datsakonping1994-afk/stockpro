@@ -809,11 +809,11 @@ function getRangeZone(price, s1, r1){
   const pctFromS1=s1>0?((price-s1)/s1*100):999;
   const pctFromR1=r1>0?((r1-price)/r1*100):999;
   if(price<=s1)        return{cls:'red',   txt:'🔴 ต่ำกว่าแนวรับ', border:'var(--red)',   zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
-  if(pctFromS1<=3)     return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก', border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
+  if(pctFromS1<=0.5)   return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก', border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
   if(pctFromS1<=7)     return{cls:'red',   txt:'🔴 ใกล้แนวรับ',    border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
   if(pctFromR1<=3)     return{cls:'green', txt:'🟢 ใกล้แนวต้านมาก',border:'var(--green)', zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
   if(pctFromR1<=7)     return{cls:'green', txt:'🟢 ใกล้แนวต้าน',   border:'var(--green)', zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
-  if(pctFromS1<=12||pos<=0.35) return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลางช่วง'};
+  if(pctFromS1<=2||pos<=0.15) return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลางช่วง'};
   if(pctFromR1<=12||pos>=0.65) return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลางช่วง'};
   return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลาง S1–R1'};
 }
@@ -1803,7 +1803,8 @@ function playAlertSound(type){
 
 function showToast(ticker, type, levelName, price, level){
   const container=document.getElementById('toast-container');
-  const isS=type==='s';
+  const isS=type==='s'||type==='near';
+  const isNear=type==='near';
   const div=document.createElement('div');
   div.className=`toast toast-${type}`;
   div.innerHTML=`${isS?'🔴':'🟢'} <strong>${ticker}</strong> ${isS?'ใกล้แนวรับ':'ใกล้แนวต้าน'} ${levelName}<br><span style="opacity:0.7">ราคา $${price.toFixed?price.toFixed(2):price} · ${levelName} $${level.toFixed?level.toFixed(2):level}</span>`;
@@ -1861,8 +1862,8 @@ function _calcBuyScore(ticker, price, s1, r1){
 
   // คะแนน (รวม 100)
   const pctFromS1 = s1>0?((price-s1)/s1*100):99;
-  if(pctFromS1<=2)       score+=25; // ใกล้ S1 มาก
-  else if(pctFromS1<=5)  score+=15;
+  if(pctFromS1<=0.5)     score+=25; // ใกล้ S1 มาก
+  else if(pctFromS1<=1.5) score+=15;
   if(rsi<=30)            score+=20; // oversold
   else if(rsi<=45)       score+=12;
   else if(rsi<=55)       score+=5;
@@ -1888,7 +1889,7 @@ function checkBuySignal(ticker, price, s1){
   const lvl=_getLevels(ticker,price);
   const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
   // trigger เมื่อ score >= 40 และใกล้ S1
-  if(sig.pctFromS1>7||sig.score<40) return;
+  if(sig.pctFromS1>2||sig.score<40) return;
   _buyAlerted.add(ticker);
   setTimeout(()=>_buyAlerted.delete(ticker), 300000);
   showBuySignalPopup(ticker, price, s1, sig, lvl);
@@ -2037,11 +2038,31 @@ function checkZoneAlert(ticker, price, s1, r1){
     // แจ้งเตือนเมื่อราคาเพิ่งแตะหรือทะลุผ่านแนว (state เปลี่ยน)
     if(cur!==prev){
       zoneAlertState[stateKey]=cur;
-      // แจ้งเฉพาะตอนเพิ่งแตะ/ทะลุ ไม่แจ้งตอนราคากลับออก
       const crossed=(lv.type==='s'&&cur==='below')||(lv.type==='r'&&cur==='above');
       if(crossed){
         playAlertSound(lv.type);
         showToast(ticker, lv.type, lv.name, price, lv.val);
+        // ทะลุ S1 จริง → popup ใหญ่ + AI
+        if(lv.name==='S1' && lv.type==='s'){
+          const lvl2=_getLevels(ticker,price);
+          const sig=_calcBuyScore(ticker,price,lv.val,lvl2.r1);
+          showBuySignalPopup(ticker,price,lv.val,sig,lvl2);
+        }
+      }
+    }
+
+    // ใกล้ S1 ≤ 0.5% → toast เตือนล่วงหน้า
+    if(lv.name==='S1' && lv.type==='s' && cur==='above'){
+      const pctNear = lv.val>0 ? ((price-lv.val)/lv.val*100) : 99;
+      const nearKey = ticker+'_S1_near';
+      const wasNear = zoneAlertState[nearKey];
+      if(pctNear<=0.5 && !wasNear){
+        zoneAlertState[nearKey] = true;
+        showToast(ticker, 'near', 'S1', price, lv.val);
+        // เรียก checkBuySignal เพื่อเช็ค score ด้วย
+        checkBuySignal(ticker, price, lv.val);
+      } else if(pctNear>2){
+        zoneAlertState[nearKey] = false; // reset เมื่อออกห่างแล้ว
       }
     }
   }
