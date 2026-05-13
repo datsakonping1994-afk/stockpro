@@ -1746,34 +1746,107 @@ function showToast(ticker, type, levelName, price, level){
 
 // ── Buy Signal Popup — เงื่อนไข B ──
 const _buyAlerted=new Set(); // ป้องกันแจ้งซ้ำ
-function checkBuySignal(ticker, price, s1){
-  if(_buyAlerted.has(ticker)) return;
-  const rsi=rsiData[ticker]||50;
-  const lvl=_getLevels(ticker,price);
-  const pctFromS1=s1>0?((price-s1)/s1*100):99;
-  // เงื่อนไข: ห่าง S1 < 5% + RSI < 50
-  if(pctFromS1>5||rsi>=55) return;
-  _buyAlerted.add(ticker);
-  setTimeout(()=>_buyAlerted.delete(ticker), 300000); // reset หลัง 5 นาที
-  showBuySignalPopup(ticker, price, s1, rsi, lvl);
+// ── Buy Signal Engine — EMA Bounce + Confirmation Score ──
+function _calcBuyScore(ticker, price, s1, r1){
+  let score = 0;
+  const rsi = rsiData[ticker]||50;
+  const data = candleCache[ticker]?.data;
+  const closes = data?.c||[];
+  const vols = data?.v||[];
+
+  // ── EMA helpers ──
+  const ema = (arr,n) => {
+    if(arr.length<n) return null;
+    const k=2/(n+1); let e=arr.slice(0,n).reduce((a,b)=>a+b,0)/n;
+    for(let i=n;i<arr.length;i++) e=arr[i]*k+e*(1-k);
+    return +e.toFixed(3);
+  };
+  const ema20 = ema(closes,20);
+  const ema50 = ema(closes,50);
+  const ema200 = ema(closes,200);
+
+  // MACD
+  const m12=ema(closes,12), m26=ema(closes,26);
+  const macdLine = m12&&m26?+(m12-m26).toFixed(3):null;
+  let macdSignal=null;
+  if(closes.length>=35){
+    const ms=[];
+    for(let i=25;i<closes.length;i++){
+      const e12=ema(closes.slice(0,i+1),12),e26=ema(closes.slice(0,i+1),26);
+      if(e12&&e26) ms.push(e12-e26);
+    }
+    if(ms.length>=9) macdSignal=+ema(ms,9).toFixed(3);
+  }
+
+  // Volume
+  const volToday=vols[vols.length-1]||0;
+  const volAvg=vols.slice(-20).reduce((a,b)=>a+b,0)/Math.min(20,vols.length)||1;
+  const volRatio=+(volToday/volAvg).toFixed(2);
+
+  // EMA Bounce — ราคาอยู่เหนือ EMA และห่างน้อยกว่า 3%
+  const emaBounce20 = ema20&&price>ema20&&((price-ema20)/ema20*100)<3;
+  const emaBounce50 = ema50&&price>ema50&&((price-ema50)/ema50*100)<3;
+  const emaBounce200 = ema200&&price>ema200&&((price-ema200)/ema200*100)<5;
+
+  // คะแนน (รวม 100)
+  const pctFromS1 = s1>0?((price-s1)/s1*100):99;
+  if(pctFromS1<=2)       score+=25; // ใกล้ S1 มาก
+  else if(pctFromS1<=5)  score+=15;
+  if(rsi<=30)            score+=20; // oversold
+  else if(rsi<=45)       score+=12;
+  else if(rsi<=55)       score+=5;
+  if(macdLine&&macdSignal&&macdLine>macdSignal) score+=15; // MACD bullish
+  if(volRatio>=1.5)      score+=15; // volume สูง
+  else if(volRatio>=1.0) score+=8;
+  if(emaBounce20)        score+=10; // EMA bounce
+  if(emaBounce50)        score+=10;
+  if(emaBounce200)       score+=5;
+  if(price>ema20&&price>ema50) score+=5; // uptrend
+
+  return {
+    score: Math.min(score,100),
+    rsi, macdLine, macdSignal, volRatio,
+    ema20, ema50, ema200,
+    emaBounce20, emaBounce50, emaBounce200,
+    pctFromS1
+  };
 }
 
-function showBuySignalPopup(ticker, price, s1, rsi, lvl){
+function checkBuySignal(ticker, price, s1){
+  if(_buyAlerted.has(ticker)) return;
+  const lvl=_getLevels(ticker,price);
+  const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
+  // trigger เมื่อ score >= 40 และใกล้ S1
+  if(sig.pctFromS1>7||sig.score<40) return;
+  _buyAlerted.add(ticker);
+  setTimeout(()=>_buyAlerted.delete(ticker), 300000);
+  showBuySignalPopup(ticker, price, s1, sig, lvl);
+}
+
+function showBuySignalPopup(ticker, price, s1, sig, lvl){
   const s=stocks.find(x=>x.t===ticker);if(!s)return;
   const r1=lvl.r1||price*1.05;
   const r2=lvl.r2||price*1.10;
   const risk=price-s1;
-  const reward1=r1-price;
-  const reward2=r2-price;
-  const rr1=risk>0?(reward1/risk).toFixed(1):'N/A';
-  const rr2=risk>0?(reward2/risk).toFixed(1):'N/A';
+  const rr1=risk>0?((r1-price)/risk).toFixed(1):'N/A';
+  const rr2=risk>0?((r2-price)/risk).toFixed(1):'N/A';
   const entryLow=(price*0.998).toFixed(2);
   const entryHigh=(price*1.005).toFixed(2);
+  const score=sig.score;
+  const scoreColor=score>=70?'var(--green)':score>=50?'var(--yellow)':'var(--red)';
+  const scoreLabel=score>=70?'แข็งแกร่ง':score>=50?'ปานกลาง':'อ่อนแอ';
 
-  // เสียงสัญญาณซื้อ (สามโน้ต)
+  // EMA bounce labels
+  const emaTxt=[];
+  if(sig.emaBounce20) emaTxt.push('EMA20');
+  if(sig.emaBounce50) emaTxt.push('EMA50');
+  if(sig.emaBounce200) emaTxt.push('EMA200');
+
+  // เสียงตาม score
+  const freqs=score>=70?[[520,0],[660,0.15],[880,0.30]]:score>=50?[[520,0],[660,0.20]]:[[380,0]];
   try{
     const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    [[520,0],[660,0.15],[880,0.30]].forEach(([freq,t])=>{
+    freqs.forEach(([freq,t])=>{
       const o=ctx.createOscillator(),g=ctx.createGain();
       o.connect(g);g.connect(ctx.destination);
       o.frequency.value=freq;
@@ -1785,26 +1858,89 @@ function showBuySignalPopup(ticker, price, s1, rsi, lvl){
 
   const overlay=document.createElement('div');
   overlay.className='buy-popup-overlay';
+  const popupId='buypop-'+ticker+'-'+Date.now();
   overlay.innerHTML=`
-    <div class="buy-popup">
-      <div class="buy-popup-title">🔔 สัญญาณซื้อ ${ticker}</div>
-      <div class="buy-popup-row"><span class="buy-popup-label">💰 ราคาปัจจุบัน</span><span class="buy-popup-val">$${price.toFixed(2)}</span></div>
-      <div class="buy-popup-row"><span class="buy-popup-label">📍 ห่าง S1</span><span class="buy-popup-val" style="color:var(--green)">${((price-s1)/s1*100).toFixed(1)}%</span></div>
-      <div class="buy-popup-row"><span class="buy-popup-label">📊 RSI</span><span class="buy-popup-val" style="color:${rsi<40?'var(--green)':'var(--yellow)'}">${rsi} ${rsi<40?'(ใกล้ oversold)':'(ปกติ)'}</span></div>
+    <div class="buy-popup" style="max-width:370px">
+      <div class="buy-popup-title">🔔 สัญญาณซื้อ ${ticker}
+        <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(0,0,0,0.3);color:${scoreColor};margin-left:8px">Score ${score}/100 · ${scoreLabel}</span>
+      </div>
+
+      <!-- Score bar -->
+      <div style="background:var(--bg4);border-radius:4px;height:5px;margin-bottom:10px;overflow:hidden">
+        <div style="width:${score}%;height:100%;background:${scoreColor};border-radius:4px;transition:width 0.5s"></div>
+      </div>
+
+      <div class="buy-popup-row"><span class="buy-popup-label">💰 ราคา</span><span class="buy-popup-val">$${price.toFixed(2)}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">📍 ห่าง S1</span><span class="buy-popup-val" style="color:var(--green)">${sig.pctFromS1.toFixed(1)}%</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">📊 RSI</span><span class="buy-popup-val" style="color:${sig.rsi<40?'var(--green)':'var(--yellow)'}">${sig.rsi} ${sig.rsi<40?'(Oversold)':'(Normal)'}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">📈 MACD</span><span class="buy-popup-val" style="color:${sig.macdLine&&sig.macdSignal&&sig.macdLine>sig.macdSignal?'var(--green)':'var(--red)'}">${sig.macdLine&&sig.macdSignal?(sig.macdLine>sig.macdSignal?'Bullish ▲':'Bearish ▼'):'N/A'}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">📦 Volume</span><span class="buy-popup-val" style="color:${sig.volRatio>=1.5?'var(--green)':sig.volRatio>=1?'var(--yellow)':'var(--red)'}">${sig.volRatio}x avg ${sig.volRatio>=1.5?'(สูงผิดปกติ)':sig.volRatio>=1?'(ปกติ)':'(ต่ำ)'}</span></div>
+      ${emaTxt.length?`<div class="buy-popup-row"><span class="buy-popup-label">📐 EMA Bounce</span><span class="buy-popup-val" style="color:var(--green)">✅ ${emaTxt.join(', ')}</span></div>`:''}
       <hr class="buy-popup-divider">
-      <div class="buy-popup-row"><span class="buy-popup-label">🎯 จุดเข้าซื้อ</span><span class="buy-popup-val">$${entryLow} - $${entryHigh}</span></div>
-      <div class="buy-popup-row"><span class="buy-popup-label">🛡️ Stop Loss</span><span class="buy-popup-val" style="color:var(--red)">$${s1.toFixed(2)} (S1)</span></div>
-      <div class="buy-popup-row"><span class="buy-popup-label">🎯 Target 1</span><span class="buy-popup-val" style="color:var(--green)">$${r1.toFixed(2)} (R1) · R:R ${rr1}</span></div>
-      <div class="buy-popup-row"><span class="buy-popup-label">🎯 Target 2</span><span class="buy-popup-val" style="color:var(--green)">$${r2.toFixed(2)} (R2) · R:R ${rr2}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🎯 เข้าซื้อ</span><span class="buy-popup-val">$${entryLow} - $${entryHigh}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🛡️ Stop Loss</span><span class="buy-popup-val" style="color:var(--red)">$${s1.toFixed(2)} · S1</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🎯 T1</span><span class="buy-popup-val" style="color:var(--green)">$${r1.toFixed(2)} · R:R ${rr1}</span></div>
+      <div class="buy-popup-row"><span class="buy-popup-label">🎯 T2</span><span class="buy-popup-val" style="color:var(--green)">$${r2.toFixed(2)} · R:R ${rr2}</span></div>
       <hr class="buy-popup-divider">
-      <div class="buy-popup-summary">ราคาเข้าใกล้แนวรับ S1 และ RSI ยังไม่ overbought — สัญญาณเบื้องต้นน่าสนใจ<br><span style="color:var(--dim);font-size:10px">*ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน*</span></div>
+      <div id="${popupId}-ai" style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--dim);line-height:1.6">
+        ⏳ AI กำลังวิเคราะห์...
+      </div>
       <div class="buy-popup-btns">
         <button class="buy-popup-goto" onclick="document.querySelector('.buy-popup-overlay').remove();goCard('${ticker}')">📊 ดูหุ้น</button>
         <button class="buy-popup-close" onclick="document.querySelector('.buy-popup-overlay').remove()">✕ ปิด</button>
       </div>
+      <div style="color:var(--dim);font-size:10px;text-align:center;margin-top:6px">*ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน*</div>
     </div>`;
+
   document.body.appendChild(overlay);
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+
+  // เรียก AI วิเคราะห์ใน popup
+  _analyzeBuySignalAI(ticker, price, s1, r1, r2, sig, lvl, popupId);
+}
+
+
+async function _analyzeBuySignalAI(ticker, price, s1, r1, r2, sig, lvl, popupId){
+  const rsi = sig.rsi;
+  const volRatio = sig.volRatio;
+  const aiEl = document.getElementById(popupId+'-ai');
+  if(!aiEl) return;
+  const s = stocks.find(x=>x.t===ticker);
+  if(!s) return;
+  const pctFromS1 = s1>0?((price-s1)/s1*100).toFixed(1):0;
+  const pctToR1 = r1>0?((r1-price)/price*100).toFixed(1):0;
+  const newsItems = liveNewsCache[ticker]?.items?.slice(0,2)||newsData[ticker]?.slice(0,2)||[];
+  const newsStr = newsItems.length?newsItems.map(n=>'- '+n.h).join('\n'):'ไม่มีข่าวล่าสุด';
+
+  try{
+    const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5',
+        max_tokens:300,
+        system:'คุณคือ AI วิเคราะห์หุ้น ตอบสั้นกระชับเป็นภาษาไทย 3-4 บรรทัด ไม่ต้องมี header หรือ bullet point มาก',
+        messages:[{
+          role:'user',
+          content:`หุ้น ${ticker} (${s.n}) ราคา $${price.toFixed(2)} ใกล้แนวรับ S1=$${s1.toFixed(2)} (ห่าง ${pctFromS1}%)
+RSI=${rsi} | Volume=${volRatio}x avg | R1=$${r1.toFixed(2)} (upside ${pctToR1}%)
+ข่าวล่าสุด: ${newsStr}
+
+วิเคราะห์สั้นๆ ว่า: 1) สัญญาณนี้น่าเชื่อถือแค่ไหน 2) ควรเข้าหรือรอ 3) ความเสี่ยงหลัก`
+        }]
+      })
+    });
+    if(!res.ok){ aiEl.textContent='❌ AI ไม่พร้อมใช้งาน'; return; }
+    const d = await res.json();
+    if(d.type==='error'){ aiEl.textContent='❌ '+d.error?.message; return; }
+    const text = d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+    if(text && aiEl){
+      aiEl.style.color='var(--text2)';
+      aiEl.innerHTML='🤖 <strong>AI:</strong> '+text.replace(/\n/g,'<br>');
+    }
+  }catch(e){
+    if(aiEl) aiEl.textContent='❌ '+e.message;
+  }
 }
 
 function checkZoneAlert(ticker, price, s1, r1){
@@ -2700,23 +2836,51 @@ async function translateNewsItems(items){
   }));
 }
 
+// ── translated headlines cache — เก็บแยกจาก raw cache ──
+const _translatedHeadlines = {}; // key = headline slice(0,60) → translated
+
 async function renderNewsTab(ticker){
   const pane=document.getElementById('news-'+ticker);
   if(!pane) return;
-  pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังโหลดข่าว...</div>`;
   const cached=liveNewsCache[ticker];
   const now=Date.now();
-  // ใช้ cache เฉพาะที่แปลแล้ว (translated:true)
-  let items=cached&&cached.translated&&(now-cached.ts<120000)?cached.items:null;
-  if(!items){
-    const raw=await fetchLiveNews(ticker);
-    if(raw){
-      pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังแปลภาษา...</div>`;
-      items=await translateNewsItems(raw);
-      liveNewsCache[ticker]={items,ts:now,translated:true};
-    } else items=newsData[ticker]||[];
+  const FETCH_TTL=300000;  // ดึงข่าวใหม่ทุก 5 นาที
+  const SHOW_TTL=30000;    // แสดงผลจาก cache ได้ 30 วินาที ก่อน re-render
+
+  // ถ้ามี cache ที่แปลแล้วและยังใหม่อยู่ — แสดงผลทันที แล้ว refresh เบื้องหลัง
+  if(cached&&cached.translated&&(now-cached.ts<FETCH_TTL)){
+    // แสดงผลเดิมก่อน (ไม่ flicker)
+    if(now-cached.ts<SHOW_TTL) {
+      _renderNewsItems(pane, cached.items, ticker);
+      return;
+    }
   }
-  if(!items.length){
+
+  pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังโหลดข่าว...</div>`;
+
+  // ดึงข่าวใหม่
+  let items = null;
+  const raw = await fetchLiveNews(ticker);
+  if(raw && raw.length){
+    // แปลเฉพาะข่าวที่ยังไม่เคยแปล (ประหยัด token)
+    const toTranslate = raw.filter(n => !_translatedHeadlines[n.h?.slice(0,60)]);
+    if(toTranslate.length > 0){
+      pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังแปล ${toTranslate.length} ข่าวใหม่...</div>`;
+      const translated = await translateNewsItems(toTranslate);
+      // เก็บ cache คำแปล
+      translated.forEach(n => { if(n.h) _translatedHeadlines[n.h.slice(0,60)] = n; });
+    }
+    // merge: ใช้คำแปลที่มีอยู่ + แปลใหม่
+    items = raw.map(n => _translatedHeadlines[n.h?.slice(0,60)] || n);
+    liveNewsCache[ticker]={items,ts:now,translated:true};
+  } else {
+    items = cached?.items || newsData[ticker] || [];
+  }
+  _renderNewsItems(pane, items, ticker);
+}
+
+function _renderNewsItems(pane, items, ticker){
+  if(!items||!items.length){
     pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:10px 0;text-align:center">ไม่มีข่าว</div>`;
     return;
   }
