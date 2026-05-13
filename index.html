@@ -270,6 +270,26 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .sort-btn.active{background:rgba(0,212,255,0.1);border-color:var(--accent);color:var(--accent);}
 .view-btn{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all 0.15s;}
 .view-btn.active{background:rgba(168,85,247,0.1);border-color:var(--purple);color:var(--purple);}
+/* ── Responsive ── */
+@media(max-width:600px){
+  body{padding:8px;}
+  .grid{grid-template-columns:1fr;}
+  .sort-row{gap:4px;row-gap:6px;}
+  .sort-lbl{display:none;}
+  .controls{gap:4px;}
+  .btn{padding:6px 10px;font-size:11px;}
+  .search{width:100px;font-size:11px;}
+  .chip .val{font-size:15px;}
+  .ticker{font-size:14px;}
+  .price{font-size:15px;}
+  .card-top{padding:10px 10px 8px;}
+  .card-body{padding:8px 10px;}
+  .tabs{gap:0;}
+  .tab{padding:6px 8px;font-size:10px;}
+  .chart-modal{padding:12px;}
+  .buy-popup{padding:14px;}
+  .hdr{flex-wrap:wrap;gap:6px;}
+}
 /* ── Pin button ── */
 .pin-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:var(--bg4);color:var(--dim);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;line-height:1;padding:0;}
 .pin-btn:hover{border-color:var(--yellow);color:var(--yellow);}
@@ -361,6 +381,13 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <span class="sort-lbl">VIEW:</span>
   <button class="view-btn active" id="view-grid" onclick="setView('grid',this)">⊞ Cards</button>
   <button class="view-btn" id="view-heat" onclick="setView('heat',this)">🔥 Heatmap</button>
+  <span style="margin-left:6px;color:var(--border)">|</span>
+  <span class="sort-lbl" style="color:var(--accent)">IND:</span>
+  <button class="sort-btn active" id="gind-classic" onclick="setGlobalIndicator('classic',this)" title="Classic Pivot">Classic</button>
+  <button class="sort-btn" id="gind-camarilla" onclick="setGlobalIndicator('camarilla',this)" title="Camarilla">Cam</button>
+  <button class="sort-btn" id="gind-fibonacci" onclick="setGlobalIndicator('fibonacci',this)" title="Fibonacci">Fib</button>
+  <button class="sort-btn" id="gind-atr" onclick="setGlobalIndicator('atr',this)" title="ATR">ATR</button>
+  <button class="sort-btn" id="gind-woodie" onclick="setGlobalIndicator('woodie',this)" title="Woodie">Woodie</button>
   <span style="margin-left:6px;color:var(--border)">|</span>
   <button class="btn" id="refreshAllBtn" style="padding:3px 10px;font-size:11px;color:#fff;background:rgba(0,212,255,0.12);border-color:rgba(0,212,255,0.5);font-weight:600" onclick="refreshAll()">🔄 รีเฟรช</button>
 </div>
@@ -1347,6 +1374,17 @@ async function loadCardExtras(ticker, currentPrice){
   if(data._mock){
     const volEl=document.getElementById('vol-val-'+ticker);
     if(volEl) volEl.innerHTML+=' <span style="font-size:9px;color:var(--dim)">(~est)</span>';
+    // Fix #2: Show prominent warning banner so user knows signals are unreliable
+    const techPane=document.getElementById('tech-'+ticker);
+    if(techPane&&!techPane.querySelector('.mock-warn')){
+      const warn=document.createElement('div');
+      warn.className='mock-warn';
+      warn.style.cssText='background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.35);border-radius:5px;padding:5px 8px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:#ffd700;margin-bottom:8px;';
+      warn.textContent='⚠️ ข้อมูลกราฟเป็นการประมาณการ (proxy offline) — indicator อาจไม่ถูกต้อง';
+      techPane.prepend(warn);
+    }
+    // Disable buy signal alerts for this ticker when using mock data
+    _buyAlerted.add(ticker+'_mock');
   }
   // อัปเดตจุดสถานะเป็นพร้อมใช้งาน
   const dot=document.getElementById('dot-'+ticker);
@@ -1561,6 +1599,7 @@ function buildGrid(){
   let up=0,dn=0;
   stocks.forEach(s=>{
     if(s.c>0)up++;if(s.c<0)dn++;
+    try{
     const sp=getS(s.p,s.t),rs=getR(s.p);
     const zone=getRangeZone(s.p,sp.s1,rs.r1);
     const cc=s.c>0?'up':s.c<0?'dn':'flat';
@@ -1587,6 +1626,7 @@ function buildGrid(){
           <div>
             <div class="price ${cc}" id="price-${s.t}">$${fmt(s.p)}</div>
             <div class="chg ${cc}" id="chg-${s.t}">${s.c>0?'+':''}${s.c}%</div>
+            <div id="stale-${s.t}" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);text-align:right">~cached</div>
           </div>
           <button class="pin-btn" id="pin-${s.t}" title="ปักมุด" onclick="togglePin('${s.t}')">📌</button>
         </div>
@@ -1660,12 +1700,12 @@ function buildGrid(){
           ${s.earn?`<div class="earn-badge-sm">📅 Earnings: ${s.earn}</div>`:''}
         </div>
         <div class="tab-pane" id="trade-${s.t}">
-          <div class="trade-lbl">POSITION SIZE CALCULATOR</div>
+          <div class="trade-lbl">POSITION SIZE CALCULATOR <span style="color:var(--dim);font-size:10px">(ค่ามาตรฐาน)</span> <button onclick="resetTradeDefaults('${s.t}')" style="font-size:10px;padding:1px 6px;border-radius:3px;background:var(--bg4);border:1px solid var(--border);color:var(--dim);cursor:pointer;margin-left:4px">↺ reset</button></div>
           <div class="input-row">
             <span class="tlbl">Port ($)</span>
-            <input class="tinput" id="port-${s.t}" type="number" value="10000" oninput="calcTrade('${s.t}')">
+            <input class="tinput" id="port-${s.t}" type="number" value="10000" placeholder="10000" oninput="calcTrade('${s.t}')">
             <span class="tlbl">Risk%</span>
-            <input class="tinput" id="risk-${s.t}" type="number" value="2" oninput="calcTrade('${s.t}')">
+            <input class="tinput" id="risk-${s.t}" type="number" value="2" placeholder="2" oninput="calcTrade('${s.t}')">
           </div>
           <div class="input-row">
             <span class="tlbl">Entry</span>
@@ -1703,6 +1743,16 @@ function buildGrid(){
       <div class="card-status-dot loading" id="dot-${s.t}" title="กำลังโหลด..."></div>`;
     grid.appendChild(card);
     setTimeout(()=>calcTrade(s.t),100);
+    }catch(cardErr){
+      console.error('buildGrid card error for '+s.t+':', cardErr);
+      // Show minimal error card instead of crashing whole grid
+      const errCard=document.createElement('div');
+      errCard.className='card';errCard.id='card-'+s.t;
+      errCard.dataset.t=s.t;errCard.dataset.n=s.n?.toUpperCase()||s.t;
+      errCard.dataset.dir='flat';errCard.dataset.near='no';errCard.dataset.pinned='0';
+      errCard.innerHTML=`<div class="card-top"><div><div class="ticker">${s.t}</div><div class="company" style="color:var(--red);font-size:11px">⚠️ โหลดไม่ได้</div></div></div>`;
+      grid.appendChild(errCard);
+    }
   });
   document.getElementById('upCnt').textContent=up;
   document.getElementById('dnCnt').textContent=dn;
@@ -1762,6 +1812,22 @@ function calcTrade(t){
   }
 }
 
+// ── Fix #6: Global Indicator switcher ──
+async function setGlobalIndicator(mode, btn){
+  document.querySelectorAll('[id^="gind-"]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  await applyIndicatorAll(mode);
+}
+
+// ── Fix #7: Reset port/risk to defaults ──
+function resetTradeDefaults(t){
+  const portEl=document.getElementById('port-'+t);
+  const riskEl=document.getElementById('risk-'+t);
+  if(portEl) portEl.value=10000;
+  if(riskEl) riskEl.value=2;
+  calcTrade(t);
+}
+
 function _getLevels(t,p){
   function getLvlVal(id,fallback){
     const el=document.getElementById(id+'-'+t);
@@ -1819,6 +1885,37 @@ function showToast(ticker, type, levelName, price, level){
 // ── Buy Signal Popup — เงื่อนไข B ──
 const _buyAlerted=new Set(); // ป้องกันแจ้งซ้ำ
 // ── Buy Signal Engine — EMA Bounce + Confirmation Score ──
+// MACD signal cache to avoid recalculating O(n²) per price tick
+const _macdSignalCache={};
+function _calcMacdSignal(closes, ticker){
+  const key=ticker+'_'+closes.length+'_'+closes[closes.length-1];
+  if(_macdSignalCache[key]) return _macdSignalCache[key];
+  const ema=(arr,n)=>{
+    if(arr.length<n) return null;
+    const k=2/(n+1); let e=arr.slice(0,n).reduce((a,b)=>a+b,0)/n;
+    for(let i=n;i<arr.length;i++) e=arr[i]*k+e*(1-k);
+    return +e.toFixed(3);
+  };
+  const m12=ema(closes,12), m26=ema(closes,26);
+  const macdLine=m12&&m26?+(m12-m26).toFixed(3):null;
+  let macdSignal=null;
+  if(closes.length>=35){
+    // Incremental MACD signal — compute only once using rolling ema on MACD line
+    const ms=[];
+    for(let i=26;i<closes.length;i++){
+      const e12=ema(closes.slice(0,i+1),12),e26=ema(closes.slice(0,i+1),26);
+      if(e12&&e26) ms.push(+(e12-e26).toFixed(3));
+    }
+    if(ms.length>=9) macdSignal=+ema(ms,9).toFixed(3);
+  }
+  const result={macdLine,macdSignal};
+  // Limit cache size
+  const keys=Object.keys(_macdSignalCache);
+  if(keys.length>200) delete _macdSignalCache[keys[0]];
+  _macdSignalCache[key]=result;
+  return result;
+}
+
 function _calcBuyScore(ticker, price, s1, r1){
   let score = 0;
   const rsi = rsiData[ticker]||50;
@@ -1837,18 +1934,8 @@ function _calcBuyScore(ticker, price, s1, r1){
   const ema50 = ema(closes,50);
   const ema200 = ema(closes,200);
 
-  // MACD
-  const m12=ema(closes,12), m26=ema(closes,26);
-  const macdLine = m12&&m26?+(m12-m26).toFixed(3):null;
-  let macdSignal=null;
-  if(closes.length>=35){
-    const ms=[];
-    for(let i=25;i<closes.length;i++){
-      const e12=ema(closes.slice(0,i+1),12),e26=ema(closes.slice(0,i+1),26);
-      if(e12&&e26) ms.push(e12-e26);
-    }
-    if(ms.length>=9) macdSignal=+ema(ms,9).toFixed(3);
-  }
+  // MACD — use cached calculation
+  const {macdLine, macdSignal} = closes.length>=26 ? _calcMacdSignal(closes, ticker) : {macdLine:null,macdSignal:null};
 
   // Volume
   const volToday=vols[vols.length-1]||0;
@@ -1886,6 +1973,8 @@ function _calcBuyScore(ticker, price, s1, r1){
 
 function checkBuySignal(ticker, price, s1){
   if(_buyAlerted.has(ticker)) return;
+  // Fix #2: Don't fire buy signals when candle data is mock/estimated
+  if(candleCache[ticker]?.data?._mock) return;
   const lvl=_getLevels(ticker,price);
   const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
   // trigger เมื่อ score >= 40 และใกล้ S1
@@ -1990,8 +2079,8 @@ async function _analyzeBuySignalAI(ticker, price, s1, r1, r2, sig, lvl, popupId)
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5',
-        max_tokens:300,
-        system:'คุณคือ AI วิเคราะห์หุ้น ตอบสั้นกระชับเป็นภาษาไทย 3-4 บรรทัด ไม่ต้องมี header หรือ bullet point มาก',
+        max_tokens:500,
+        system:'คุณคือ AI วิเคราะห์หุ้น ตอบเป็นภาษาไทย กระชับ ตรงประเด็น ใช้ 3-5 ประโยค ห้ามตัดคำกลางประโยค',
         messages:[{
           role:'user',
           content:`หุ้น ${ticker} (${s.n}) ราคา $${price.toFixed(2)} ใกล้แนวรับ S1=$${s1.toFixed(2)} (ห่าง ${pctFromS1}%)
@@ -2083,6 +2172,9 @@ function updateCard(s){
     if(old&&s.p>old){pe.style.color='var(--green)';setTimeout(()=>pe.style.color='',600);}
     else if(old&&s.p<old){pe.style.color='var(--red)';setTimeout(()=>pe.style.color='',600);}
   }
+  // Fix #3: remove stale badge once live price arrives
+  const staleEl=document.getElementById('stale-'+s.t);
+  if(staleEl) staleEl.remove();
   const ce=document.getElementById('chg-'+s.t);if(ce){ce.textContent=(s.c>0?'+':'')+s.c+'%';ce.className='chg '+cc;}
   // always use indicator levels (Classic Pivot by default, or whatever is selected)
   const {s1,r1}=_getLevels(s.t,s.p);
@@ -2296,27 +2388,50 @@ function countdown(d){
   const days=Math.floor(diff/86400000),hrs=Math.floor((diff%86400000)/3600000);
   return days>0?`อีก ${days}วัน ${hrs}ชม.`:`อีก ${hrs}ชม.`;
 }
+// Fix #6: Auto-compute earnings status dynamically so it never goes stale
+const _thMonths={'ม.ค.':0,'ก.พ.':1,'มี.ค.':2,'เม.ย.':3,'พ.ค.':4,'มิ.ย.':5,'ก.ค.':6,'ส.ค.':7,'ก.ย.':8,'ต.ค.':9,'พ.ย.':10,'ธ.ค.':11};
+function _parseEarningsDate(dstr){
+  const p=dstr.trim().split(' ');
+  if(p.length>=3){
+    const day=parseInt(p[0]);
+    const mon=_thMonths[p[1]];
+    const yr=parseInt(p[2])-543; // Buddhist era → AD
+    if(!isNaN(day)&&mon!==undefined&&!isNaN(yr)) return new Date(yr,mon,day,20,30,0);
+  }
+  return null;
+}
+function _getEarningsSt(e){
+  const d=_parseEarningsDate(e.d);
+  if(!d) return e.st; // can't parse (e.g. "ปลาย พ.ค.") — keep original
+  const now=new Date();
+  const diff=d-now;
+  if(diff<0) return 'done';
+  if(diff<7*24*3600*1000) return 'soon';
+  return 'future';
+}
+
 function renderEarnings(){
   const body=document.getElementById('earningsBody');
   function row(e){
-    const isDone=e.st==='done',isSoon=e.st==='soon';
+    const st=_getEarningsSt(e);
+    const isDone=st==='done',isSoon=st==='soon';
     const bg=isDone?'rgba(0,230,118,0.04)':isSoon?'rgba(255,215,0,0.06)':'var(--bg3)';
     const bc=isDone?'rgba(0,230,118,0.25)':isSoon?'rgba(255,215,0,0.3)':'var(--border)';
     const tc=isDone?'var(--green)':isSoon?'var(--yellow)':'var(--text2)';
-    const badge=isDone?`<span class="earn-badge earn-done">${e.res}</span>`:isSoon?`<span class="earn-badge earn-soon">${countdown(e.d)||'⏳'}</span>`:`<span style="color:var(--dim);font-size:11px">—</span>`;
+    const badge=isDone?`<span class="earn-badge earn-done">${e.res||'✅ Done'}</span>`:isSoon?`<span class="earn-badge earn-soon">${countdown(e.d)||'⏳'}</span>`:`<span style="color:var(--dim);font-size:11px">—</span>`;
     return`<div class="earn-row" style="background:${bg};border-color:${bc}" onclick="goCard('${e.t}')">
       <span class="earn-ticker" style="color:${tc}">${e.t}</span><span class="earn-name">${e.n}</span>
       <span class="earn-date">${e.d}</span><span class="earn-eps">${e.eps||'—'}</span>
       <span class="earn-rev">${e.rev||'—'}</span>${badge}</div>`;
   }
-  const soon=earningsData.filter(e=>e.st==='soon');
-  const done=earningsData.filter(e=>e.st==='done');
-  const future=earningsData.filter(e=>e.st==='future');
+  const soon=earningsData.filter(e=>_getEarningsSt(e)==='soon');
+  const done=earningsData.filter(e=>_getEarningsSt(e)==='done');
+  const future=earningsData.filter(e=>_getEarningsSt(e)==='future'||(!_parseEarningsDate(e.d)&&e.st==='future'));
   body.innerHTML=
     `<div class="earn-hdr"><span>Ticker</span><span>บริษัท</span><span>วันที่</span><span>EPS</span><span>Rev</span><span>สถานะ</span></div>`+
-    `<div class="earn-grp" style="color:var(--yellow)">⏳ เร็วๆ นี้</div>`+soon.map(row).join('')+
-    `<div class="earn-grp" style="color:var(--green)">✅ รายงานแล้ว</div>`+done.map(row).join('')+
-    `<div class="earn-grp" style="color:var(--dim)">📅 อนาคต</div>`+future.map(row).join('');
+    (soon.length?`<div class="earn-grp" style="color:var(--yellow)">⏳ เร็วๆ นี้</div>`+soon.map(row).join(''):'')+
+    (done.length?`<div class="earn-grp" style="color:var(--green)">✅ รายงานแล้ว</div>`+done.map(row).join(''):'')+
+    (future.length?`<div class="earn-grp" style="color:var(--dim)">📅 อนาคต</div>`+future.map(row).join(''):'');
 }
 // ═══════════════════════════════════════════════════════
 // AI ENGINE — Claude Sonnet + Streaming + Chat
@@ -2611,7 +2726,13 @@ async function sendAIChat(t) {
   } else {
     msgDiv.innerHTML = full.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     aiChatHistory[t].push({ role: 'assistant', content: full });
-    if (aiChatHistory[t].length > 20) aiChatHistory[t] = aiChatHistory[t].slice(-20);
+    // Fix #5: Keep last 10 messages AND limit total chars to ~4000 to avoid huge context
+    if (aiChatHistory[t].length > 10) aiChatHistory[t] = aiChatHistory[t].slice(-10);
+    let totalChars = aiChatHistory[t].reduce((sum,m)=>sum+m.content.length,0);
+    while(totalChars > 4000 && aiChatHistory[t].length > 2){
+      aiChatHistory[t].shift();
+      totalChars = aiChatHistory[t].reduce((sum,m)=>sum+m.content.length,0);
+    }
   }
   if (sendBtn) sendBtn.disabled = false;
   if (aibtn) aibtn.disabled = false;
@@ -2771,18 +2892,6 @@ async function fallbackPoll(){
     if(extra.length>0) await Promise.all(extra.map(async s=>{
       const d=await fetchOne(s.t); if(d){s.p=d.price;s.c=d.change;updateCard(s);}
     }));
-    return;
-  }
-  // ถ้า WS ติดอยู่ ให้ poll ช้าลง (WS เป็นหลัก)
-  if(wsReady) {
-    // WS ติด — poll แค่หุ้นที่เกิน WS limit (index 50-51)
-    const extraStocks = stocks.slice(WS_MAX_SUBS);
-    if(extraStocks.length > 0){
-      await Promise.all(extraStocks.map(async s=>{
-        const d=await fetchOne(s.t);
-        if(d){s.p=d.price;s.c=d.change;updateCard(s);}
-      }));
-    }
     return;
   }
   _pollRunning=true;
@@ -3140,16 +3249,43 @@ try {
 async function applyIndicatorAll(mode='classic'){
   const st=document.getElementById('statusbar');
   st.innerHTML=`⏳ กำลังโหลด ${mode.toUpperCase()} Pivot ทุก card...`;
+  // ── ตั้ง Classic เป็น default ทุก card ก่อนโหลด ──
+  stocks.forEach(s=>{
+    const sel=document.getElementById('indselector-'+s.t);
+    if(!sel) return;
+    sel.querySelectorAll('.ind-btn').forEach(b=>b.classList.remove('active'));
+    const modeMap={classic:0,camarilla:1,fibonacci:2,atr:3,woodie:4};
+    const idx=modeMap[mode]??0;
+    const target=sel.querySelectorAll('.ind-btn')[idx];
+    if(target) target.classList.add('active');
+  });
   // ── FIX 6: batch 8 + delay 150ms → indicator ครบใน ~1s (จากเดิม ~3s) ──
   for(let i=0;i<stocks.length;i+=8){
     await Promise.all(stocks.slice(i,i+8).map(s=>{
-      const btn=document.querySelector(`#indselector-${s.t} .ind-btn.active`);
+      const sel=document.getElementById('indselector-'+s.t);
+      const btn=sel?.querySelector('.ind-btn.active');
       return btn ? setIndicator(s.t,mode,btn) : Promise.resolve();
     }));
     await new Promise(r=>setTimeout(r,150));
   }
   document.getElementById('statusbar').innerHTML=`✅ Classic Pivot โหลดครบ · ${new Date().toLocaleTimeString('th-TH')}`;
   _pivotReady=true;
+  // Fix #3: initialize zone states AFTER pivot loaded to prevent false alerts on startup
+  stocks.forEach(s=>{
+    const lvl=_getLevels(s.t,s.p);
+    const levels=[
+      {name:'S1',val:lvl.s1,type:'s'},{name:'S2',val:lvl.s2,type:'s'},{name:'S3',val:lvl.s3,type:'s'},
+      {name:'R1',val:lvl.r1,type:'r'},{name:'R2',val:lvl.r2,type:'r'},{name:'R3',val:lvl.r3,type:'r'},
+    ];
+    levels.forEach(lv=>{
+      if(!lv.val||lv.val<=0) return;
+      const cur=lv.type==='s'?(s.p<=lv.val?'below':'above'):(s.p>=lv.val?'above':'below');
+      zoneAlertState[s.t+'_'+lv.name]=cur;
+    });
+    // reset near-S1 state too
+    zoneAlertState[s.t+'_S1_near']=false;
+  });
+  zoneAlertReady=true;
   updateAlerts();
 }
 
@@ -3192,8 +3328,11 @@ async function refreshAll(){
 
   // 3. โหลด Sparkline + Volume + MA ใหม่
   st.innerHTML=`✅ [2/4] Indicator ครบ · ⏳ [3/4] โหลด Sparkline & MA...`;
-  // clear candle cache เพื่อบังคับ re-fetch
-  Object.keys(candleCache).forEach(k=>{ if(candleCache[k]) candleCache[k].ts=0; });
+  // Fix #4: Only clear stale candle cache (>15min old), keep fresh data
+  const CANDLE_STALE = 900000; // 15 minutes
+  Object.keys(candleCache).forEach(k=>{
+    if(candleCache[k] && (Date.now()-candleCache[k].ts) > CANDLE_STALE) candleCache[k].ts=0;
+  });
   await loadAllExtras();
 
   // 4. รีเฟรชข่าวทุก tab ที่เปิดอยู่
@@ -3248,20 +3387,7 @@ async function startup(){
   await new Promise(r=>setTimeout(r,500));
   // 3. Load sparkline + volume + MA (uses daily candle API, separate from quote)
   await loadAllExtras();
-  // 4. initialize zone states ก่อน เพื่อกัน popup ตอนเริ่ม
-  stocks.forEach(s=>{
-    const lvl=_getLevels(s.t,s.p);
-    const levels=[
-      {name:'S1',val:lvl.s1,type:'s'},{name:'S2',val:lvl.s2,type:'s'},{name:'S3',val:lvl.s3,type:'s'},
-      {name:'R1',val:lvl.r1,type:'r'},{name:'R2',val:lvl.r2,type:'r'},{name:'R3',val:lvl.r3,type:'r'},
-    ];
-    levels.forEach(lv=>{
-      if(!lv.val||lv.val<=0) return;
-      const cur=lv.type==='s'?(s.p<=lv.val?'below':'above'):(s.p>=lv.val?'above':'below');
-      zoneAlertState[s.t+'_'+lv.name]=cur;
-    });
-  });
-  zoneAlertReady=true;
+  // zoneAlertReady is now set inside applyIndicatorAll after pivot loads correctly
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3538,7 +3664,9 @@ async function runAIMarketSummary(){
   const overbought=Object.entries(rsiData).filter(([t,r])=>r>=70).map(([t,r])=>`${t}(${r})`);
   const oversold=Object.entries(rsiData).filter(([t,r])=>r<=30).map(([t,r])=>`${t}(${r})`);
 
+  const todayStr = new Date().toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const prompt=`วิเคราะห์ภาพรวมตลาดหุ้นจากพอร์ตนี้ (${stocks.length} ตัว) เป็นภาษาไทย กระชับ ตรงประเด็น:
+📅 วันที่: ${todayStr}
 
 📊 ภาพรวม: บวก ${up} ตัว / ลบ ${dn} ตัว
 🚀 ขึ้นแรง: ${topGainers.map(s=>`${s.t}(+${s.c}%)`).join(', ')||'ไม่มี'}
