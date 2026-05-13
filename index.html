@@ -2425,8 +2425,7 @@ async function streamClaude(systemPrompt, messages, onChunk, onDone) {
   // ── ตรวจ ReadableStream support (iOS Safari เก่าไม่รองรับ) ──
   const supportsStream = typeof ReadableStream !== 'undefined' && typeof TextDecoder !== 'undefined';
 
-  if (supportsStream) {
-    // ── Streaming mode ──
+  if (false) { // Streaming disabled — Worker forces non-streaming
     try {
       const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
         method: 'POST', headers,
