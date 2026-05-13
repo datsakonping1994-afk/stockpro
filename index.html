@@ -2707,11 +2707,20 @@ function wsConnect(){
     clearInterval(wsPingInterval);
     if(isLive){
       _wsReconnectCount++;
-      // reconnect เร็ว: 1s→2s→4s→max 10s (ไม่รอนาน)
-      const delay=Math.min(1000*Math.pow(2,_wsReconnectCount-1), 10000);
       const st=document.getElementById('statusbar');
-      st.innerHTML=`🔴 WS หลุด · เชื่อมใหม่ใน ${(delay/1000).toFixed(0)}s (ครั้งที่ ${_wsReconnectCount}) · HTTP poll แทน`;
-      // เร่ง HTTP poll ระหว่างรอ WS
+      // ตรวจตลาดเปิด/ปิด
+      const _n=new Date(),_h=_n.getUTCHours(),_m=_n.getUTCMinutes(),_d=_n.getUTCDay();
+      const _open=_d>=1&&_d<=5&&(_h>13||(_h===13&&_m>=30))&&_h<20;
+      // หยุด reconnect ถ้าตลาดปิด หรือ reconnect เกิน 15 ครั้ง
+      if(!_open||_wsReconnectCount>15){
+        st.innerHTML=`⚫ ${_open?'WS หยุด (reconnect เกิน 15 ครั้ง)':'ตลาดปิด'} · HTTP poll แทน`;
+        clearInterval(httpPollTimer);
+        httpPollTimer=setInterval(async()=>{ if(isLive) await fallbackPoll(); },30000);
+        return;
+      }
+      const delay=Math.min(1000*Math.pow(2,_wsReconnectCount-1), 10000);
+      st.innerHTML=`🔴 WS หลุด · เชื่อมใหม่ใน ${(delay/1000).toFixed(0)}s (ครั้งที่ ${_wsReconnectCount})`;
+      // เร่ง HTTP poll 5s ระหว่างรอ WS reconnect
       clearInterval(httpPollTimer);
       httpPollTimer=setInterval(async()=>{ if(isLive&&!wsReady) await fallbackPoll(); },5000);
       _wsReconnectTimer=setTimeout(()=>{
@@ -2737,6 +2746,26 @@ let httpPollTimer=null; // setInterval handle
 let _pollRunning=false;
 async function fallbackPoll(){
   if(!isLive||_pollRunning) return;
+  // ถ้า WS ติดอยู่ → poll เฉพาะหุ้นที่เกิน WS limit
+  if(wsReady){
+    const extra=stocks.slice(WS_MAX_SUBS);
+    if(extra.length>0) await Promise.all(extra.map(async s=>{
+      const d=await fetchOne(s.t); if(d){s.p=d.price;s.c=d.change;updateCard(s);}
+    }));
+    return;
+  }
+  // ถ้า WS ติดอยู่ ให้ poll ช้าลง (WS เป็นหลัก)
+  if(wsReady) {
+    // WS ติด — poll แค่หุ้นที่เกิน WS limit (index 50-51)
+    const extraStocks = stocks.slice(WS_MAX_SUBS);
+    if(extraStocks.length > 0){
+      await Promise.all(extraStocks.map(async s=>{
+        const d=await fetchOne(s.t);
+        if(d){s.p=d.price;s.c=d.change;updateCard(s);}
+      }));
+    }
+    return;
+  }
   _pollRunning=true;
   try{
   const st=document.getElementById('statusbar');
@@ -2814,13 +2843,14 @@ async function _fetchFinnhubPrice(ticker){
 async function fetchOne(ticker){
   try{
     // ── Race: Yahoo vs Finnhub — ใครตอบก่อนใช้ก่อน ──
-    const result = await Promise.race([
+    let d = await Promise.race([
       _fetchYahooPrice(ticker),
       _fetchFinnhubPrice(ticker),
-      new Promise(r=>setTimeout(()=>r(null),6000)) // timeout 6s
+      new Promise(r=>setTimeout(()=>r(null),6000))
     ]);
-    // ถ้า race ได้ null ลอง fallback ทีละตัว
-    const d = result || await _fetchFinnhubPrice(ticker) || await _fetchYahooPrice(ticker);
+    // ถ้า race ได้ null ลอง fallback ทีละตัว (ไม่เรียกซ้ำ)
+    if(!d) d = await _fetchFinnhubPrice(ticker);
+    if(!d) d = await _fetchYahooPrice(ticker);
     if(!d||!d.price||d.price<=0) return null;
 
     // อัปเดต OHLC cache
@@ -2994,6 +3024,88 @@ async function fetchLiveNews(ticker){
 }
 
 
+// ── Translate news items via Claude Worker ──
+async function translateNewsItems(items){
+  if(!items||!items.length) return items;
+  try{
+    const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
+    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5',
+        max_tokens:4000,
+        system:'แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown',
+        messages:[{role:'user',content:`input: ${JSON.stringify(toTranslate)}`}]
+      })
+    });
+    if(r.ok){
+      const d=await r.json();
+      const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+      const clean=raw.replace(/```json|```/g,'').trim();
+      const arr=JSON.parse(clean);
+      if(Array.isArray(arr)&&arr.length===items.length){
+        return items.map((n,i)=>({...n,h:arr[i]?.h||n.h,x:arr[i]?.x||n.x}));
+      }
+    }
+  }catch(e){console.warn('translateNewsItems failed:',e);}
+  return items;
+}
+
+async function renderNewsTab(ticker){
+  const pane=document.getElementById('news-'+ticker);
+  if(!pane) return;
+  const cached=liveNewsCache[ticker];
+  const now=Date.now();
+  const FETCH_TTL=300000; // 5 นาที
+
+  // ถ้ามี cache ใหม่อยู่ แสดงผลทันที
+  if(cached&&cached.translated&&(now-cached.ts<FETCH_TTL)){
+    _renderNewsItems(pane,cached.items,ticker);
+    return;
+  }
+
+  pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังโหลดข่าว...</div>`;
+
+  const raw=await fetchLiveNews(ticker);
+  let items=null;
+  if(raw&&raw.length){
+    const toTranslate=raw.filter(n=>!_translatedCache[n.h?.slice(0,60)]);
+    if(toTranslate.length>0){
+      pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:14px 0;text-align:center">⏳ กำลังแปล ${toTranslate.length} ข่าว...</div>`;
+      const translated=await translateNewsItems(toTranslate);
+      translated.forEach(n=>{if(n.h) _translatedCache[n.h.slice(0,60)]=n;});
+    }
+    items=raw.map(n=>_translatedCache[n.h?.slice(0,60)]||n);
+    liveNewsCache[ticker]={items,ts:now,translated:true};
+  } else {
+    items=cached?.items||newsData[ticker]||[];
+  }
+  _renderNewsItems(pane,items,ticker);
+}
+
+function _renderNewsItems(pane,items,ticker){
+  if(!items||!items.length){
+    pane.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:10px 0;text-align:center">ไม่มีข่าว</div>`;
+    return;
+  }
+  const s=stocks.find(x=>x.t===ticker);
+  const change=s?.c||0;
+  pane.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim)">📡 LIVE · ${items.length} ข่าว · ${new Date().toLocaleTimeString('th-TH')}</span>
+      <button onclick="refreshNewsTab('${ticker}')" style="font-size:10px;padding:2px 6px;border-radius:4px;background:var(--bg3);border:1px solid var(--border);color:var(--dim);cursor:pointer">🔄</button>
+    </div>
+    ${items.map(n=>`
+    <div class="news-item" ${n.u?`onclick="window.open(encodeURI('${n.u}'),'_blank')" style="cursor:pointer"`:''}>
+      <div class="news-hl">${n.h||''}</div>
+      ${n.x?`<div style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.5">${n.x.slice(0,150)}${n.x.length>150?'...':''}</div>`:''}
+      <div style="font-size:10px;color:var(--dim);margin-top:4px">${n.s||''} · ${n.d||''}</div>
+    </div>`).join('')}`;
+}
+
+const _translatedCache={};
+
 async function refreshNewsTab(ticker){
   delete liveNewsCache[ticker]; // force fresh fetch
   await renderNewsTab(ticker);
@@ -3104,7 +3216,15 @@ async function startup(){
       renderNewsTab(t);
     });
   },300000);
-  // 1. Start live prices (WS + HTTP พร้อมกัน)
+  // 1. Auto-start Live ทันทีที่เปิดแอป
+  // ตรวจตลาดเปิด/ปิดก่อน
+  const _now = new Date();
+  const _utcH = _now.getUTCHours();
+  const _utcM = _now.getUTCMinutes();
+  const _utcDay = _now.getUTCDay(); // 0=Sun, 6=Sat
+  // ตลาด US เปิด 13:30-20:00 UTC (21:30-04:00 ไทย) วันจันทร์-ศุกร์
+  const _marketOpen = _utcDay >= 1 && _utcDay <= 5 &&
+    (_utcH > 13 || (_utcH === 13 && _utcM >= 30)) && _utcH < 20;
   toggleLive();
   // 2. Wait 1.5s แทน 3s — HTTP poll รอบแรกเสร็จใน ~3s แล้ว
   await new Promise(r=>setTimeout(r,1500));
