@@ -3549,10 +3549,13 @@ async function runAIMarketSummary(){
 
 // ═══════════════════════════════════════════════════════
 // ── Gemini AI (ฟรี แทน Claude) ──
-// Claude ผ่าน Cloudflare Worker
+// AI แบบ fallback อัตโนมัติ: Claude Haiku → Gemini Flash
+const WORKER = 'https://anthropic-proxy.datsakonping1994.workers.dev';
+
 async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
+  // ── ลอง Claude Haiku ก่อน ──
   try{
-    const r = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
+    const r = await fetch(WORKER, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -3562,11 +3565,32 @@ async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
         messages: [{role: 'user', content: userPrompt}]
       })
     });
-    if(!r.ok) return null;
-    const d = await r.json();
-    if(d.type==='error') return null;
-    return d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('') || null;
-  }catch(e){ console.warn('AI error:', e); return null; }
+    if(r.ok){
+      const d = await r.json();
+      if(d.type !== 'error' && d?.content?.length){
+        return d.content.filter(b=>b.type==='text').map(b=>b.text).join('') || null;
+      }
+    }
+  }catch(e){ console.warn('Claude error:', e); }
+
+  // ── Fallback: Gemini Flash (ฟรี) ──
+  try{
+    const r2 = await fetch(WORKER + '/gemini/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        system_instruction: {parts: [{text: systemPrompt}]},
+        contents: [{parts: [{text: userPrompt}]}],
+        generationConfig: {maxOutputTokens: maxTokens, temperature: 0.7}
+      })
+    });
+    if(r2.ok){
+      const d2 = await r2.json();
+      return d2?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    }
+  }catch(e){ console.warn('Gemini fallback error:', e); }
+
+  return null;
 }
 
 
