@@ -3544,16 +3544,15 @@ async function runAIMarketSummary(){
 }
 
 // ═══════════════════════════════════════════════════════
-// ── Claude AI ผ่าน Cloudflare Worker ──
-const CLAUDE_PROXY = 'https://anthropic-proxy.datsakonping1994.workers.dev/';
-
+// ── Gemini AI (ฟรี แทน Claude) ──
+// Claude ผ่าน Cloudflare Worker
 async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
   try{
-    const r = await fetch(CLAUDE_PROXY, {
+    const r = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5',
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{role: 'user', content: userPrompt}]
@@ -3561,8 +3560,8 @@ async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
     });
     if(!r.ok) return null;
     const d = await r.json();
-    return d?.content?.[0]?.text || null;
-  }catch(e){ console.warn('Claude error:', e); return null; }
+    return d?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  }catch(e){ console.warn('Gemini error:', e); return null; }
 }
 
 // SUPABASE AUTH — ใช้ fetch โดยตรง ไม่ต้องพึ่ง CDN
