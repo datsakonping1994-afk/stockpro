@@ -2525,27 +2525,19 @@ async function doAI(t, btn) {
   const msgDiv = appendAIMsg(chatEl, 'assistant', '▋', true);
   aiChatHistory[t].push({ role: 'user', content: ctx.userPrompt });
 
-  await streamClaude(
-    ctx.systemPrompt,
-    [{ role: 'user', content: ctx.userPrompt }],
-    (partial) => {
-      msgDiv.className = 'ai-msg assistant ai-typing';
-      msgDiv.innerHTML = partial.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      chatEl.scrollTop = chatEl.scrollHeight;
-    },
-    (full, err) => {
-      msgDiv.classList.remove('ai-typing');
-      if (err || !full) {
-        msgDiv.className = 'ai-msg error';
-        msgDiv.textContent = '❌ เกิดข้อผิดพลาด: ' + (err || 'ไม่มีข้อมูล');
-      } else {
-        msgDiv.innerHTML = full.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        aiChatHistory[t].push({ role: 'assistant', content: full });
-      }
-      btn.disabled = false; btn.textContent = '🔄 วิเคราะห์ใหม่';
-      if (sendBtn) sendBtn.disabled = false;
-    }
-  );
+  msgDiv.className = 'ai-msg assistant ai-typing';
+  msgDiv.innerHTML = '⏳ AI กำลังวิเคราะห์...';
+  const full = await callGemini(ctx.systemPrompt, ctx.userPrompt, 1200);
+  msgDiv.classList.remove('ai-typing');
+  if (!full) {
+    msgDiv.className = 'ai-msg error';
+    msgDiv.textContent = '❌ ไม่ได้รับข้อมูลจาก AI';
+  } else {
+    msgDiv.innerHTML = full.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    aiChatHistory[t].push({ role: 'assistant', content: full });
+  }
+  btn.disabled = false; btn.textContent = '🔄 วิเคราะห์ใหม่';
+  if (sendBtn) sendBtn.disabled = false;
 }
 
 // ── sendAIChat: follow-up chat ──
@@ -2579,29 +2571,22 @@ async function sendAIChat(t) {
   const ctx = await buildAIContext(t);
   const systemPrompt = ctx?.systemPrompt || 'คุณคือ AI นักวิเคราะห์หุ้น ตอบเป็นภาษาไทย กระชับ ตรงประเด็น';
 
-  await streamClaude(
-    systemPrompt,
-    aiChatHistory[t],
-    (partial) => {
-      msgDiv.className = 'ai-msg assistant ai-typing';
-      msgDiv.innerHTML = partial.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      chatEl.scrollTop = chatEl.scrollHeight;
-    },
-    (full, err) => {
-      msgDiv.classList.remove('ai-typing');
-      if (err || !full) {
-        msgDiv.className = 'ai-msg error';
-        msgDiv.textContent = '❌ ' + (err || 'เกิดข้อผิดพลาด');
-      } else {
-        msgDiv.innerHTML = full.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        aiChatHistory[t].push({ role: 'assistant', content: full });
-        // จำกัด history ไม่เกิน 20 messages เพื่อป้องกัน token overflow
-        if (aiChatHistory[t].length > 20) aiChatHistory[t] = aiChatHistory[t].slice(-20);
-      }
-      if (sendBtn) sendBtn.disabled = false;
-      if (aibtn) aibtn.disabled = false;
-    }
-  );
+  msgDiv.className = 'ai-msg assistant ai-typing';
+  msgDiv.innerHTML = '⏳ กำลังคิด...';
+  const history = aiChatHistory[t].map(m => m.role+': '+m.content).join('\n');
+  const fullPrompt = history + '\nuser: ' + text;
+  const full = await callGemini(systemPrompt, fullPrompt, 800);
+  msgDiv.classList.remove('ai-typing');
+  if (!full) {
+    msgDiv.className = 'ai-msg error';
+    msgDiv.textContent = '❌ ไม่ได้รับข้อมูล';
+  } else {
+    msgDiv.innerHTML = full.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    aiChatHistory[t].push({ role: 'assistant', content: full });
+    if (aiChatHistory[t].length > 20) aiChatHistory[t] = aiChatHistory[t].slice(-20);
+  }
+  if (sendBtn) sendBtn.disabled = false;
+  if (aibtn) aibtn.disabled = false;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2729,8 +2714,11 @@ function wsConnect(){
       // เร่ง HTTP poll 5s ระหว่างรอ WS reconnect
       clearInterval(httpPollTimer);
       httpPollTimer=setInterval(async()=>{ if(isLive&&!wsReady) await fallbackPoll(); },5000);
-      _wsReconnectTimer=setTimeout(()=>{
-        if(isLive&&(!ws||ws.readyState>1)) wsConnect();
+      _wsReconnectTimer=setTimeout(async()=>{
+        if(isLive&&(!ws||ws.readyState>1)){
+          await _fetchWsKey();
+          wsConnect();
+        }
       }, delay);
     }
   };
@@ -2882,7 +2870,11 @@ async function toggleLive(){
     btn.textContent='⏸ Stop';btn.style.color='var(--red)';
     document.getElementById('statusbar').innerHTML='🔄 กำลังเชื่อมต่อ...';
     // WS เป็นหลัก (real-time) + HTTP poll เป็น backup
-    try{ wsConnect(); }catch(e){}
+    // fetch WS key ก่อนแล้วค่อย connect
+    try{
+      await _fetchWsKey();
+      wsConnect();
+    }catch(e){ console.warn('WS connect failed:',e); }
     await fallbackPoll();
     clearInterval(httpPollTimer);
     // ตอนเริ่ม WS ยังไม่พร้อม → poll ทุก 5s ก่อน (wsOpen จะเปลี่ยนเป็น 30s เอง)
@@ -3035,19 +3027,11 @@ async function translateNewsItems(items){
   if(!items||!items.length) return items;
   try{
     const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
-    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-haiku-4-5',
-        max_tokens:4000,
-        system:'แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown',
-        messages:[{role:'user',content:`input: ${JSON.stringify(toTranslate)}`}]
-      })
-    });
-    if(r.ok){
-      const d=await r.json();
-      const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+    const raw = await callGemini(
+      'แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown',
+      `input: ${JSON.stringify(toTranslate)}`, 4000
+    );
+    if(raw){
       const clean=raw.replace(/```json|```/g,'').trim();
       const arr=JSON.parse(clean);
       if(Array.isArray(arr)&&arr.length===items.length){
@@ -3548,21 +3532,9 @@ async function runAIMarketSummary(){
 ลงท้ายด้วย: ⚠️ ข้อมูลเพื่อการศึกษาเท่านั้น`;
 
   try{
-    const res=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-5',
-        max_tokens:1000,
-        system:'คุณคือ AI นักวิเคราะห์ตลาดหุ้น ตอบเป็นภาษาไทย กระชับ ตรงประเด็น มีประโยชน์',
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    if(!res.ok){ body.textContent='❌ API error '+res.status; return; }
-    const d=await res.json();
-    if(d.type==='error'){ body.textContent='❌ '+d.error?.message; return; }
-    const text=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
-    body.textContent=text||'ไม่ได้รับข้อมูล';
+    const text = await callGemini('คุณคือ AI นักวิเคราะห์ตลาดหุ้น ตอบเป็นภาษาไทย กระชับ ตรงประเด็น มีประโยชน์', prompt, 1000);
+    if(!text){ body.textContent='❌ ไม่ได้รับข้อมูลจาก AI'; return; }
+    body.textContent=text;
     timeEl.textContent=new Date().toLocaleTimeString('th-TH');
   }catch(e){
     body.textContent='❌ '+e.message;
@@ -3572,6 +3544,27 @@ async function runAIMarketSummary(){
 }
 
 // ═══════════════════════════════════════════════════════
+// ── Gemini AI (ฟรี แทน Claude) ──
+const GEMINI_KEY = 'AIzaSyCfrII66ndKAblLq1eVEDcprjldA-iFTXk';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+
+async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
+  try{
+    const r = await fetch(GEMINI_URL + GEMINI_KEY, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        system_instruction: {parts: [{text: systemPrompt}]},
+        contents: [{parts: [{text: userPrompt}]}],
+        generationConfig: {maxOutputTokens: maxTokens, temperature: 0.7}
+      })
+    });
+    if(!r.ok) return null;
+    const d = await r.json();
+    return d?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  }catch(e){ console.warn('Gemini error:', e); return null; }
+}
+
 // SUPABASE AUTH — ใช้ fetch โดยตรง ไม่ต้องพึ่ง CDN
 // Auth ผ่าน Cloudflare Worker (ป้องกัน CORS)
 const _SUPA_URL = 'https://anthropic-proxy.datsakonping1994.workers.dev';
