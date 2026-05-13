@@ -3544,25 +3544,25 @@ async function runAIMarketSummary(){
 }
 
 // ═══════════════════════════════════════════════════════
-// ── Gemini AI (ฟรี แทน Claude) ──
-const GEMINI_KEY = 'AIzaSyCfrII66ndKAblLq1eVEDcprjldA-iFTXk';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+// ── Claude AI ผ่าน Cloudflare Worker ──
+const CLAUDE_PROXY = 'https://anthropic-proxy.datsakonping1994.workers.dev/claude/';
 
 async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
   try{
-    const r = await fetch(GEMINI_URL + GEMINI_KEY, {
+    const r = await fetch(CLAUDE_PROXY, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        system_instruction: {parts: [{text: systemPrompt}]},
-        contents: [{parts: [{text: userPrompt}]}],
-        generationConfig: {maxOutputTokens: maxTokens, temperature: 0.7}
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{role: 'user', content: userPrompt}]
       })
     });
     if(!r.ok) return null;
     const d = await r.json();
-    return d?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  }catch(e){ console.warn('Gemini error:', e); return null; }
+    return d?.content?.[0]?.text || null;
+  }catch(e){ console.warn('Claude error:', e); return null; }
 }
 
 // SUPABASE AUTH — ใช้ fetch โดยตรง ไม่ต้องพึ่ง CDN
