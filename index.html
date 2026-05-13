@@ -3612,10 +3612,15 @@ async function doLogout(){
   if(typeof isLive!=='undefined'&&isLive) toggleLive();
 }
 
+let _appStarted = false;
 function _showApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('mainApp').style.display='';
   document.getElementById('logoutBtn').style.display='inline-block';
+  if(!_appStarted){
+    _appStarted = true;
+    startup();
+  }
 }
 
 // ตรวจ session ที่มีอยู่
