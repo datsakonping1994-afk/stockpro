@@ -335,7 +335,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 // ── Merged: best features from all versions ──────────────────────────────────
 // ⚠️ WARNING: API keys เหล่านี้มองเห็นได้ใน browser — อย่า deploy บน server สาธารณะ
 const FINNHUB_KEY='d802m6hr01qj3ct8r57gd802m6hr01qj3ct8r580';
-const ANTHROPIC_KEY='sk-ant-api03-3WbyF4iBocrmyrTHL1PKSnZ44a7GQI8LVjZ4ZZlFpHbqPfZPA6NMOUL0VHUMkKE6I9KYi6R7ilwzeG9PDmY5Tw-5PXv0wAA';
+// ANTHROPIC_KEY moved to Cloudflare Worker (anthropic-proxy.datsakonping1994.workers.dev)
 const stocks=[
   {t:"RKLB",n:"Rocket Lab",p:105.47,c:34.22,pe:null,mktcap:"38.4B",rev:"32%",earn:"8 พ.ค. 2026"},
   {t:"EOSE",n:"Eos Energy",p:8.01,c:25.94,pe:null,mktcap:"0.8B",rev:"120%",earn:null},
@@ -2219,10 +2219,7 @@ async function streamClaude(systemPrompt, messages, onChunk, onDone) {
     messages
   });
   const headers = {
-    'Content-Type': 'application/json',
-    'x-api-key': ANTHROPIC_KEY,
-    'anthropic-version': '2023-06-01',
-    'anthropic-dangerous-direct-browser-calls': 'true'
+    'Content-Type': 'application/json'
   };
 
   // ── ตรวจ ReadableStream support (iOS Safari เก่าไม่รองรับ) ──
@@ -2231,7 +2228,7 @@ async function streamClaude(systemPrompt, messages, onChunk, onDone) {
   if (supportsStream) {
     // ── Streaming mode ──
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
         method: 'POST', headers,
         body: JSON.stringify({ ...JSON.parse(body), stream: true })
       });
@@ -2285,8 +2282,8 @@ async function streamClaude(systemPrompt, messages, onChunk, onDone) {
 async function _claudeFallback(headers, body, onChunk, onDone) {
   try {
     onChunk('⏳ กำลังวิเคราะห์...');
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers, body
+    const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body
     });
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
@@ -2653,14 +2650,9 @@ async function translateTH(text){
   const cacheKey=text.slice(0,80);
   if(_translateCache[cacheKey]) return _translateCache[cacheKey];
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
+    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':ANTHROPIC_KEY,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-calls':'true'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',
         max_tokens:1000,
@@ -2679,14 +2671,9 @@ async function translateNewsItems(items){
   // Batch translate ด้วย Claude AI — แปลทุก item ในครั้งเดียว แม่นยำกว่า
   try{
     const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
+    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':ANTHROPIC_KEY,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-calls':'true'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',
         max_tokens:4000,
