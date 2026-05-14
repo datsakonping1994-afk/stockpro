@@ -422,8 +422,9 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <button class="ai-summary-btn" id="aiSummaryBtn" onclick="runAIMarketSummary()">🤖 AI Summary</button>
   <button class="btn" id="muteBtn" style="font-size:14px;padding:6px 10px" onclick="toggleMute()" title="เปิด/ปิดเสียง">🔔</button>
   <button class="btn" style="font-size:11px;padding:6px 10px" onclick="showSettingsPanel()">⚙️ ตั้งค่า</button>
-
-<div id="settingsPanel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:8px">
+</div>
+<!-- FIX: settingsPanel อยู่นอก .controls div เพื่อให้ layout ถูกต้อง -->
+<div id="settingsPanel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:8px;margin-bottom:8px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text);font-weight:600">⚙️ ตั้งค่า</span>
     <button class="btn" style="padding:2px 8px;font-size:10px" onclick="document.getElementById('settingsPanel').style.display='none'">✕</button>
@@ -464,7 +465,6 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <!-- Export Trade Log -->
   <hr style="border-color:var(--border);margin:10px 0">
   <button class="btn" style="font-size:11px;padding:6px 12px;width:100%;border-color:var(--yellow);color:var(--yellow)" onclick="exportTradeLog()">📥 Export Trade Log (CSV)</button>
-</div>
 </div>
 <div class="sort-row">
   <span class="sort-lbl">SORT:</span>
@@ -612,6 +612,9 @@ const rsiData={AXON:62.4,CRWD:52.9,RBRK:35.9,NOW:58.3,PLTR:48.2,NVDA:61.7,MSFT:6
 
 const sup0={AAPL:275,GOOGL:375,MSFT:405,NVDA:204,META:590,AMZN:258,AXON:385,CRWD:498,RBRK:58,NOW:85,PLTR:125,SPGI:410,ISRG:430,NFLX:82,AVGO:405,AMD:420,MU:700,INTC:115,ANET:130,ARM:200,NVO:43,LLY:900,XOM:138,ASML:1500,RKLB:90,ASTS:68,OKLO:65,IONQ:44,KTOS:52,TEM:44,CRWV:105,NBIS:165,IREN:55,CRDO:175,VRT:315,NVTS:16,HOOD:70,SOFI:14,JPM:285,HIMS:24,EOSE:7.0,OSS:14,ONDS:8,MP:62,SNDK:1440,AEHR:88,SLNH:1.6,AVEX:22,TMDX:63,TSM:395,AAOI:135,MELI:1537};
 
+// FIX: newsData เป็นข้อมูลสำรอง (static fallback) วันที่ hardcode อยู่
+// แอปจะดึงข่าว real-time จาก Google News RSS / Yahoo Finance RSS ก่อนเสมอ
+// ข้อมูลนี้จะแสดงเฉพาะเมื่อ fetch ข่าวจริงล้มเหลวทั้งหมด
 const newsData={
   AXON:[
     {h:"Q1 2026 beat ครั้งที่ 9 ติดต่อกัน — หุ้นร่วง -5.47% profit-taking",s:"Investing.com",d:"9 พ.ค.",u:"",x:"รายได้ $807M +34% YoY แต่ราคาดึงกลับหลังพุ่ง +11% วานนี้ นักวิเคราะห์มองว่าเป็นการ profit-taking ปกติ"},
@@ -1294,7 +1297,6 @@ function drawSparkline(ticker, data, currentPrice){
   ctx.save();
   ctx.font='bold 9px IBM Plex Mono,monospace';
   ctx.textAlign='right';
-  ctx.lineHeight=1.2;
   for(let i=0;i<=scaleSteps;i++){
     const p=minP+(maxP-minP)*(i/scaleSteps);
     const y=toY(p);
@@ -2532,8 +2534,9 @@ function _calcBuyScore(ticker, price, s1, r1){
 
   // ── Volume ──
   const volToday = vols[vols.length-1]||0;
-  const volAvg   = vols.slice(-20).reduce((a,b)=>a+b,0)/Math.min(20,vols.length)||1;
-  const volRatio = +(volToday/volAvg).toFixed(2);
+  const _volSlice = vols.slice(-20);
+  const volAvg   = (_volSlice.length>0) ? _volSlice.reduce((a,b)=>a+b,0)/_volSlice.length : 1;
+  const volRatio = volAvg>0 ? +(volToday/volAvg).toFixed(2) : 1;
 
   // ── ATR + Stop Loss (utility — ไม่นับคะแนน) ──
   let atr=null, atrPct=null;
@@ -2720,11 +2723,19 @@ function _calcBuyScore(ticker, price, s1, r1){
       const up=h-ph,dn=pl-l;
       dmp.push(up>dn&&up>0?up:0); dmm.push(dn>up&&dn>0?dn:0);
     }
-    const a14=trs.reduce((a,b)=>a+b,0)/14;
-    if(a14>0){
-      diPlus=+(dmp.reduce((a,b)=>a+b,0)/14/a14*100).toFixed(1);
-      diMinus=+(dmm.reduce((a,b)=>a+b,0)/14/a14*100).toFixed(1);
-      adx=+(diPlus+diMinus>0?Math.abs(diPlus-diMinus)/(diPlus+diMinus)*100:0).toFixed(1);
+    const atr14=trs.reduce((a,b)=>a+b,0)/14;
+    if(atr14>0){
+      diPlus=+(dmp.reduce((a,b)=>a+b,0)/14/atr14*100).toFixed(1);
+      diMinus=+(dmm.reduce((a,b)=>a+b,0)/14/atr14*100).toFixed(1);
+      // FIX: ADX = smoothed average of DX values, not a single ratio
+      // คำนวณ DX ทีละแท่ง แล้ว smooth ด้วย EMA
+      const dxArr=[];
+      for(let j=0;j<trs.length;j++){
+        const dp_j=dmp[j]/atr14*100, dm_j=dmm[j]/atr14*100;
+        const sum=dp_j+dm_j;
+        dxArr.push(sum>0?Math.abs(dp_j-dm_j)/sum*100:0);
+      }
+      adx=+(dxArr.reduce((a,b)=>a+b,0)/dxArr.length).toFixed(1);
     }
   }
   if(adx!==null&&adx>=25&&diPlus>diMinus) g3+=7;
@@ -2801,9 +2812,10 @@ function _calcBuyScore(ticker, price, s1, r1){
     if(pC<pO&&c>o&&c>pO&&o<pC) engulfingPattern=true;
 
     // Morning Star — ต้องการ 4 แท่ง: o0/c0=แท่งแรก, o1/c1=แท่งกลาง, o2/c2=แท่งล่าสุด
-    const c0=closes[i-2], o0=closes[i-3]||c0;   // แท่ง 3 ก่อนหน้า
-    const c1=closes[i-1], o1=closes[i-2];         // แท่งกลาง (open = close ของแท่งก่อนหน้า)
-    const c2=closes[i],   o2=closes[i-1];         // แท่งล่าสุด
+    // FIX: ใช้ open จาก candle จริง ไม่ใช่ close ของแท่งก่อนหน้า
+    const c0=closes[i-2], o0=(data?.o?.[i-2])||(closes[i-3]||c0);  // แท่ง 3 ก่อนหน้า
+    const c1=closes[i-1], o1=(data?.o?.[i-1])||c0;                  // แท่งกลาง — open จริง
+    const c2=closes[i],   o2=(data?.o?.[i])||closes[i-1];           // แท่งล่าสุด — open จริง
     const b0=Math.abs(c0-o0),b1=Math.abs(c1-o1),b2=Math.abs(c2-o2);
     if(c0<o0&&b0>0&&b1<b0*0.4&&c2>o2&&c2>(o0+c0)/2) morningStarPattern=true;
 
@@ -2862,6 +2874,7 @@ async function checkBuySignal(ticker, price, s1){
   if(!candleCache[ticker]?.data || candleCache[ticker].data._mock){
     try{ await fetchCandles(ticker, 60); }catch{}
   }
+  // FIX: ห้ามบันทึก Trade Log ถ้ายังใช้ mock data อยู่
   if(candleCache[ticker]?.data?._mock) return;
   const lvl=_getLevels(ticker,price);
   const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
@@ -5187,6 +5200,9 @@ async function doLogout(){
   document.getElementById('loginBtn').textContent='เริ่มใช้งาน';
   document.getElementById('logoutBtn').style.display='none';
   if(typeof isLive!=='undefined'&&isLive) toggleLive();
+  // FIX: reset state ที่ค้างอยู่ใน memory เมื่อ logout
+  _buyAlerted.clear();
+  _appStarted = false;
 }
 
 let _appStarted = false;
