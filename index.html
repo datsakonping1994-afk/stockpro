@@ -418,7 +418,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <button class="btn dn" id="filterDnBtn" onclick="setFilter('dn')">▼ ลบ</button>
   <button class="btn" style="color:var(--yellow)" id="filterNearBtn" onclick="setFilter('near')">⚠ แนวรับ</button>
   <button class="btn" style="color:#ff9966;border-color:rgba(255,153,102,0.3)" onclick="togglePanel('newsPanel')">📰 ข่าวทุกหุ้น</button>
-  <button class="btn" style="color:var(--purple);border-color:rgba(168,85,247,0.3)" onclick="toggleEarnings()">📅 Earnings</button>
+  <button class="btn" style="color:var(--purple);border-color:rgba(168,85,247,0.3)" onclick="toggleEarnings()">📅 รายงานผลประกอบการ</button>
   <button class="ai-summary-btn" id="aiSummaryBtn" onclick="runAIMarketSummary()">🤖 AI Summary</button>
   <button class="btn" id="muteBtn" style="font-size:14px;padding:6px 10px" onclick="toggleMute()" title="เปิด/ปิดเสียง">🔔</button>
   <button class="btn" style="font-size:11px;padding:6px 10px" onclick="showSettingsPanel()">⚙️ ตั้งค่า</button>
@@ -504,7 +504,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 
 <!-- Earnings Panel -->
 <div id="earningsPanel" class="panel" style="border:1px solid rgba(168,85,247,0.25)">
-  <div class="panel-hdr"><span class="panel-title" style="color:var(--purple)">📅 Earnings Calendar</span><button class="btn" style="padding:3px 8px;font-size:10px" onclick="toggleEarnings()">✕</button></div>
+  <div class="panel-hdr"><span class="panel-title" style="color:var(--purple)">📅 รายงานผลประกอบการ</span><button class="btn" style="padding:3px 8px;font-size:10px" onclick="toggleEarnings()">✕</button></div>
   <div id="earningsBody"></div>
 </div>
 
@@ -1137,6 +1137,7 @@ const candleCache={};
 
 // ── สร้าง mock sparkline จากราคาปัจจุบัน เมื่อ proxy ทุกตัวล้มเหลว ──
 function _genMockCandles(ticker, currentPrice, days=60){
+  if(!currentPrice||currentPrice<=0) return null; // FIX: ป้องกัน price=0
   const c=[],h=[],l=[],o=[],v=[],t=[];
   let p=currentPrice*(0.75+Math.random()*0.1); // เริ่มที่ ~75-85% ของราคาปัจจุบัน
   const now=Math.floor(Date.now()/1000);
@@ -1209,8 +1210,10 @@ async function fetchCandles(ticker, days=60){
   const s=stocks.find(x=>x.t===ticker);
   if(s&&s.p>0){
     const data=_genMockCandles(ticker,s.p,days);
-    candleCache[ticker]={data,ts:Date.now()-240000,days}; // cache สั้นกว่า เพื่อ retry จริงเร็วขึ้น
-    return data;
+    if(data){ // FIX: ตรวจ null ก่อน cache
+      candleCache[ticker]={data,ts:Date.now()-240000,days};
+      return data;
+    }
   }
   return null;
 }
@@ -2236,6 +2239,9 @@ function buildGrid(){
   grid.appendChild(_frag); // render ทั้งหมดใน DOM ครั้งเดียว
   document.getElementById('upCnt').textContent=up;
   document.getElementById('dnCnt').textContent=dn;
+  // FIX: อัปเดตจำนวนหุ้นทั้งหมดทุกครั้งที่ buildGrid ถูกเรียก
+  const totalEl=document.getElementById('totalCnt');
+  if(totalEl) totalEl.textContent=stocks.length;
   updateAlerts();
 }
 
@@ -2743,10 +2749,12 @@ function _calcBuyScore(ticker, price, s1, r1){
 
   // RSI divergence
   let rsiDivergence=false;
-  if(closes.length>=10&&lows.length>=10){
+  // FIX: ต้องการ closes.length>=15 เพื่อให้ closes.length-14 >= 1 (ไม่ติดลบ)
+  if(closes.length>=15&&lows.length>=10){
     const rLow=Math.min(...lows.slice(-5)),pLow=Math.min(...lows.slice(-10,-5));
     const gains=[],losses=[];
-    for(let i=closes.length-14;i<closes.length;i++){
+    const startIdx=Math.max(1, closes.length-14); // FIX: ไม่ให้ index ติดลบ
+    for(let i=startIdx;i<closes.length;i++){
       const d=closes[i]-(closes[i-1]||closes[i]);
       if(d>=0)gains.push(d);else losses.push(Math.abs(d));
     }
@@ -2870,19 +2878,19 @@ function _calcBuyScore(ticker, price, s1, r1){
 
 async function checkBuySignal(ticker, price, s1){
   if(_buyAlerted.has(ticker)) return;
+  // FIX: add ก่อน await เพื่อป้องกัน race condition จาก 2 tick พร้อมกัน
+  _buyAlerted.add(ticker);
+  setTimeout(()=>_buyAlerted.delete(ticker), 600000);
   // โหลด candle ถ้ายังไม่มี หรือมีแต่เป็น mock
   if(!candleCache[ticker]?.data || candleCache[ticker].data._mock){
     try{ await fetchCandles(ticker, 60); }catch{}
   }
   // FIX: ห้ามบันทึก Trade Log ถ้ายังใช้ mock data อยู่
-  if(candleCache[ticker]?.data?._mock) return;
+  if(candleCache[ticker]?.data?._mock){ _buyAlerted.delete(ticker); return; }
   const lvl=_getLevels(ticker,price);
   const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
   // FIX: เพิ่ม threshold เป็น 55 ลด false signal
-  if(sig.pctFromS1>0.5||sig.score<55) return;
-  _buyAlerted.add(ticker);
-  // FIX: cooldown 10 นาที
-  setTimeout(()=>_buyAlerted.delete(ticker), 600000);
+  if(sig.pctFromS1>0.5||sig.score<55){ _buyAlerted.delete(ticker); return; }
   // บันทึก trade log
   logTrade(ticker, price, s1, lvl.r1, sig.score);
   showBuySignalPopup(ticker, price, s1, sig, lvl);
@@ -2990,6 +2998,8 @@ function showBuySignalPopup(ticker, price, s1, sig, lvl){
       <div style="color:var(--dim);font-size:10px;text-align:center;margin-top:6px">*เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน*</div>
     </div>`;
 
+  // FIX: ลบ popup เก่าก่อนเพื่อป้องกันซ้อนกัน
+  document.querySelector('.buy-popup-overlay')?.remove();
   document.body.appendChild(overlay);
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
 
@@ -3118,6 +3128,8 @@ ${(()=>{const st=getTradeStats();return st?`📊 สถิติที่ผ่�
 🎯 เป้าหมาย 1: $${r1.toFixed(2)} | เป้าหมาย 2: $${r2?r2.toFixed(2):'N/A'} | ตัดขาดทุน: $${sig.atrStopLoss||'[แนะนำ]'} ${sig.atrStopLoss?'(S1−1.5×ATR)':''} | อัตราเสี่ยง/ผลตอบแทน: ${rr1}:1`;
 
   try{
+    const _bsCtrl=new AbortController();
+    const _bsTimeout=setTimeout(()=>_bsCtrl.abort(),30000);
     const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -3126,8 +3138,10 @@ ${(()=>{const st=getTradeStats();return st?`📊 สถิติที่ผ่�
         max_tokens:600,
         system:'คุณคือที่ปรึกษาหุ้นที่พูดภาษาไทยแบบชาวบ้านเข้าใจได้ ห้ามใช้ศัพท์เทคนิคภาษาอังกฤษ ให้แปลเป็นคำไทยธรรมดาทุกครั้ง เช่น "ราคาชิดจุดรับ" แทน "near support" "ราคาขึ้นมาเยอะแล้ว" แทน "overbought" ตอบกระชับ ตรงประเด็น ทำตามรูปแบบที่กำหนดให้ครบทุกหัวข้อ',
         messages:[{role:'user',content:prompt}]
-      })
+      }),
+      signal:_bsCtrl.signal
     });
+    clearTimeout(_bsTimeout);
     if(!res.ok){ aiEl.textContent='❌ AI ไม่พร้อมใช้งาน'; return; }
     const d = await res.json();
     if(d.type==='error'){ aiEl.textContent='❌ '+d.error?.message; return; }
@@ -3470,7 +3484,119 @@ async function renderAllNews(forceRefresh=false){
 function toggleEarnings(){
   const p=document.getElementById('earningsPanel');
   if(p.classList.contains('show')){p.classList.remove('show');return;}
-  p.classList.add('show');renderEarnings();
+  p.classList.add('show');
+  fetchAndRenderEarnings();
+}
+
+// ── ดึง Earnings จาก Finnhub API แล้ว merge กับ hardcoded data ──
+async function fetchAndRenderEarnings(){
+  const body=document.getElementById('earningsBody');
+  body.innerHTML='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;color:var(--dim);padding:12px 0">⏳ กำลังดึงข้อมูล Earnings...</div>';
+
+  if(FINNHUB_KEY){
+    try{
+      // ดึง earnings calendar 60 วันข้างหน้า + 30 วันที่ผ่านมา
+      const today=new Date();
+      const from=new Date(today); from.setDate(from.getDate()-30);
+      const to=new Date(today); to.setDate(to.getDate()+60);
+      const fmt=d=>d.toISOString().slice(0,10);
+
+      const ctrl=new AbortController();
+      const tid=setTimeout(()=>ctrl.abort(),8000);
+      const r=await fetch(
+        `https://finnhub.io/api/v1/calendar/earnings?from=${fmt(from)}&to=${fmt(to)}&token=${FINNHUB_KEY}`,
+        {signal:ctrl.signal}
+      );
+      clearTimeout(tid);
+
+      if(r.ok){
+        const d=await r.json();
+        const items=d?.earningsCalendar||[];
+        // กรองเฉพาะหุ้นที่มีในแอป
+        const tickers=new Set(stocks.map(s=>s.t));
+        const matched=items.filter(e=>tickers.has(e.symbol));
+
+        if(matched.length>0){
+          // แปลงเป็น format เดียวกับ earningsData
+          const thMonthNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+          const fmtThDate=ds=>{
+            const dt=new Date(ds+'T00:00:00');
+            return `${dt.getDate()} ${thMonthNames[dt.getMonth()]} ${dt.getFullYear()}`;
+          };
+          const now=new Date();
+          const apiData=matched.filter(e=>e.date).map(e=>{
+            const dt=new Date(e.date+'T00:00:00');
+            const isPast=dt<now;
+            const diffDays=(dt-now)/86400000;
+            const st=isPast?'done':diffDays<=7?'soon':'future';
+            const s=stocks.find(x=>x.t===e.symbol);
+            return{
+              t:e.symbol,
+              n:s?.n||e.symbol,
+              d:fmtThDate(e.date),
+              st,
+              eps:e.epsEstimate!=null?`$${(+e.epsEstimate).toFixed(2)}`:null,
+              epsActual:e.epsActual!=null?`$${(+e.epsActual).toFixed(2)}`:null,
+              rev:e.revenueEstimate!=null?`$${(e.revenueEstimate/1e9).toFixed(1)}B`:null,
+              revActual:e.revenueActual!=null?`$${(e.revenueActual/1e9).toFixed(1)}B`:null,
+              res:isPast&&e.epsActual!=null&&e.epsEstimate!=null?(e.epsActual>=e.epsEstimate?'✅ Beat':'❌ Miss'):isPast?'✅ Done':null,
+              _live:true
+            };
+          });
+
+          // merge: API ก่อน, hardcoded เป็น fallback สำหรับที่ API ไม่มี
+          const apiTickers=new Set(apiData.map(e=>e.t));
+          const fallback=earningsData.filter(e=>!apiTickers.has(e.t));
+          const merged=[...apiData,...fallback];
+          merged.sort((a,b)=>{
+            const da=_parseEarningsDate(a.d)||new Date('2099-01-01');
+            const db=_parseEarningsDate(b.d)||new Date('2099-01-01');
+            return da-db;
+          });
+          renderEarningsData(merged, true);
+          return;
+        }
+      }
+    }catch(e){}
+  }
+  // fallback: ใช้ hardcoded data
+  renderEarnings();
+}
+
+function renderEarningsData(data, isLive=false){
+  const body=document.getElementById('earningsBody');
+  function row(e){
+    const st=_getEarningsSt(e);
+    const isDone=st==='done',isSoon=st==='soon';
+    const bg=isDone?'rgba(0,230,118,0.04)':isSoon?'rgba(255,215,0,0.06)':'var(--bg3)';
+    const bc=isDone?'rgba(0,230,118,0.25)':isSoon?'rgba(255,215,0,0.3)':'var(--border)';
+    const tc=isDone?'var(--green)':isSoon?'var(--yellow)':'var(--text2)';
+    // แสดง actual ถ้ามี ไม่งั้นแสดง estimate
+    const epsStr=e.epsActual||e.eps||'—';
+    const revStr=e.revActual||e.rev||'—';
+    const badge=isDone
+      ?`<span class="earn-badge earn-done">${e.res||'✅ Done'}</span>`
+      :isSoon
+      ?`<span class="earn-badge earn-soon">${countdown(e.d)||'⏳'}</span>`
+      :`<span style="color:var(--dim);font-size:11px">—</span>`;
+    const liveTag=e._live?'<span style="font-size:8px;color:var(--accent);margin-left:3px">●</span>':'';
+    return`<div class="earn-row" style="background:${bg};border-color:${bc}" onclick="goCard('${e.t}')">
+      <span class="earn-ticker" style="color:${tc}">${e.t}${liveTag}</span><span class="earn-name">${e.n}</span>
+      <span class="earn-date">${e.d}</span><span class="earn-eps">${epsStr}</span>
+      <span class="earn-rev">${revStr}</span>${badge}</div>`;
+  }
+  const soon=data.filter(e=>_getEarningsSt(e)==='soon');
+  const done=data.filter(e=>_getEarningsSt(e)==='done');
+  const future=data.filter(e=>_getEarningsSt(e)==='future'||(!_parseEarningsDate(e.d)&&e.st==='future'));
+  const srcLabel=isLive
+    ?'<span style="font-size:10px;color:var(--accent);font-family:\'IBM Plex Mono\',monospace">● Live จาก Finnhub</span>'
+    :'<span style="font-size:10px;color:var(--dim);font-family:\'IBM Plex Mono\',monospace">⚠️ ข้อมูลสำรอง</span>';
+  body.innerHTML=
+    `<div style="text-align:right;padding:0 0 6px">${srcLabel}</div>`+
+    `<div class="earn-hdr"><span>Ticker</span><span>บริษัท</span><span>วันที่</span><span>EPS</span><span>Rev</span><span>สถานะ</span></div>`+
+    (soon.length?`<div class="earn-grp" style="color:var(--yellow)">⏳ เร็วๆ นี้</div>`+soon.map(row).join(''):'')+
+    (done.length?`<div class="earn-grp" style="color:var(--green)">✅ รายงานแล้ว</div>`+done.map(row).join(''):'')+
+    (future.length?`<div class="earn-grp" style="color:var(--dim)">📅 อนาคต</div>`+future.map(row).join(''):'');
 }
 function countdown(d){
   const m={'ม.ค.':0,'ก.พ.':1,'มี.ค.':2,'เม.ย.':3,'พ.ค.':4,'มิ.ย.':5,'ก.ค.':6,'ส.ค.':7,'ก.ย.':8,'ต.ค.':9,'พ.ย.':10,'ธ.ค.':11};
@@ -3486,11 +3612,13 @@ function countdown(d){
 // Fix #6: Auto-compute earnings status dynamically so it never goes stale
 const _thMonths={'ม.ค.':0,'ก.พ.':1,'มี.ค.':2,'เม.ย.':3,'พ.ค.':4,'มิ.ย.':5,'ก.ค.':6,'ส.ค.':7,'ก.ย.':8,'ต.ค.':9,'พ.ย.':10,'ธ.ค.':11};
 function _parseEarningsDate(dstr){
+  if(!dstr) return null; // FIX: guard against undefined/null
   const p=dstr.trim().split(' ');
   if(p.length>=3){
     const day=parseInt(p[0]);
     const mon=_thMonths[p[1]];
-    const yr=parseInt(p[2])-543; // Buddhist era → AD
+    // FIX: ข้อมูลใช้ ค.ศ. (2026) ไม่ใช่ พ.ศ. (2569) — ไม่ต้องลบ 543
+    const yr=parseInt(p[2]);
     if(!isNaN(day)&&mon!==undefined&&!isNaN(yr)) return new Date(yr,mon,day,20,30,0);
   }
   return null;
@@ -3506,27 +3634,7 @@ function _getEarningsSt(e){
 }
 
 function renderEarnings(){
-  const body=document.getElementById('earningsBody');
-  function row(e){
-    const st=_getEarningsSt(e);
-    const isDone=st==='done',isSoon=st==='soon';
-    const bg=isDone?'rgba(0,230,118,0.04)':isSoon?'rgba(255,215,0,0.06)':'var(--bg3)';
-    const bc=isDone?'rgba(0,230,118,0.25)':isSoon?'rgba(255,215,0,0.3)':'var(--border)';
-    const tc=isDone?'var(--green)':isSoon?'var(--yellow)':'var(--text2)';
-    const badge=isDone?`<span class="earn-badge earn-done">${e.res||'✅ Done'}</span>`:isSoon?`<span class="earn-badge earn-soon">${countdown(e.d)||'⏳'}</span>`:`<span style="color:var(--dim);font-size:11px">—</span>`;
-    return`<div class="earn-row" style="background:${bg};border-color:${bc}" onclick="goCard('${e.t}')">
-      <span class="earn-ticker" style="color:${tc}">${e.t}</span><span class="earn-name">${e.n}</span>
-      <span class="earn-date">${e.d}</span><span class="earn-eps">${e.eps||'—'}</span>
-      <span class="earn-rev">${e.rev||'—'}</span>${badge}</div>`;
-  }
-  const soon=earningsData.filter(e=>_getEarningsSt(e)==='soon');
-  const done=earningsData.filter(e=>_getEarningsSt(e)==='done');
-  const future=earningsData.filter(e=>_getEarningsSt(e)==='future'||(!_parseEarningsDate(e.d)&&e.st==='future'));
-  body.innerHTML=
-    `<div class="earn-hdr"><span>Ticker</span><span>บริษัท</span><span>วันที่</span><span>EPS</span><span>Rev</span><span>สถานะ</span></div>`+
-    (soon.length?`<div class="earn-grp" style="color:var(--yellow)">⏳ เร็วๆ นี้</div>`+soon.map(row).join(''):'')+
-    (done.length?`<div class="earn-grp" style="color:var(--green)">✅ รายงานแล้ว</div>`+done.map(row).join(''):'')+
-    (future.length?`<div class="earn-grp" style="color:var(--dim)">📅 อนาคต</div>`+future.map(row).join(''):'');
+  renderEarningsData(earningsData, false);
 }
 // ═══════════════════════════════════════════════════════
 // AI ENGINE — Claude Sonnet + Streaming + Chat
@@ -3664,7 +3772,7 @@ function appendAIMsg(chatEl, role, text, isStreaming = false) {
 async function streamClaude(systemPrompt, messages, onChunk, onDone) {
   // Worker does not support true SSE streaming — simulate word-by-word reveal
   await _claudeFallback(null, JSON.stringify({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: systemPrompt,
     messages
@@ -3674,9 +3782,12 @@ async function streamClaude(systemPrompt, messages, onChunk, onDone) {
 async function _claudeFallback(headers, body, onChunk, onDone) {
   try {
     onChunk('⏳ กำลังวิเคราะห์...');
+    const _cfCtrl=new AbortController();
+    const _cfTimeout=setTimeout(()=>_cfCtrl.abort(),30000);
     const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body
+      method: 'POST', headers: {'Content-Type':'application/json'}, body, signal:_cfCtrl.signal
     });
+    clearTimeout(_cfTimeout);
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
       onDone(null, `API error ${res.status}: ${errBody.slice(0, 100)}`);
@@ -3697,7 +3808,9 @@ async function _claudeFallback(headers, body, onChunk, onDone) {
     }
     onDone(text, null);
   } catch (e) {
-    onDone(null, e.message);
+    // FIX: AbortError (timeout) ไม่ควรแสดงเป็น error message
+    if(e.name==='AbortError') onDone(null, '⏱️ AI ใช้เวลานานเกินไป ลองใหม่อีกครั้ง');
+    else onDone(null, e.message);
   }
 }
 
@@ -3852,6 +3965,8 @@ function wsConnect(){
       ws.send(JSON.stringify({type:'subscribe',symbol:s.t}));
     });
     // ping every 20s to keep alive
+    // FIX: clear ก่อนเสมอเพื่อป้องกัน interval leak เมื่อ reconnect
+    clearInterval(wsPingInterval);
     wsPingInterval=setInterval(()=>{if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'}));},20000);
     // WS กลับมาแล้ว → ลด HTTP poll เหลือ 30s (แค่ backup)
     clearInterval(httpPollTimer);
@@ -4123,9 +4238,22 @@ function addCustomTicker(){
           const s=stocks.find(x=>x.t===t);
           if(s){ s.p=d.c; s.c=d.dp||0; updateCard(s); }
           showToastMsg(`✅ ${t} ดึงราคาสำเร็จ $${d.c}`);
+        } else {
+          showToastMsg(`⚠️ ${t} ไม่พบราคา — ตรวจสอบ ticker อีกครั้ง`);
         }
-      }).catch(()=>{});
+      }).catch(()=>{ showToastMsg(`⚠️ ดึงราคา ${t} ไม่ได้`); });
   }
+  // FIX: subscribe WS ทันทีถ้า WebSocket เปิดอยู่
+  if(typeof ws!=='undefined' && ws && ws.readyState===1){
+    ws.send(JSON.stringify({type:'subscribe',symbol:t}));
+  }
+  // FIX: โหลด candle + indicator สำหรับหุ้นใหม่
+  setTimeout(async()=>{
+    await fetchCandles(t, 60);
+    const btn=document.querySelector(`#indselector-${t} .ind-btn.active`);
+    const mode=tickerIndicator[t]||'classic';
+    if(btn) setIndicator(t, mode, btn);
+  }, 1000);
   // ดึง domain อัตโนมัติสำหรับโลโก้
   _fetchLogoDomain(t);
 }
@@ -4137,6 +4265,20 @@ function removeCustomTicker(t){
   const card=document.getElementById('card-'+t);
   if(card) card.remove();
   renderCustomTickerList();
+  // FIX: unsubscribe WS เมื่อลบหุ้น
+  if(typeof ws!=='undefined'&&ws&&ws.readyState===1){
+    ws.send(JSON.stringify({type:'unsubscribe',symbol:t}));
+  }
+  // FIX: clear cache ทั้งหมดของหุ้นที่ลบ ป้องกัน memory leak
+  delete candleCache[t];
+  delete liveCache[t];
+  delete liveNewsCache[t];
+  delete tickerIndicator[t];
+  delete _relStrength[t];
+  if(typeof aiChatHistory!=='undefined') delete aiChatHistory[t];
+  // FIX: อัปเดตจำนวนหุ้นทั้งหมด
+  const totalEl=document.getElementById('totalCnt');
+  if(totalEl) totalEl.textContent=stocks.length;
   showToastMsg('🗑️ ลบ '+t+' แล้ว');
 }
 function renderCustomTickerList(){
@@ -4181,7 +4323,8 @@ function exportTradeLog(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url; a.download='stockpro_tradelog.csv'; a.click();
-  URL.revokeObjectURL(url);
+  // FIX: delay revokeObjectURL เพื่อให้ browser download เสร็จก่อน
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
 }
 
 
@@ -4491,6 +4634,8 @@ async function translateNewsItems(items){
   try{
     const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
     // ใช้ Claude proxy แทน callGemini ที่ไม่ได้นิยาม
+    const _trCtrl=new AbortController();
+    const _trTimeout=setTimeout(()=>_trCtrl.abort(),30000);
     const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -4499,8 +4644,10 @@ async function translateNewsItems(items){
         max_tokens:4000,
         system:'แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown หรือ preamble',
         messages:[{role:'user',content:`input: ${JSON.stringify(toTranslate)}`}]
-      })
+      }),
+      signal:_trCtrl.signal
     });
+    clearTimeout(_trTimeout);
     if(!res.ok) return items;
     const d=await res.json();
     const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
@@ -5124,16 +5271,21 @@ const WORKER = 'https://anthropic-proxy.datsakonping1994.workers.dev';
 async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
   // ── ลอง Claude Haiku ก่อน ──
   try{
+    // FIX: เพิ่ม timeout 30s ป้องกัน fetch ค้างตลอดกาล
+    const _aiCtrl = new AbortController();
+    const _aiTimeout = setTimeout(()=>_aiCtrl.abort(), 30000);
     const r = await fetch(WORKER, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{role: 'user', content: userPrompt}]
-      })
+      }),
+      signal: _aiCtrl.signal
     });
+    clearTimeout(_aiTimeout);
     if(r.ok){
       const d = await r.json();
       if(d.type !== 'error' && d?.content?.length){
@@ -5144,6 +5296,9 @@ async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
 
   // ── Fallback: Gemini Flash (ฟรี) ──
   try{
+    // FIX: เพิ่ม timeout 30s
+    const _gemCtrl = new AbortController();
+    const _gemTimeout = setTimeout(()=>_gemCtrl.abort(), 30000);
     const r2 = await fetch(WORKER + '/gemini/', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -5151,8 +5306,10 @@ async function callGemini(systemPrompt, userPrompt, maxTokens=1000){
         system_instruction: {parts: [{text: systemPrompt}]},
         contents: [{parts: [{text: userPrompt}]}],
         generationConfig: {maxOutputTokens: maxTokens, temperature: 0.7}
-      })
+      }),
+      signal: _gemCtrl.signal
     });
+    clearTimeout(_gemTimeout);
     if(r2.ok){
       const d2 = await r2.json();
       return d2?.candidates?.[0]?.content?.parts?.[0]?.text || null;
@@ -5203,6 +5360,22 @@ async function doLogout(){
   // FIX: reset state ที่ค้างอยู่ใน memory เมื่อ logout
   _buyAlerted.clear();
   _appStarted = false;
+  // FIX: clear timers ที่อาจยังทำงานอยู่
+  clearInterval(newsRefreshTimer); newsRefreshTimer=null;
+  clearTimeout(_wsReconnectTimer); _wsReconnectTimer=null;
+  _wsReconnectCount=0;
+  // FIX: clear caches ทั้งหมดเพื่อไม่ให้ข้อมูลเก่าปน session ใหม่
+  Object.keys(liveCache).forEach(k=>delete liveCache[k]);
+  Object.keys(candleCache).forEach(k=>delete candleCache[k]);
+  Object.keys(ohlcCache).forEach(k=>delete ohlcCache[k]);
+  Object.keys(_indThrottle).forEach(k=>delete _indThrottle[k]);
+  Object.keys(zoneAlertState).forEach(k=>delete zoneAlertState[k]);
+  Object.keys(aiChatHistory).forEach(k=>delete aiChatHistory[k]);
+  Object.keys(liveNewsCache).forEach(k=>delete liveNewsCache[k]);
+  Object.keys(_relStrength).forEach(k=>delete _relStrength[k]);
+  // FIX: reset flags เพื่อให้ startup ทำงานถูกต้องใน session ใหม่
+  zoneAlertReady=false;
+  _pivotReady=false;
 }
 
 let _appStarted = false;
@@ -5295,7 +5468,7 @@ function updateTradeResults(){
     const age=(now-new Date(t.time).getTime())/1000/60/60/24; // วัน
     if(age<1) return; // รอ 1 วันก่อน
     const s=stocks.find(x=>x.t===t.ticker);
-    if(!s) return;
+    if(!s||s.p<=0) return; // FIX: ข้ามถ้าราคาปัจจุบัน 0 (ยังดึงไม่ได้)
     t.result = s.p>t.price?'win':'loss';
     t.exitPrice = s.p;
     t.pct = +((s.p-t.price)/t.price*100).toFixed(2);
@@ -5304,10 +5477,10 @@ function updateTradeResults(){
   if(changed) _saveTradeLog(log);
 }
 function getTradeStats(){
-  const log=_loadTradeLog().filter(t=>t.result!==null);
+  const log=_loadTradeLog().filter(t=>t.result!==null&&t.pct!=null);
   if(!log.length) return null;
   const wins=log.filter(t=>t.result==='win').length;
-  const avgPct=log.reduce((a,t)=>a+t.pct,0)/log.length;
+  const avgPct=log.reduce((a,t)=>a+(t.pct||0),0)/log.length;
   return {total:log.length, wins, losses:log.length-wins,
           winRate:+(wins/log.length*100).toFixed(1), avgPct:+avgPct.toFixed(2)};
 }
