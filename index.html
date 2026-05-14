@@ -538,7 +538,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 <script>
 // ── Merged: best features from all versions ──────────────────────────────────
 // ⚠️ WARNING: API keys เหล่านี้มองเห็นได้ใน browser — อย่า deploy บน server สาธารณะ
-let FINNHUB_KEY=''; // Set by user on startup
+let FINNHUB_KEY='ใส่_KEY_ของคุณตรงนี้'; // hardcoded key
 let PORT_SIZE = (()=>{ try{ return parseFloat(localStorage.getItem('_sp_portsize')||'10000'); }catch{ return 10000; } })();
 function setPortSize(v){ PORT_SIZE=v; try{localStorage.setItem('_sp_portsize',v);}catch{} }
 const marketCtx = {SPY:{price:0,change:0,trend:'unknown'}, QQQ:{price:0,change:0,trend:'unknown'}};
@@ -5239,26 +5239,16 @@ applyFontSize();
   });
 })();
 
-// ตรวจ key ที่บันทึกไว้ — เข้าแอปทันที แล้วค่อย verify ใน background
+// ── Auto-launch — key hardcoded ──
 (async()=>{
   try{
-    const key=await _loadKeyAsync();
+    const saved=await _loadKeyAsync();
+    const key=saved||FINNHUB_KEY;
     if(key){
       FINNHUB_KEY=key;
       _showApp();
-      try{
-        const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
-        const d=await r.json();
-        if(d.error||!r.ok){
-          FINNHUB_KEY='';
-          _clearKey();
-          document.getElementById('mainApp').style.display='none';
-          document.getElementById('loginScreen').style.display='flex';
-          document.getElementById('loginError').textContent='⚠️ API Key หมดอายุ กรุณาใส่ใหม่';
-        }
-      }catch{}
     }
-  }catch{}
+  }catch{ if(FINNHUB_KEY) _showApp(); }
 })();
 </script>
 </div>
