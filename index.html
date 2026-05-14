@@ -3087,7 +3087,7 @@ function checkZoneAlert(ticker, price, s1, r1){
             if(candleCache[ticker]?.data?._mock) return;
             const lvl2=_getLevels(ticker,price);
             const sig=_calcBuyScore(ticker,price,lv.val,lvl2.r1);
-            showBuySignalPopup(ticker,price,lv.val,sig,lvl2);
+            if(sig.score>=55) showBuySignalPopup(ticker,price,lv.val,sig,lvl2);
           })();
         }
         // ทะลุ R1 จริง → เสียงขึ้น + toast
