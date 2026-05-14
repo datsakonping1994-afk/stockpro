@@ -2049,7 +2049,7 @@ function buildGrid(){
         <div class="card-header-row">
           <div>
             <div class="ticker" style="display:flex;align-items:center;gap:6px">
-              ${(()=>{ const lu=_getLogoUrlAuto(s.t); return lu?`<img id="logo-${s.t}" src="${lu}" style="width:16px;height:16px;border-radius:3px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">`: `<img id="logo-${s.t}" style="display:none;width:16px;height:16px;border-radius:3px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">` })()}
+              ${(()=>{ const lu=_getLogoUrlAuto(s.t); return lu?`<img id="logo-${s.t}" src="${lu}" style="width:24px;height:24px;border-radius:4px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">`: `<img id="logo-${s.t}" style="display:none;width:24px;height:24px;border-radius:4px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">` })()}
               ${s.t}<span class="badge ${zone.cls==='accent'?'green':zone.cls}" id="badge-${s.t}">${zone.txt}</span>
             </div>
             <div class="company">${s.n}</div>
@@ -3147,18 +3147,16 @@ function checkZoneAlert(ticker, price, s1, r1){
       }
     }
 
-    // ใกล้ S1 ≤ 0.5% → toast เตือนล่วงหน้า
+    // ใกล้ S1 ≤ 0.5% → toast เตือนล่วงหน้า (cooldown 15 นาที)
     if(lv.name==='S1' && lv.type==='s' && cur==='above'){
       const pctNear = lv.val>0 ? ((price-lv.val)/lv.val*100) : 99;
       const nearKey = ticker+'_S1_near';
-      const wasNear = zoneAlertState[nearKey];
-      if(pctNear<=0.5 && !wasNear){
-        zoneAlertState[nearKey] = true;
+      const lastAlert = zoneAlertState[nearKey]||0;
+      const cooldown = 15*60*1000; // 15 นาที
+      if(pctNear<=0.5 && Date.now()-lastAlert>cooldown){
+        zoneAlertState[nearKey] = Date.now();
         showToast(ticker, 'near', 'S1', price, lv.val);
-        // เรียก checkBuySignal เพื่อเช็ค score ด้วย
         checkBuySignal(ticker, price, lv.val);
-      } else if(pctNear>0.5){
-        zoneAlertState[nearKey] = false; // reset เมื่อออกห่างแล้ว
       }
     }
   }
@@ -4519,7 +4517,7 @@ async function applyIndicatorAll(mode='classic'){
       zoneAlertState[s.t+'_'+lv.name]=cur;
     });
     // reset near-S1 state too
-    zoneAlertState[s.t+'_S1_near']=false;
+    zoneAlertState[s.t+'_S1_near']=0;
   });
   zoneAlertReady=true;
   updateAlerts();
