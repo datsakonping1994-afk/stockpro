@@ -2585,6 +2585,61 @@ function _calcBuyScore(ticker, price, s1, r1){
   else if(emaSupport100) g1+=4;
   else if(emaSupport200) g1+=3;
 
+  // ── Fibonacci Retracement ──
+  // หา swing high/low จาก 50 แท่งล่าสุด แล้วคำนวณ 38.2%, 50%, 61.8%
+  if(closes.length>=20 && highs.length>=20 && lows.length>=20){
+    const n=Math.min(50,closes.length);
+    const recentHighs=highs.slice(-n), recentLows=lows.slice(-n);
+    const swHigh=Math.max(...recentHighs), swLow=Math.min(...recentLows);
+    const fibRange=swHigh-swLow;
+    if(fibRange>0){
+      const fib382=swHigh-fibRange*0.382;
+      const fib500=swHigh-fibRange*0.500;
+      const fib618=swHigh-fibRange*0.618;
+      const fibLevels=[fib618,fib500,fib382];
+      const fibWeights=[5,4,3];
+      for(let i=0;i<fibLevels.length;i++){
+        const pct=Math.abs(price-fibLevels[i])/fibLevels[i]*100;
+        if(pct<=0.5){ g1+=fibWeights[i]; break; }
+        else if(pct<=1.2){ g1+=Math.floor(fibWeights[i]/2); break; }
+      }
+    }
+  }
+
+  // ── Swing Low Support ──
+  // หา swing low ที่ใกล้ราคาปัจจุบันมากที่สุด (ห่างไม่เกิน 2%)
+  if(lows.length>=10){
+    const swingLows=[];
+    for(let i=2;i<lows.length-2;i++){
+      if(lows[i]<lows[i-1]&&lows[i]<lows[i-2]&&lows[i]<lows[i+1]&&lows[i]<lows[i+2]){
+        swingLows.push(lows[i]);
+      }
+    }
+    // หา swing low ที่ใกล้ราคาปัจจุบันมากที่สุดและต่ำกว่าราคา
+    const nearSwing=swingLows.filter(v=>v<=price).sort((a,b)=>b-a)[0];
+    if(nearSwing){
+      const pct=Math.abs(price-nearSwing)/nearSwing*100;
+      if(pct<=0.5)      g1+=6;
+      else if(pct<=1.5) g1+=3;
+    }
+  }
+
+  // ── Ichimoku Cloud — Kijun-sen (Base Line) as support ──
+  // Kijun-sen = (highest high + lowest low) / 2 ของ 26 แท่ง
+  let kijun=null, tenkan=null;
+  if(highs.length>=26 && lows.length>=26){
+    const kHigh=Math.max(...highs.slice(-26)), kLow=Math.min(...lows.slice(-26));
+    kijun=+((kHigh+kLow)/2).toFixed(3);
+    const tHigh=Math.max(...highs.slice(-9)), tLow=Math.min(...lows.slice(-9));
+    tenkan=+((tHigh+tLow)/2).toFixed(3);
+  }
+  if(kijun!==null){
+    const kPct=Math.abs(price-kijun)/kijun*100;
+    // ราคาชิด Kijun หรืออยู่เหนือ Kijun (แนวรับแข็ง)
+    if(price>=kijun && kPct<=0.5)      g1+=6;
+    else if(price>=kijun && kPct<=1.5) g1+=3;
+  }
+
   const score1 = Math.min(g1, 30);
   if(score1>0) scoreBreakdown.push(`📍 ชิดแนวรับ ${score1}/30`);
 
