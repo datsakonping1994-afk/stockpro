@@ -365,7 +365,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <div class="chip"><span class="val" id="totalCnt">51</span>หุ้น</div>
   <div class="chip" onclick="setFilter('up')" style="cursor:pointer"><span class="val up" id="upCnt">—</span>บวก</div>
   <div class="chip" onclick="setFilter('dn')" style="cursor:pointer"><span class="val dn" id="dnCnt">—</span>ลบ</div>
-  <div class="chip" onclick="setFilter('near')" style="cursor:pointer;border-color:rgba(255,215,0,0.3)"><span class="val" style="color:var(--yellow)" id="nearCnt">—</span>ใกล้แนวรับ</div>
+  <div class="chip" onclick="toggleAlertPanel()" style="cursor:pointer;border-color:rgba(255,215,0,0.3)"><span class="val" style="color:var(--yellow)" id="nearCnt">—</span>ใกล้แนวรับ <span id="nearArrow" style="font-size:9px;color:var(--dim)">▼</span></div>
 </div>
 <div id="alertPanel" class="alert-panel">
   <div class="alert-h" style="margin-bottom:6px">
@@ -2696,7 +2696,7 @@ function updateAlerts(){
   document.getElementById('nearCnt').textContent=total;
   const panel=document.getElementById('alertPanel');
   if(!total){panel.classList.remove('show');return;}
-  panel.classList.add('show');
+  // ไม่ auto-show — ให้ user กดเปิดเอง
   // S section
   const listS=document.getElementById('alertListS');
   const sLabel=document.getElementById('alertSLabel');
@@ -2730,6 +2730,13 @@ function updateAlerts(){
     listR.innerHTML='';
   }
 }
+function toggleAlertPanel(){
+  const panel=document.getElementById('alertPanel');
+  panel.classList.toggle('show');
+  const arrow=document.getElementById('nearArrow');
+  if(arrow) arrow.textContent=panel.classList.contains('show')?'▲':'▼';
+}
+
 function toggleAlertList(){
   // toggle ทั้ง S และ R list พร้อมกัน
   const ls=document.getElementById('alertListS');
@@ -4492,9 +4499,16 @@ function _showApp(){
 
 // ── Key Storage: localStorage → sessionStorage → cookie (fallback chain) ──
 function _saveKey(key){
-  try{ localStorage.setItem('_fh_key',key); return; }catch{}
-  try{ sessionStorage.setItem('_fh_key',key); return; }catch{}
+  // บันทึกทุก storage พร้อมกัน ไม่ใช่แค่ตัวแรก
+  try{ localStorage.setItem('_fh_key',key); }catch{}
+  try{ sessionStorage.setItem('_fh_key',key); }catch{}
   try{ document.cookie=`_fh_key=${encodeURIComponent(key)};max-age=31536000;path=/;SameSite=Strict`; }catch{}
+  // IndexedDB fallback สำหรับ iOS Safari Private Mode
+  try{
+    const req=indexedDB.open('stockpro',1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('kv');
+    req.onsuccess=e=>e.target.result.transaction('kv','readwrite').objectStore('kv').put(key,'fhkey');
+  }catch{}
 }
 function _loadKey(){
   try{ const k=localStorage.getItem('_fh_key'); if(k) return k; }catch{}
@@ -4504,6 +4518,24 @@ function _loadKey(){
     if(m) return decodeURIComponent(m[1]);
   }catch{}
   return null;
+}
+// โหลด key จาก IndexedDB แบบ async (ถ้า sync methods ล้มเหลวทั้งหมด)
+async function _loadKeyAsync(){
+  const sync = _loadKey();
+  if(sync) return sync;
+  return new Promise(resolve=>{
+    try{
+      const req=indexedDB.open('stockpro',1);
+      req.onupgradeneeded=e=>e.target.result.createObjectStore('kv');
+      req.onsuccess=e=>{
+        const tx=e.target.result.transaction('kv','readonly');
+        const r2=tx.objectStore('kv').get('fhkey');
+        r2.onsuccess=()=>resolve(r2.result||null);
+        r2.onerror=()=>resolve(null);
+      };
+      req.onerror=()=>resolve(null);
+    }catch{ resolve(null); }
+  });
 }
 function _clearKey(){
   try{ localStorage.removeItem('_fh_key'); }catch{}
@@ -4651,7 +4683,7 @@ applyFontSize();
 // ตรวจ key ที่บันทึกไว้ — เข้าแอปทันที แล้วค่อย verify ใน background
 (async()=>{
   try{
-    const key=_loadKey();
+    const key=await _loadKeyAsync();
     if(key){
       FINNHUB_KEY=key;
       _showApp();
