@@ -45,6 +45,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .toast.show{opacity:1;transform:translateX(0);}
 .toast.toast-s{background:#1a0508;border:1px solid rgba(255,68,102,0.9);color:#ff8899;box-shadow:0 4px 16px rgba(0,0,0,0.8);}
 .toast.toast-r{background:#051a0a;border:1px solid rgba(0,230,118,0.8);color:#66ffaa;box-shadow:0 4px 16px rgba(0,0,0,0.8);}
+.toast.toast-near{background:#1a0508;border:1px solid rgba(255,68,102,0.6);color:#ffaabb;box-shadow:0 4px 16px rgba(0,0,0,0.8);}
 .summary{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .chip{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text2);}
 .chip .val{font-size:18px;font-weight:600;display:block;color:var(--text);}
@@ -2448,7 +2449,6 @@ function _calcMacdSignal(closes, ticker){
 }
 
 function _calcBuyScore(ticker, price, s1, r1){
-  let score = 0;
   const scoreBreakdown = [];
   const rsi = rsiData[ticker]||50;
   const data = candleCache[ticker]?.data;
@@ -2457,111 +2457,292 @@ function _calcBuyScore(ticker, price, s1, r1){
   const lows   = data?.l||[];
   const vols   = data?.v||[];
 
-  // ── EMA helpers ──
+  // ── EMA helper ──
   const ema = (arr,n) => {
     if(arr.length<n) return null;
     const k=2/(n+1); let e=arr.slice(0,n).reduce((a,b)=>a+b,0)/n;
     for(let i=n;i<arr.length;i++) e=arr[i]*k+e*(1-k);
     return +e.toFixed(3);
   };
-  const ema20  = ema(closes,20);
-  const ema50  = ema(closes,50);
-  const ema100 = ema(closes,100);
-  const ema200 = ema(closes,200);
-
-  // MACD
-  const {macdLine, macdSignal} = closes.length>=26 ? _calcMacdSignal(closes, ticker) : {macdLine:null,macdSignal:null};
-
-  // Volume
-  const volToday = vols[vols.length-1]||0;
-  const volAvg   = vols.slice(-20).reduce((a,b)=>a+b,0)/Math.min(20,vols.length)||1;
-  const volRatio = +(volToday/volAvg).toFixed(2);
-
-  // FIX: EMA Support — ราคาแตะแนว EMA (ห่างน้อยกว่า 1.5%) ไม่ใช่อยู่เหนือ EMA
+  const ema20=ema(closes,20), ema50=ema(closes,50);
+  const ema100=ema(closes,100), ema200=ema(closes,200);
+  const inUptrend = ema200 ? price > ema200 : null;
   const emaSupport20  = ema20  && Math.abs(price-ema20)/ema20*100   < 1.5;
   const emaSupport50  = ema50  && Math.abs(price-ema50)/ema50*100   < 1.5;
   const emaSupport100 = ema100 && Math.abs(price-ema100)/ema100*100 < 1.8;
   const emaSupport200 = ema200 && Math.abs(price-ema200)/ema200*100 < 2.0;
 
-  // FIX: Trend filter — ต้องอยู่เหนือ EMA200
-  const inUptrend = ema200 ? price > ema200 : null;
+  // ── MACD ──
+  const {macdLine,macdSignal} = closes.length>=26 ? _calcMacdSignal(closes,ticker) : {macdLine:null,macdSignal:null};
 
-  // Candle Pattern (3 candles ล่าสุด)
-  let hammerPattern=false, engulfingPattern=false, dojiPattern=false;
-  if(closes.length>=3 && highs.length>=3 && lows.length>=3){
-    const i=closes.length-1;
-    const c=closes[i], o=closes[i-1]||c, h=highs[i], l=lows[i];
-    const body=Math.abs(c-o), range=h-l;
-    const lowerWick=Math.min(c,o)-l, upperWick=h-Math.max(c,o);
-    if(range>0 && lowerWick>=body*2 && upperWick<body*0.5) hammerPattern=true;
-    if(range>0 && body/range<0.1) dojiPattern=true;
-    const prevC=closes[i-1]||c, prevO=closes[i-2]||prevC;
-    if(prevC<prevO && c>o && c>prevO && o<prevC) engulfingPattern=true;
+  // ── Volume ──
+  const volToday = vols[vols.length-1]||0;
+  const volAvg   = vols.slice(-20).reduce((a,b)=>a+b,0)/Math.min(20,vols.length)||1;
+  const volRatio = +(volToday/volAvg).toFixed(2);
+
+  // ── ATR + Stop Loss (utility — ไม่นับคะแนน) ──
+  let atr=null, atrPct=null;
+  if(closes.length>=15 && highs.length>=15 && lows.length>=15){
+    const trs=[];
+    for(let i=closes.length-14;i<closes.length;i++){
+      const prev=closes[i-1]||closes[i];
+      trs.push(Math.max(highs[i]-lows[i],Math.abs(highs[i]-prev),Math.abs(lows[i]-prev)));
+    }
+    atr=+(trs.reduce((a,b)=>a+b,0)/trs.length).toFixed(3);
+    atrPct=price>0?+(atr/price*100).toFixed(2):null;
+  }
+  const atrStopLoss = (atr&&s1>0) ? +(s1-1.5*atr).toFixed(2) : null;
+
+  // ════════════════════════════════════════════════
+  // GROUP 1 — ราคาชิดแนวรับ (30 คะแนน)
+  // indicator: pctFromS1, Bollinger Bands, VWAP, EMA support
+  // ════════════════════════════════════════════════
+  let g1=0;
+  const pctFromS1 = s1>0?((price-s1)/s1*100):99;
+
+  // pctFromS1 — น้ำหนักหลัก
+  if(pctFromS1<=0.15)      g1+=14;
+  else if(pctFromS1<=0.35) g1+=10;
+  else if(pctFromS1<=0.5)  g1+=6;
+
+  // Bollinger Bands %B
+  let bbLower=null,bbUpper=null,bbMid=null,bbPct=null;
+  if(closes.length>=20){
+    const sl=closes.slice(-20), mid=sl.reduce((a,b)=>a+b,0)/20;
+    const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mid)**2,0)/20);
+    bbMid=+mid.toFixed(3); bbLower=+(mid-2*sd).toFixed(3); bbUpper=+(mid+2*sd).toFixed(3);
+    bbPct=bbUpper>bbLower?+((price-bbLower)/(bbUpper-bbLower)*100).toFixed(1):50;
+  }
+  if(bbPct!==null && bbPct<=10)      g1+=8;
+  else if(bbPct!==null && bbPct<=20) g1+=4;
+
+  // VWAP
+  let vwap=null;
+  if(closes.length>=20 && vols.length>=20){
+    let sumPV=0,sumV=0;
+    for(let i=closes.length-20;i<closes.length;i++){
+      const tp=(highs[i]+lows[i]+closes[i])/3, v=vols[i]||0;
+      sumPV+=tp*v; sumV+=v;
+    }
+    vwap=sumV>0?+(sumPV/sumV).toFixed(3):null;
+  }
+  if(vwap!==null && price<=vwap){
+    const vp=Math.abs(price-vwap)/vwap*100;
+    if(vp<=0.3) g1+=8; else if(vp<=0.8) g1+=4;
   }
 
-  // RSI Divergence: ราคาทำ low ใหม่แต่ RSI ไม่ทำ (bullish divergence)
+  // EMA support (เลือกตัวที่ใกล้ที่สุด — ไม่บวกซ้ำหลายตัว)
+  if     (emaSupport20)  g1+=5;
+  else if(emaSupport50)  g1+=5;
+  else if(emaSupport100) g1+=4;
+  else if(emaSupport200) g1+=3;
+
+  const score1 = Math.min(g1, 30);
+  if(score1>0) scoreBreakdown.push(`📍 ชิดแนวรับ ${score1}/30`);
+
+  // ════════════════════════════════════════════════
+  // GROUP 2 — Oversold (25 คะแนน)
+  // indicator: RSI, Williams %R, CCI, MFI, Stoch RSI
+  // ใช้ "voting" — แต่ละตัวให้ 0/1 แล้วแปลงเป็นคะแนนกลุ่ม
+  // ════════════════════════════════════════════════
+  let osVotes=0, osMax=5;
+
+  if(rsi<=30) osVotes+=1.0; else if(rsi<=40) osVotes+=0.6; else if(rsi<=50) osVotes+=0.2;
+
+  // Williams %R
+  let williamsR=null;
+  if(highs.length>=14 && lows.length>=14){
+    const hh=Math.max(...highs.slice(-14)), ll=Math.min(...lows.slice(-14));
+    williamsR=hh>ll?+((hh-price)/(hh-ll)*-100).toFixed(1):null;
+  }
+  if(williamsR!==null){ if(williamsR<=-80) osVotes+=1.0; else if(williamsR<=-65) osVotes+=0.5; }
+
+  // CCI
+  let cci=null;
+  if(closes.length>=20 && highs.length>=20 && lows.length>=20){
+    const tpArr=Array.from({length:20},(_,j)=>{const idx=closes.length-20+j;return(highs[idx]+lows[idx]+closes[idx])/3;});
+    const tpMean=tpArr.reduce((a,b)=>a+b,0)/20;
+    const md=tpArr.reduce((a,b)=>a+Math.abs(b-tpMean),0)/20;
+    cci=md>0?+((tpArr[19]-tpMean)/(0.015*md)).toFixed(1):null;
+  }
+  if(cci!==null){ if(cci<=-100) osVotes+=1.0; else if(cci<=-80) osVotes+=0.5; }
+
+  // MFI
+  let mfi=null;
+  if(closes.length>=15 && highs.length>=15 && lows.length>=15 && vols.length>=15){
+    let pos=0,neg=0;
+    const mfiStart=closes.length-14;
+    let prevTp=(highs[mfiStart-1]+lows[mfiStart-1]+closes[mfiStart-1])/3;
+    for(let i=mfiStart;i<closes.length;i++){
+      const tp=(highs[i]+lows[i]+closes[i])/3, mf=tp*(vols[i]||0);
+      if(tp>=prevTp) pos+=mf; else neg+=mf; prevTp=tp;
+    }
+    mfi=neg>0?+(100-(100/(1+pos/neg))).toFixed(1):100;
+  }
+  if(mfi!==null){ if(mfi<=20) osVotes+=1.0; else if(mfi<=30) osVotes+=0.5; }
+
+  // Stoch RSI
+  const srsi=calcStochRSI(closes);
+  if(srsi){
+    if(srsi.k<=20&&srsi.d<=20) osVotes+=1.0;
+    else if(srsi.k<=20) osVotes+=0.6;
+    else if(srsi.k>srsi.d&&srsi.k<=40) osVotes+=0.3;
+  }
+
+  const score2 = Math.round(Math.min(osVotes/osMax,1)*25);
+  if(score2>0) scoreBreakdown.push(`📉 oversold ${score2}/25`);
+
+  // ════════════════════════════════════════════════
+  // GROUP 3 — Momentum กลับตัว (20 คะแนน)
+  // indicator: MACD crossover, ADX+DI, RSI divergence, Stoch K>D
+  // ════════════════════════════════════════════════
+  let g3=0;
+
+  if(macdLine&&macdSignal&&macdLine>macdSignal) g3+=8;
+
+  // ADX
+  let adx=null,diPlus=null,diMinus=null;
+  if(closes.length>=20 && highs.length>=20 && lows.length>=20){
+    const trs=[],dmp=[],dmm=[];
+    for(let i=closes.length-14-1;i<closes.length-1;i++){
+      const h=highs[i+1],l=lows[i+1],ph=highs[i],pl=lows[i],prev=closes[i];
+      trs.push(Math.max(h-l,Math.abs(h-prev),Math.abs(l-prev)));
+      const up=h-ph,dn=pl-l;
+      dmp.push(up>dn&&up>0?up:0); dmm.push(dn>up&&dn>0?dn:0);
+    }
+    const a14=trs.reduce((a,b)=>a+b,0)/14;
+    if(a14>0){
+      diPlus=+(dmp.reduce((a,b)=>a+b,0)/14/a14*100).toFixed(1);
+      diMinus=+(dmm.reduce((a,b)=>a+b,0)/14/a14*100).toFixed(1);
+      adx=+(diPlus+diMinus>0?Math.abs(diPlus-diMinus)/(diPlus+diMinus)*100:0).toFixed(1);
+    }
+  }
+  if(adx!==null&&adx>=25&&diPlus>diMinus) g3+=7;
+  else if(adx!==null&&adx>=20&&diPlus>diMinus) g3+=4;
+
+  // RSI divergence
   let rsiDivergence=false;
-  if(closes.length>=10 && lows.length>=10){
-    const recentLow=Math.min(...lows.slice(-5));
-    const prevLow=Math.min(...lows.slice(-10,-5));
+  if(closes.length>=10&&lows.length>=10){
+    const rLow=Math.min(...lows.slice(-5)),pLow=Math.min(...lows.slice(-10,-5));
     const gains=[],losses=[];
     for(let i=closes.length-14;i<closes.length;i++){
       const d=closes[i]-(closes[i-1]||closes[i]);
-      if(d>=0) gains.push(d); else losses.push(Math.abs(d));
+      if(d>=0)gains.push(d);else losses.push(Math.abs(d));
     }
-    const avgG=gains.reduce((a,b)=>a+b,0)/(gains.length||1);
-    const avgL=losses.reduce((a,b)=>a+b,0)/(losses.length||1);
-    const prevRsi=avgL>0?100-(100/(1+avgG/avgL)):50;
-    if(recentLow<prevLow && rsi>prevRsi+3) rsiDivergence=true;
+    const ag=gains.reduce((a,b)=>a+b,0)/(gains.length||1);
+    const al=losses.reduce((a,b)=>a+b,0)/(losses.length||1);
+    const pr=al>0?100-(100/(1+ag/al)):50;
+    if(rLow<pLow&&rsi>pr+3) rsiDivergence=true;
+  }
+  if(rsiDivergence) g3+=5;
+
+  const score3 = Math.min(g3, 20);
+  if(score3>0) scoreBreakdown.push(`📈 momentum ${score3}/20`);
+
+  // ════════════════════════════════════════════════
+  // GROUP 4 — Volume ยืนยัน (15 คะแนน)
+  // indicator: Volume ratio, OBV divergence, MFI (ใช้ซ้ำ)
+  // ════════════════════════════════════════════════
+  let g4=0;
+
+  if(volRatio>=2.0)      g4+=8;
+  else if(volRatio>=1.5) g4+=6;
+  else if(volRatio>=1.0) g4+=3;
+
+  // OBV divergence
+  let obvTrend=null;
+  if(closes.length>=10&&vols.length>=10){
+    const n=Math.min(20,closes.length); let obv=0; const arr=[];
+    for(let i=closes.length-n;i<closes.length;i++){
+      const prev=closes[i-1]||closes[i];
+      if(closes[i]>prev) obv+=vols[i]||0; else if(closes[i]<prev) obv-=vols[i]||0;
+      arr.push(obv);
+    }
+    const half=Math.floor(arr.length/2);
+    const of=arr.slice(0,half).reduce((a,b)=>a+b,0)/half;
+    const ol=arr.slice(-half).reduce((a,b)=>a+b,0)/half;
+    const pt=closes[closes.length-1]-closes[closes.length-1-half];
+    obvTrend=ol>of?'up':'dn';
+    if(ol>of&&pt<=0) g4+=7; // เงินไหลเข้าเงียบๆ
+    else if(ol>of)   g4+=3;
   }
 
-  // ── คะแนน (รวม 100) ──
-  const pctFromS1 = s1>0?((price-s1)/s1*100):99;
+  // MFI ยืนยัน (ถ้า oversold + volume strong)
+  if(mfi!==null&&mfi<=25&&volRatio>=1.2) g4+=3;
 
-  if(pctFromS1<=0.25){ score+=25; scoreBreakdown.push('ราคาชิดแนวรับมาก +25'); }
-  else if(pctFromS1<=0.5){ score+=15; scoreBreakdown.push('ราคาใกล้แนวรับ +15'); }
+  const score4 = Math.min(g4, 15);
+  if(score4>0) scoreBreakdown.push(`📦 volume ${score4}/15`);
 
-  if(rsi<=30){ score+=20; scoreBreakdown.push('ราคาถูกเกินไป +20'); }
-  else if(rsi<=45){ score+=12; scoreBreakdown.push('โมเมนตัมอ่อน +12'); }
-  else if(rsi<=55){ score+=5; scoreBreakdown.push('โมเมนตัมกลาง +5'); }
+  // ════════════════════════════════════════════════
+  // GROUP 5 — Candle Pattern (10 คะแนน)
+  // เลือก pattern ที่แม่นสุดตัวเดียว (ไม่บวกซ้ำ)
+  // ════════════════════════════════════════════════
+  let hammerPattern=false,engulfingPattern=false,dojiPattern=false;
+  let morningStarPattern=false,threeWhiteSoldiersPattern=false,piercingPattern=false;
+  let g5=0;
+  if(closes.length>=4&&highs.length>=4&&lows.length>=4){
+    const i=closes.length-1;
+    const c=closes[i],o=closes[i-1]||c,h=highs[i],l=lows[i];
+    const body=Math.abs(c-o),range=h-l;
+    const lw=Math.min(c,o)-l, uw=h-Math.max(c,o);
+    if(range>0&&lw>=body*2&&uw<body*0.5) hammerPattern=true;
+    if(range>0&&body/range<0.1) dojiPattern=true;
+    const pC=closes[i-1]||c,pO=closes[i-2]||pC;
+    if(pC<pO&&c>o&&c>pO&&o<pC) engulfingPattern=true;
 
-  if(macdLine&&macdSignal&&macdLine>macdSignal){ score+=15; scoreBreakdown.push('แนวโน้มกลับขึ้น +15'); }
+    // Morning Star — ต้องการ 4 แท่ง: o0/c0=แท่งแรก, o1/c1=แท่งกลาง, o2/c2=แท่งล่าสุด
+    const c0=closes[i-2], o0=closes[i-3]||c0;   // แท่ง 3 ก่อนหน้า
+    const c1=closes[i-1], o1=closes[i-2];         // แท่งกลาง (open = close ของแท่งก่อนหน้า)
+    const c2=closes[i],   o2=closes[i-1];         // แท่งล่าสุด
+    const b0=Math.abs(c0-o0),b1=Math.abs(c1-o1),b2=Math.abs(c2-o2);
+    if(c0<o0&&b0>0&&b1<b0*0.4&&c2>o2&&c2>(o0+c0)/2) morningStarPattern=true;
 
-  if(volRatio>=1.5){ score+=15; scoreBreakdown.push('ปริมาณซื้อพุ่ง '+volRatio+'x +15'); }
-  else if(volRatio>=1.0){ score+=8; scoreBreakdown.push('ปริมาณซื้อปกติ '+volRatio+'x +8'); }
+    // Three White Soldiers
+    if(c0>o0&&c1>o1&&c2>o2&&c1>c0&&c2>c1){
+      const uw0=highs[i-2]-c0,uw1=highs[i-1]-c1,uw2=highs[i]-c2;
+      if(uw0<b0*0.3&&uw1<b1*0.3&&uw2<b2*0.3) threeWhiteSoldiersPattern=true;
+    }
 
-  if(emaSupport20){  score+=8;  scoreBreakdown.push('ราคาแตะเส้นค่าเฉลี่ย 20 วัน +8'); }
-  if(emaSupport50){  score+=7;  scoreBreakdown.push('ราคาแตะเส้นค่าเฉลี่ย 50 วัน +7'); }
-  if(emaSupport100){ score+=6;  scoreBreakdown.push('ราคาแตะเส้นค่าเฉลี่ย 100 วัน +6'); }
-  if(emaSupport200){ score+=5;  scoreBreakdown.push('ราคาแตะเส้นค่าเฉลี่ย 200 วัน +5'); }
-
-  if(engulfingPattern){ score+=10; scoreBreakdown.push('แท่งเทียนกลืนขึ้น +10'); }
-  else if(hammerPattern){ score+=8; scoreBreakdown.push('แท่งเทียนค้อน +8'); }
-  else if(dojiPattern){  score+=4; scoreBreakdown.push('แท่งเทียนลังเล +4'); }
-
-  if(rsiDivergence){ score+=10; scoreBreakdown.push('แรงซื้อฟื้นตัว +10'); }
-
-  // Stochastic RSI
-  const srsi=calcStochRSI(closes);
-  if(srsi){
-    if(srsi.k<=20 && srsi.d<=20){ score+=10; scoreBreakdown.push(`แรงขายอ่อนตัวมาก (K:${srsi.k} D:${srsi.d}) +10`); }
-    else if(srsi.k<=20){ score+=5; scoreBreakdown.push(`แรงขายอ่อนตัว (${srsi.k}) +5`); }
-    if(srsi.k>srsi.d && srsi.k<=40){ score+=5; scoreBreakdown.push('โมเมนตัมเริ่มกลับขึ้น +5'); }
+    // Piercing Line
+    if(c1<o1&&c2>o2&&o2<lows[i-1]&&c2>(o1+c1)/2&&c2<o1) piercingPattern=true;
   }
 
-  // FIX: Trend filter — bonus/penalty
-  if(inUptrend===true){ score+=5; scoreBreakdown.push('แนวโน้มขาขึ้น +5'); }
-  else if(inUptrend===false){ score=Math.round(score*0.7); scoreBreakdown.push('แนวโน้มขาลง (ลดคะแนน)'); }
+  if(morningStarPattern)          g5=10;
+  else if(threeWhiteSoldiersPattern) g5=9;
+  else if(engulfingPattern)       g5=8;
+  else if(piercingPattern)        g5=7;
+  else if(hammerPattern)          g5=6;
+  else if(dojiPattern)            g5=3;
+
+  const score5 = g5;
+  if(score5>0) scoreBreakdown.push(`🕯️ pattern ${score5}/10`);
+
+  // ════════════════════════════════════════════════
+  // รวมคะแนน + Trend multiplier
+  // ════════════════════════════════════════════════
+  let total = score1 + score2 + score3 + score4 + score5; // max = 100
+
+  if(inUptrend===true){
+    total = Math.round(total*1.05); // ขาขึ้น: บวกเพิ่ม 5%
+    scoreBreakdown.push('📡 ขาขึ้น ×1.05');
+  } else if(inUptrend===false){
+    total = Math.round(total*0.75); // ขาลง: หักออก 25%
+    scoreBreakdown.push('📡 ขาลง ×0.75');
+  }
 
   return {
-    score: Math.min(Math.round(score),100),
+    score: Math.min(total, 100),
     scoreBreakdown,
     rsi, macdLine, macdSignal, volRatio,
     ema20, ema50, ema100, ema200,
     emaSupport20, emaSupport50, emaSupport100, emaSupport200,
     hammerPattern, engulfingPattern, dojiPattern,
+    morningStarPattern, threeWhiteSoldiersPattern, piercingPattern,
     rsiDivergence, inUptrend,
-    pctFromS1
+    pctFromS1,
+    bbLower, bbUpper, bbMid, bbPct,
+    williamsR, atr, atrPct, atrStopLoss, obvTrend,
+    cci, mfi, adx, diPlus, diMinus, vwap
   };
 }
 
@@ -2623,7 +2804,7 @@ function showBuySignalPopup(ticker, price, s1, sig, lvl){
           <div style="flex:1;background:var(--bg4);border-radius:4px;height:4px;overflow:hidden"><div style="width:${score}%;height:100%;background:${scoreColor};border-radius:4px"></div></div>
           <span style="font-size:10px;color:${scoreColor};font-family:'IBM Plex Mono',monospace">${scoreLabel}</span>
         </div>
-
+      </div>
 
       <!-- ── Position Sizing ── -->
       ${(()=>{
@@ -2669,6 +2850,14 @@ function showBuySignalPopup(ticker, price, s1, sig, lvl){
           ${emaTxt.length?'<div class="buy-popup-row"><span class="buy-popup-label">📐 ราคาแตะค่าเฉลี่ย</span><span class="buy-popup-val" style="color:var(--green)">✅ '+emaTxt.map(n=>n+' วัน').join(', ')+'</span></div>':''}
         </div>
       </details>
+
+      <!-- ── AI Analysis ── -->
+      <div id="${popupId}-ai" style="margin-bottom:8px">
+        <div id="${popupId}-ai-loading" style="background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--dim);font-family:'IBM Plex Mono',monospace">
+          ⏳ AI กำลังวิเคราะห์...
+        </div>
+        <div id="${popupId}-ai-content" style="display:none;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.7"></div>
+      </div>
 
       <!-- ── Buttons ── -->
       <div class="buy-popup-btns">
@@ -2749,6 +2938,10 @@ async function _analyzeBuySignalAI(ticker, price, s1, r1, r2, sig, lvl, popupId)
   const emaSupportStr = [sig.emaSupport20&&'ค่าเฉลี่ย 20 วัน',sig.emaSupport50&&'ค่าเฉลี่ย 50 วัน',sig.emaSupport100&&'ค่าเฉลี่ย 100 วัน',sig.emaSupport200&&'ค่าเฉลี่ย 200 วัน'].filter(Boolean).join(', ')||'ไม่มี';
   const macdStr   = sig.macdLine&&sig.macdSignal?(sig.macdLine>sig.macdSignal?`โมเมนตัมขาขึ้น (${sig.macdLine})`:`โมเมนตัมขาลง (${sig.macdLine})`):'ไม่มีข้อมูล';
   const breakdownStr = sig.scoreBreakdown.join(', ');
+  const bbStr = sig.bbPct!==null?`Bollinger %B=${sig.bbPct}% (Lower=$${sig.bbLower}, Upper=$${sig.bbUpper})`:'ไม่มีข้อมูล';
+  const wrStr = sig.williamsR!==null?`%R=${sig.williamsR} ${sig.williamsR<=-80?'(oversold มาก)':sig.williamsR<=-70?'(oversold)':'(ปกติ)'}`:'ไม่มีข้อมูล';
+  const atrStr = sig.atr?`ATR=$${sig.atr} (${sig.atrPct}%) StopLoss=$${sig.atrStopLoss||'N/A'}`:'ไม่มีข้อมูล';
+  const obvStr = sig.obvTrend?`OBV ${sig.obvTrend==='up'?'เพิ่มขึ้น (เงินไหลเข้า)':'ลดลง (เงินไหลออก)'}`:'ไม่มีข้อมูล';
 
   // คำนวณ swing levels
   const {swingSupports, swingResists} = _calcSwingLevels(ticker, price);
@@ -2771,6 +2964,10 @@ async function _analyzeBuySignalAI(ticker, price, s1, r1, r2, sig, lvl, popupId)
 - ราคาแตะค่าเฉลี่ย: ${emaSupportStr} | แนวโน้ม: ${trendStr}
 - รูปแบบแท่งเทียน: ${candleStr} | มีสัญญาณราคาต่ำแต่โมเมนตัมฟื้น: ${sig.rsiDivergence?'✅ ใช่':'ไม่มี'}
 - อัตราเสี่ยง/ผลตอบแทน: 1:${rr1} | เหตุผลที่ได้คะแนน: ${breakdownStr}
+- Bollinger Bands: ${bbStr}
+- Williams %R: ${wrStr}
+- ATR: ${atrStr}
+- OBV: ${obvStr}
 - ประกาศผลบริษัท: ${(()=>{const d=_getEarningsDaysLeft(s.earn);return d===null?'ไม่มีข้อมูล':d<=0?'ผ่านไปแล้ว':d<=3?('⚠️ อีก '+d+' วัน (เสี่ยงมาก)'):d<=7?('🟡 อีก '+d+' วัน'):d<=14?('อีก '+d+' วัน'):'ยังไกล';})()} (${s.earn||'N/A'})
 
 📐 ระดับราคาสำคัญ:
@@ -2795,7 +2992,7 @@ ${(()=>{const st=getTradeStats();return st?`📊 สถิติที่ผ่�
 4) ควรซื้อเดี๋ยวนี้หรือรอสัญญาณอะไรเพิ่ม
 5) ความเสี่ยงที่ต้องระวัง
 
-🎯 เป้าหมาย 1: $${r1.toFixed(2)} | เป้าหมาย 2: $${r2?r2.toFixed(2):'N/A'} | ตัดขาดทุน: $[แนะนำ] | อัตราเสี่ยง/ผลตอบแทน: ${rr1}:1`;
+🎯 เป้าหมาย 1: $${r1.toFixed(2)} | เป้าหมาย 2: $${r2?r2.toFixed(2):'N/A'} | ตัดขาดทุน: $${sig.atrStopLoss||'[แนะนำ]'} ${sig.atrStopLoss?'(S1−1.5×ATR)':''} | อัตราเสี่ยง/ผลตอบแทน: ${rr1}:1`;
 
   try{
     const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
