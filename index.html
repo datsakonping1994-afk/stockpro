@@ -5747,7 +5747,7 @@ applyFontSize();
   try{
     const saved=await _loadKeyAsync();
     const key=saved||FINNHUB_KEY;
-    if(key){
+    if(key && !String(key).includes('ใส่_KEY')){
       FINNHUB_KEY=key;
       _showApp();
     }
