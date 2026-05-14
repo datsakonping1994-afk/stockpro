@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
   <link rel="manifest" href="data:application/json,%7B%22name%22%3A%20%22Stock%20Pro%22%2C%20%22short_name%22%3A%20%22StockPro%22%2C%20%22start_url%22%3A%20%22.%22%2C%20%22display%22%3A%20%22standalone%22%2C%20%22background_color%22%3A%20%22%2309090f%22%2C%20%22theme_color%22%3A%20%22%2300d4ff%22%2C%20%22icons%22%3A%20%5B%7B%22src%22%3A%20%22icon.svg%22%2C%20%22sizes%22%3A%20%22any%22%2C%20%22type%22%3A%20%22image%2Fsvg%2Bxml%22%7D%5D%7D">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1143,7 +1144,14 @@ function drawSparkline(ticker, data, currentPrice){
   const canvas=document.getElementById('spark-'+ticker);
   if(!canvas) return;
   const wrap=document.getElementById('spark-wrap-'+ticker);
-  const W=wrap.offsetWidth||canvas.parentElement.offsetWidth||240;
+  // FIX: ถ้า wrap ยังไม่ render (width=0) ให้ใช้ parentElement หรือ screen width
+  let W = wrap?.offsetWidth || canvas.parentElement?.offsetWidth || 0;
+  if(W < 50){
+    // ลองดึงจาก card width
+    const card = canvas.closest('.card');
+    W = card ? card.offsetWidth - 28 : window.innerWidth - 32;
+  }
+  W = Math.max(W, 200); // minimum width
   const H=90;
   const dpr=window.devicePixelRatio||1;
   canvas.width=W*dpr; canvas.height=H*dpr;
@@ -1669,6 +1677,18 @@ function renderHeatmap(){
 
 // ═══════════════════════════════════════════════════════
 // ORIGINAL buildGrid
+// ── ResizeObserver: redraw sparkline เมื่อ card resize ──
+const _sparkResizeObserver = new ResizeObserver(entries=>{
+  entries.forEach(entry=>{
+    const wrap = entry.target;
+    const ticker = wrap.id?.replace('spark-wrap-','');
+    if(!ticker) return;
+    const data = candleCache[ticker]?.data;
+    const s = stocks.find(x=>x.t===ticker);
+    if(data && s) drawSparkline(ticker, data, s.p);
+  });
+});
+
 // ── Sparkline Timeframe + Touch Crosshair ──
 const _sparkTf = {};
 
@@ -1904,6 +1924,8 @@ function buildGrid(){
       <div class="card-status-dot loading" id="dot-${s.t}" title="กำลังโหลด..."></div>`;
     _frag.appendChild(card);
     _candleObserver.observe(card); // lazy load candles
+    const _sw=document.getElementById('spark-wrap-'+s.t);
+    if(_sw) _sparkResizeObserver.observe(_sw);
     setTimeout(()=>calcTrade(s.t),100);
     }catch(cardErr){
       console.error('buildGrid card error for '+s.t+':', cardErr);
