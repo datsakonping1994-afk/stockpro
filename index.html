@@ -69,12 +69,19 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .card.hidden{display:none;}
 .card-top{padding:12px 14px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;}
+.card-header{padding:12px 14px 10px;border-bottom:1px solid var(--border);}
 .ticker{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;color:var(--text);}
 .company{font-size:12px;color:var(--dim);margin-top:2px;}
 .price{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;text-align:right;}
 .chg{font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;margin-top:2px;}
 /* Sparkline */
-.sparkline-wrap{padding:0;margin-top:0;position:relative;height:90px;cursor:pointer;}
+.sparkline-wrap{padding:0;margin-top:0;position:relative;cursor:pointer;background:var(--bg3);}
+.spark-tf-bar{display:flex;gap:3px;padding:5px 14px 3px;background:transparent;}
+.spark-tf-btn{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid var(--border);color:var(--dim);background:transparent;transition:all 0.15s;}
+.spark-tf-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.08);}
+.card-header{padding:12px 14px 10px;border-bottom:1px solid var(--border);}
+.card-header-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;}
+.card-price-row{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
 .sparkline-wrap:hover::after{content:'🔍';position:absolute;top:4px;right:18px;font-size:14px;opacity:0.6;}
 /* ── Full Chart Modal ── */
 .chart-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9998;display:flex;align-items:center;justify-content:center;padding:12px;}
@@ -290,6 +297,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   .ticker{font-size:14px;}
   .price{font-size:15px;}
   .card-top{padding:10px 10px 8px;}
+  .card-header{padding:10px 10px 8px;}
   .card-body{padding:8px 10px;}
   .tabs{gap:0;}
   .tab{padding:6px 8px;font-size:10px;}
@@ -1144,11 +1152,11 @@ function drawSparkline(ticker, data, currentPrice){
   const canvas=document.getElementById('spark-'+ticker);
   if(!canvas) return;
   const wrap=document.getElementById('spark-wrap-'+ticker);
-  // FIX: คิด width จาก wrap (ซึ่งเต็ม card) โดยหัก padding 14px ทั้งสองข้าง
+  // คิด width จาก wrap เต็ม (canvas เต็มความกว้าง)
   const card = canvas.closest('.card');
-  let W = (wrap?.offsetWidth || card?.offsetWidth || window.innerWidth) - 28;
+  let W = wrap?.offsetWidth || card?.offsetWidth || window.innerWidth - 16;
   W = Math.max(W, 180);
-  const H = 84;
+  const H = 90;
   const dpr=window.devicePixelRatio||1;
   canvas.width=W*dpr; canvas.height=H*dpr;
   canvas.style.width=W+'px'; canvas.style.height=H+'px';
@@ -1685,6 +1693,17 @@ const _sparkResizeObserver = new ResizeObserver(entries=>{
   });
 });
 
+function _buildTfBtns(ticker){
+  return ['1W','1M','3M','1Y'].map(tf=>{
+    const a=(_sparkTf[ticker]||'1M')===tf;
+    return '<button class="spark-tf-btn'+(a?' active':'')+'" data-ticker="'+ticker+'" data-tf="'+tf+'" onclick="_onTfBtn(this,event)">'+tf+'</button>';
+  }).join('');
+}
+function _onTfBtn(btn,e){
+  if(e){e.stopPropagation();e.preventDefault();}
+  setSparkTf(btn.dataset.ticker, btn.dataset.tf, e);
+}
+
 // ── Sparkline Timeframe + Touch Crosshair ──
 const _sparkTf = {};
 
@@ -1694,12 +1713,8 @@ function setSparkTf(ticker, tf, e){
   // re-render TF buttons
   const wrap = document.getElementById('spark-wrap-'+ticker);
   if(wrap){
-    const prev = wrap.previousElementSibling;
-    if(prev) prev.querySelectorAll('span').forEach(sp=>{
-      const t = sp.textContent.trim();
-      const active = t===tf;
-      sp.style.borderColor = active?'var(--accent)':'var(--border)';
-      sp.style.color = active?'var(--accent)':'var(--dim)';
+    wrap.querySelectorAll('.spark-tf-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.textContent.trim()===tf);
     });
   }
   const data = candleCache[ticker]?.data;
@@ -1789,29 +1804,32 @@ function buildGrid(){
     card.dataset.pinned='0';
     card.style.borderLeft=`3px solid ${zone.border}`;
     card.innerHTML=`
-      <div class="card-top">
-        <div>
-          <div class="ticker">${s.t}<span class="badge ${zone.cls==='accent'?'green':zone.cls}" id="badge-${s.t}">${zone.txt}</span></div>
-          <div class="company">${s.n}</div>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:6px">
+      <div class="card-header">
+        <div class="card-header-row">
           <div>
-            <div class="price ${cc}" id="price-${s.t}">$${fmt(s.p)}</div>
-            <div id="rs-${s.t}" style="display:inline"></div>
-            <div class="chg ${cc}" id="chg-${s.t}">${s.c>0?'+':''}${s.c}%</div>
-            <div id="stale-${s.t}" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);text-align:right">~cached</div>
+            <div class="ticker">${s.t}<span class="badge ${zone.cls==='accent'?'green':zone.cls}" id="badge-${s.t}">${zone.txt}</span></div>
+            <div class="company">${s.n}</div>
           </div>
-          <button class="pin-btn" id="pin-${s.t}" title="ปักมุด" onclick="togglePin('${s.t}')">📌</button>
+          <div style="display:flex;align-items:flex-start;gap:6px">
+            <div style="text-align:right">
+              <div class="price ${cc}" id="price-${s.t}">$${fmt(s.p)}</div>
+              <div class="card-price-row">
+                <div id="rs-${s.t}"></div>
+                <div class="chg ${cc}" id="chg-${s.t}">${s.c>0?'+':''}${s.c}%</div>
+              </div>
+              <div id="stale-${s.t}" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);text-align:right">~cached</div>
+            </div>
+            <button class="pin-btn" id="pin-${s.t}" title="ปักมุด" onclick="togglePin('${s.t}')">📌</button>
+          </div>
         </div>
       </div>
-      </div>
-      <div class="sparkline-wrap" id="spark-wrap-${s.t}" onclick="openChartModal('${s.t}')" title="คลิกเพื่อดูกราฟเต็ม" style="position:relative;height:108px;padding:0">
-        <div style="display:flex;gap:4px;padding:4px 14px 2px;position:relative;z-index:2">
-      <div class="sparkline-wrap" id="spark-wrap-${s.t}" onclick="openChartModal('${s.t}')" title="คลิกเพื่อดูกราฟเต็ม" style="position:relative">
-        </div>
-        <canvas class="sparkline-canvas" id="spark-${s.t}" style="display:block;width:100%;height:84px;padding:0 14px;box-sizing:border-box"></canvas>
+      <div class="sparkline-wrap" id="spark-wrap-${s.t}" onclick="openChartModal('${s.t}')" title="คลิกเพื่อดูกราฟเต็ม">
+        <div class="spark-tf-bar">
+          ${_buildTfBtns(s.t)}
+        <canvas class="sparkline-canvas" id="spark-${s.t}"></canvas>
         <div id="spark-tip-${s.t}" style="display:none;position:absolute;top:22px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);background:var(--bg4);padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;z-index:10"></div>
       </div>
+      <div class="vol-row" id="vol-row-${s.t}">
         <span class="vol-label">VOL</span>
         <span class="vol-val" id="vol-val-${s.t}">—</span>
         <span class="vol-ratio norm" id="vol-ratio-${s.t}">—</span>
