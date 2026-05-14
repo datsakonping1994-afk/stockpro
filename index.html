@@ -76,9 +76,10 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .chg{font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;margin-top:2px;}
 /* Sparkline */
 .sparkline-wrap{padding:0;margin-top:0;position:relative;cursor:pointer;background:var(--bg3);}
-.spark-tf-bar{display:flex;gap:3px;padding:5px 14px 3px;background:transparent;}
-.spark-tf-btn{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid var(--border);color:var(--dim);background:transparent;transition:all 0.15s;}
-.spark-tf-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.08);}
+.spark-tf-bar{display:flex;gap:4px;padding:5px 14px 6px;background:transparent;border-top:1px solid var(--border);}
+.spark-tf-btn{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--dim);background:var(--bg3);transition:all 0.15s;line-height:1.6;}
+.spark-tf-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.1);font-weight:600;}
+.spark-tf-btn:hover{border-color:var(--text2);color:var(--text2);}
 .card-header{padding:12px 14px 10px;border-bottom:1px solid var(--border);}
 .card-header-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;}
 .card-price-row{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
@@ -1710,10 +1711,10 @@ const _sparkTf = {};
 function setSparkTf(ticker, tf, e){
   if(e){ e.stopPropagation(); e.preventDefault(); }
   _sparkTf[ticker] = tf;
-  // re-render TF buttons
-  const wrap = document.getElementById('spark-wrap-'+ticker);
-  if(wrap){
-    wrap.querySelectorAll('.spark-tf-btn').forEach(btn=>{
+  // re-render TF buttons — อยู่ใน tf-bar ด้านล่าง
+  const tfBar = document.getElementById('tf-bar-'+ticker) || document.getElementById('spark-wrap-'+ticker);
+  if(tfBar){
+    tfBar.querySelectorAll('.spark-tf-btn').forEach(btn=>{
       btn.classList.toggle('active', btn.textContent.trim()===tf);
     });
   }
@@ -1823,11 +1824,11 @@ function buildGrid(){
           </div>
         </div>
       </div>
-      <div class="sparkline-wrap" id="spark-wrap-${s.t}" onclick="openChartModal('${s.t}')" title="คลิกเพื่อดูกราฟเต็ม">
-        <div class="spark-tf-bar">
-          ${_buildTfBtns(s.t)}
         <canvas class="sparkline-canvas" id="spark-${s.t}"></canvas>
         <div id="spark-tip-${s.t}" style="display:none;position:absolute;top:22px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);background:var(--bg4);padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;z-index:10"></div>
+      <div class="spark-tf-bar" id="tf-bar-${s.t}">
+          ${_buildTfBtns(s.t)}
+      </div>
       </div>
       <div class="vol-row" id="vol-row-${s.t}">
         <span class="vol-label">VOL</span>
