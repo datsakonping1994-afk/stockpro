@@ -3203,16 +3203,18 @@ function checkZoneAlert(ticker, price, s1, r1){
       }
     }
 
-    // ใกล้ S1 ≤ 0.5% → toast เตือนล่วงหน้า (cooldown 15 นาที)
+    // ใกล้ S1 ≤ 0.5% → toast เตือน | reset เมื่อราคาออกห่าง 1%
     if(lv.name==='S1' && lv.type==='s' && cur==='above'){
       const pctNear = lv.val>0 ? ((price-lv.val)/lv.val*100) : 99;
       const nearKey = ticker+'_S1_near';
-      const lastAlert = zoneAlertState[nearKey]||0;
-      const cooldown = 15*60*1000; // 15 นาที
-      if(pctNear<=0.5 && Date.now()-lastAlert>cooldown){
-        zoneAlertState[nearKey] = Date.now();
+      const nearState = zoneAlertState[nearKey]||'idle'; // 'idle' | 'alerted'
+      if(pctNear<=0.5 && nearState==='idle'){
+        zoneAlertState[nearKey]='alerted';
         showToast(ticker, 'near', 'S1', price, lv.val);
         checkBuySignal(ticker, price, lv.val);
+      } else if(pctNear>1.0){
+        // ออกห่างเกิน 1% → reset ให้แจ้งได้ใหม่ถ้ากลับมา
+        zoneAlertState[nearKey]='idle';
       }
     }
   }
@@ -4049,13 +4051,18 @@ function applyFontSize(){
   if(lbl) lbl.textContent=_fontSize+'px';
 }
 
-// ── Custom Tickers (persistent) ──
-const CUSTOM_TICKERS_KEY='_sp_custom_tickers';
+// ── Custom Tickers Storage — with in-memory fallback for file:// ──
+let _customTickersMemory = [];
+const CUSTOM_TICKERS_KEY = '_sp_custom_tickers';
 function _loadCustomTickers(){
-  try{ const d=localStorage.getItem(CUSTOM_TICKERS_KEY); return d?JSON.parse(d):[]; }catch{}
-  return [];
+  try{
+    const d=localStorage.getItem(CUSTOM_TICKERS_KEY);
+    if(d){ _customTickersMemory=JSON.parse(d); return _customTickersMemory; }
+  }catch{}
+  return _customTickersMemory;
 }
 function _saveCustomTickers(arr){
+  _customTickersMemory=arr;
   try{ localStorage.setItem(CUSTOM_TICKERS_KEY,JSON.stringify(arr)); }catch{}
 }
 function addCustomTicker(){
@@ -4599,7 +4606,7 @@ async function applyIndicatorAll(mode='classic'){
       zoneAlertState[s.t+'_'+lv.name]=cur;
     });
     // reset near-S1 state too
-    zoneAlertState[s.t+'_S1_near']=0;
+    zoneAlertState[s.t+'_S1_near']='idle';
   });
   zoneAlertReady=true;
   updateAlerts();
