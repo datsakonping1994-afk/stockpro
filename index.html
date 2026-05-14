@@ -364,6 +364,14 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .onboard-btn:disabled{opacity:0.4;cursor:not-allowed;}
 .onboard-change{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);cursor:pointer;padding:2px 6px;border-radius:3px;border:1px solid var(--border);background:transparent;transition:all 0.15s;}
 .onboard-change:hover{border-color:var(--accent);color:var(--accent);}
+/* ── Stale Price Banner ── */
+#stale-banner{display:none;background:#1a0508;border:1px solid rgba(255,68,102,0.7);border-radius:8px;padding:9px 14px;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#ff8899;align-items:center;gap:8px;animation:pulse-red 2s ease-in-out infinite;}
+#stale-banner.show{display:flex;}
+#stale-banner .stale-icon{font-size:16px;flex-shrink:0;}
+#stale-banner .stale-text{flex:1;line-height:1.5;}
+#stale-banner .stale-age{color:rgba(255,136,153,0.7);font-size:10px;display:block;margin-top:1px;}
+#stale-banner .stale-retry{padding:3px 10px;border-radius:5px;background:rgba(255,68,102,0.15);border:1px solid rgba(255,68,102,0.5);color:#ff8899;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;transition:background 0.15s;}
+#stale-banner .stale-retry:hover{background:rgba(255,68,102,0.3);}
 </style>
 </head>
 <body>
@@ -386,6 +394,16 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   </div>
 </div>
 <div id="mainApp" style="display:none">
+
+<!-- ── Stale Price Banner — แสดงเมื่อราคาค้างนานกว่า 5 นาที ── -->
+<div id="stale-banner">
+  <span class="stale-icon">⚠️</span>
+  <span class="stale-text">
+    ราคาเป็นค่าเก่า — กรุณาตรวจสอบก่อนตัดสินใจซื้อขาย
+    <span class="stale-age" id="stale-age-text"></span>
+  </span>
+  <button class="stale-retry" onclick="refreshAll()">🔄 รีเฟรช</button>
+</div>
 
 <div class="hdr">
   <div class="logo">◈ STOCK PRO</div>
@@ -3720,40 +3738,140 @@ async function buildAIContext(t) {
   const vwapStr = vwapVal ? `$${vwapVal} (ราคา ${price >= vwapVal ? 'เหนือ +' : 'ต่ำกว่า '}${vwapVal > 0 ? ((price-vwapVal)/vwapVal*100).toFixed(2) : 0}%)` : 'N/A';
   if(srsiResult) chips.push({ label: `StochRSI K:${srsiResult.k}`, cls: srsiResult.k>=80?'bear':srsiResult.k<=20?'bull':'neut' });
   if(vwapVal) chips.push({ label: `VWAP $${vwapVal} ${price>=vwapVal?'▲':'▼'}`, cls: price>=vwapVal?'bull':'bear' });
+  if(adxAI) chips.push({ label: `ADX ${adxAI} ${adxAI>=25?'🔥':''}`, cls: adxAI>=25&&diPlusAI>diMinusAI?'bull':adxAI>=25?'bear':'neut' });
+  if(kijunAI) chips.push({ label: `Kijun $${kijunAI} ${price>=kijunAI?'▲':'▼'}`, cls: price>=kijunAI?'bull':'bear' });
   const chipEl = document.getElementById('ai-chips-' + t);
   if (chipEl) chipEl.innerHTML = chips.map(c => `<span class="ai-ind-chip ${c.cls}">${c.label}</span>`).join('');
 
+  // ── Ichimoku Cloud ──
+  let kijunAI=null, tenkanAI=null, senkouA=null, senkouB=null;
+  if(highs.length>=52&&lows.length>=52){
+    const kH=Math.max(...highs.slice(-26)),kL=Math.min(...lows.slice(-26));
+    kijunAI=+((kH+kL)/2).toFixed(2);
+    const tH=Math.max(...highs.slice(-9)),tL=Math.min(...lows.slice(-9));
+    tenkanAI=+((tH+tL)/2).toFixed(2);
+    const sH52=Math.max(...highs.slice(-52)),sL52=Math.min(...lows.slice(-52));
+    senkouA=+((tenkanAI+kijunAI)/2).toFixed(2);
+    senkouB=+((sH52+sL52)/2).toFixed(2);
+  }
+  const ichimokuStr=kijunAI?`Tenkan $${tenkanAI} | Kijun $${kijunAI} | Senkou A $${senkouA} | Senkou B $${senkouB} | ราคา${price>Math.max(senkouA,senkouB)?'อยู่เหนือเมฆ (bullish)':price<Math.min(senkouA,senkouB)?'อยู่ใต้เมฆ (bearish)':'อยู่ในเมฆ (sideways)'}`: 'N/A';
+
+  // ── ADX ──
+  let adxAI=null,diPlusAI=null,diMinusAI=null;
+  if(closes.length>=20&&highs.length>=20&&lows.length>=20){
+    const trs=[],dmp=[],dmm=[];
+    for(let i=closes.length-15;i<closes.length-1;i++){
+      const h=highs[i+1],l=lows[i+1],ph=highs[i],pl=lows[i],prev=closes[i];
+      trs.push(Math.max(h-l,Math.abs(h-prev),Math.abs(l-prev)));
+      const up=h-ph,dn=pl-l;
+      dmp.push(up>dn&&up>0?up:0); dmm.push(dn>up&&dn>0?dn:0);
+    }
+    const atr14=trs.reduce((a,b)=>a+b,0)/trs.length;
+    if(atr14>0){
+      diPlusAI=+(dmp.reduce((a,b)=>a+b,0)/trs.length/atr14*100).toFixed(1);
+      diMinusAI=+(dmm.reduce((a,b)=>a+b,0)/trs.length/atr14*100).toFixed(1);
+      const dxArr=trs.map((_,j)=>{const sum=dmp[j]/atr14*100+dmm[j]/atr14*100;return sum>0?Math.abs(dmp[j]/atr14*100-dmm[j]/atr14*100)/sum*100:0;});
+      adxAI=+(dxArr.reduce((a,b)=>a+b,0)/dxArr.length).toFixed(1);
+    }
+  }
+  const adxStr=adxAI?`ADX ${adxAI} (${adxAI>=25?'เทรนด์แข็ง':'เทรนด์อ่อน'}) | DI+ ${diPlusAI} DI- ${diMinusAI} → ${diPlusAI>diMinusAI?'แรงซื้อครอง':'แรงขายครอง'}`:'N/A';
+
+  // ── Trade Log สำหรับ personalized context ──
+  const tradeLog=_loadTradeLog().filter(x=>x.ticker===t).slice(-5);
+  const tradeLogStr=tradeLog.length?tradeLog.map(x=>{
+    const icon=x.result==='win'?'✅':x.result==='loss'?'❌':'⏳';
+    const pctStr=x.pct!=null?(x.pct>=0?'+':'')+x.pct+'%':'';
+    return `${icon} เข้า $${x.price} → ${x.result||'รอผล'} ${pctStr}`;
+  }).join('\n'):'ยังไม่มีประวัติเทรดตัวนี้';
+
+  // ── สถิติรวมทั้งพอร์ต ──
+  const allStats=getTradeStats();
+  const statsStr=allStats?`Win Rate ${allStats.winRate}% (${allStats.wins}W/${allStats.losses}L จาก ${allStats.total} เทรด) | กำไรเฉลี่ย ${allStats.avgPct>=0?'+':''}${allStats.avgPct}%`:'ยังไม่มีสถิติ';
+
+  // ── Candle Pattern ──
+  const sig2=_calcBuyScore(t,price,lvl.s1||price*0.95,lvl.r1||price*1.05);
+  const patternStr=sig2.morningStarPattern?'⭐ Morning Star (กลับตัวขึ้น)':
+    sig2.threeWhiteSoldiersPattern?'⭐ Three White Soldiers (ขาขึ้นแข็ง)':
+    sig2.engulfingPattern?'🕯️ แท่งกลืนขึ้น (momentum กลับ)':
+    sig2.piercingPattern?'🕯️ Piercing Line (ดีดตัวจากแนวรับ)':
+    sig2.hammerPattern?'🔨 แท่งค้อน (ราคากลับขึ้น)':
+    sig2.dojiPattern?'〽️ Doji (ลังเล รอยืนยัน)':'ไม่มีรูปแบบพิเศษ';
+  const scoreStr=`Score ${sig2.score}/100 (${sig2.score>=70?'แข็งแกร่ง 🔥':sig2.score>=55?'ปานกลาง':'อ่อน'})`;
+
+  // ── Volume Profile POC ──
+  const vp=calcVolumeProfile({c:closes,h:highs,l:lows,v:vols},10);
+  const vpStr=vp?`POC $${vp.profile[vp.pocIdx]?.price||'N/A'} (ราคาที่มีปริมาณซื้อขายมากที่สุด) | Value Area $${vp.valLo}-$${vp.valHi}`:'N/A';
+
+  // ── Relative Strength vs SPY ──
+  const rs=_relStrength[t];
+  const rsStr=rs?`${rs.rs>=2?'แข็งกว่าตลาดมาก 💪':rs.rs>=0.5?'แข็งกว่าตลาด':rs.rs>=-0.5?'ใกล้เคียงตลาด':rs.rs>=-2?'อ่อนกว่าตลาด':'อ่อนกว่าตลาดมาก 🩸'} (RS ${rs.rs>=0?'+':''}${rs.rs}%)`:'N/A';
+
+  // ── Sector context ──
+  const sector=tickerSector?.[t]||'N/A';
+  const sectorPeers=(sectorMap[sector]||[]).filter(x=>x!==t).slice(0,4);
+  const sectorPeersStr=sectorPeers.length?sectorPeers.map(x=>{
+    const px=stocks.find(s=>s.t===x);
+    return px?`${x} ${px.c>=0?'+':''}${px.c}%`:'';
+  }).filter(Boolean).join(' | '):'N/A';
+
+  // ── Earnings ──
+  const daysLeft=_getEarningsDaysLeft(s.earn);
+  const earningsStr=daysLeft===null?'ไม่มีข้อมูล':daysLeft<=0?'ประกาศแล้ว':daysLeft<=3?`⚠️ อีก ${daysLeft} วัน (เสี่ยงสูง!)`:daysLeft<=7?`🟡 อีก ${daysLeft} วัน`:daysLeft<=14?`อีก ${daysLeft} วัน`:'ยังไกล';
+
+  // ── Port size + risk context ──
+  const portContext=`ขนาด Port: $${PORT_SIZE.toLocaleString()} | ความเสี่ยงต่อเทรด: 1-2% (~$${(PORT_SIZE*0.015).toFixed(0)})`;
+
   return {
-    systemPrompt: `คุณคือที่ปรึกษาหุ้นที่พูดภาษาไทยแบบเข้าใจง่าย ห้ามใช้ศัพท์เทคนิคภาษาอังกฤษ เช่น RSI, overbought, oversold, bullish, bearish, pullback, EMA, MACD, breakout — ให้แปลเป็นคำไทยธรรมดาแทนทุกครั้ง เช่น "ราคาขึ้นมาเยอะแล้ว" "แนวโน้มขาขึ้น" "อาจมีคนขายทำกำไร" "ราคาอาจย่อตัว" ตอบกระชับ อ่านง่าย เหมือนคุยกับเพื่อน ลงท้ายด้วย "⚠️ ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน"`,
-    userPrompt: `วิเคราะห์หุ้น ${t} (${s.n}) ให้ละเอียด:
+    systemPrompt: `คุณคือที่ปรึกษาการลงทุนมืออาชีพที่พูดภาษาไทยแบบเข้าใจง่าย มีความรู้ technical analysis ลึกมาก
+กฎสำคัญ:
+- ห้ามใช้ศัพท์เทคนิคภาษาอังกฤษ ให้แปลเป็นภาษาไทยธรรมดาทุกครั้ง
+- ตอบตรงประเด็น กระชับ อ่านง่าย เหมือนคุยกับผู้เชี่ยวชาญที่เป็นเพื่อน
+- คำนึงถึงขนาด port และความเสี่ยงของผู้ใช้เสมอ
+- ใช้ประวัติการเทรดและสถิติในการแนะนำ
+- ถ้าใกล้ประกาศผลไตรมาส ให้เตือนความเสี่ยงเพิ่มเติม
+- ลงท้ายด้วย "⚠️ ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน"`,
+    userPrompt: `วิเคราะห์หุ้น ${t} (${s.n}) แบบครบถ้วน:
 
-💰 ราคาปัจจุบัน: $${price} (${s.c > 0 ? '+' : ''}${s.c}%)
-📊 ข้อมูลบริษัท: P/E=${s.pe || 'N/A'}, มูลค่าตลาด=${s.mktcap || 'N/A'}, รายได้เติบโต=${s.rev || 'N/A'}
+💼 พอร์ต: ${portContext}
+📊 สถิติเทรดรวม: ${statsStr}
 
-📈 ตัวชี้วัดราคา:
-- ความแข็งแรงราคา (RSI): ${rsi || 'N/A'} ${rsi >= 70 ? '(ราคาขึ้นมาเยอะแล้ว)' : rsi <= 30 ? '(ราคาถูกขายลงมาเยอะ)' : '(ปกติ)'}
-- ค่าเฉลี่ย 20 วัน: $${ema20 || 'N/A'} | ค่าเฉลี่ย 50 วัน: $${ema50 || 'N/A'} | ค่าเฉลี่ย 200 วัน: $${ema200 || 'N/A'}
-- ราคาเทียบค่าเฉลี่ย: ${ema20 ? (price > ema20 ? 'สูงกว่า' : 'ต่ำกว่า') : 'N/A'}ค่าเฉลี่ย 20 วัน, ${ema50 ? (price > ema50 ? 'สูงกว่า' : 'ต่ำกว่า') : 'N/A'}ค่าเฉลี่ย 50 วัน, ${ema200 ? (price > ema200 ? 'สูงกว่า' : 'ต่ำกว่า') : 'N/A'}ค่าเฉลี่ย 200 วัน
-- โมเมนตัม (MACD): ${macdLine || 'N/A'} → ${macdLine && macdSignal ? (macdLine > macdSignal ? 'แนวโน้มขาขึ้น' : 'แนวโน้มขาลง') : 'N/A'}
-- แบนด์ราคา (Bollinger): บน=$${bbUpper || 'N/A'}, กลาง=$${bbMid || 'N/A'}, ล่าง=$${bbLower || 'N/A'}
-- สัญญาณซื้อขายสะสม (Stochastic): ${stochK || 'N/A'}
-- สัญญาณ Stochastic RSI: ${srsiStr}
-- ราคาเฉลี่ยถ่วงปริมาณ (VWAP): ${vwapStr}
-- ความผันผวนรายวัน (ATR): $${atr || 'N/A'}
-- ปริมาณซื้อขาย: ${volRatio}x ${volRatio >= 1.5 ? '(สูงกว่าปกติมาก)' : volRatio <= 0.7 ? '(ต่ำกว่าปกติ)' : '(ปกติ)'}
-- แนวโน้มปริมาณสะสม (OBV): ${obvTrend}
+💰 ราคา: $${price} (${s.c>0?'+':''}${s.c}%) | P/E=${s.pe||'N/A'} | Market Cap=${s.mktcap||'N/A'} | รายได้โต=${s.rev||'N/A'}
+🏭 Sector: ${sector} | หุ้นกลุ่มเดียวกัน: ${sectorPeersStr}
+📅 ประกาศผลไตรมาส: ${earningsStr} (${s.earn||'N/A'})
 
-🎯 ระดับราคาสำคัญ:
-- จุดรับ S1: ${lvl.s1 ? '$' + lvl.s1.toFixed(2) : 'N/A'} | จุดรับ S2: ${lvl.s2 ? '$' + lvl.s2.toFixed(2) : 'N/A'}
-- จุดต้าน R1: ${lvl.r1 ? '$' + lvl.r1.toFixed(2) : 'N/A'} | จุดต้าน R2: ${lvl.r2 ? '$' + lvl.r2.toFixed(2) : 'N/A'}
+📈 Technical:
+- ความแข็งแรงราคา: ${rsi||'N/A'} ${rsi>=70?'(ขึ้นมาเยอะแล้ว ⚠)':rsi<=30?'(ถูกขายลงมาเยอะ ✅)':'(ปกติ)'}
+- ค่าเฉลี่ย: 20วัน $${ema20||'N/A'} | 50วัน $${ema50||'N/A'} | 200วัน $${ema200||'N/A'}
+- โมเมนตัม: ${macdLine&&macdSignal?(macdLine>macdSignal?'กำลังขึ้น ✅':'กำลังลง ❌'):'N/A'}
+- แบนด์ราคา: บน $${bbUpper||'N/A'} กลาง $${bbMid||'N/A'} ล่าง $${bbLower||'N/A'}
+- Stochastic: ${stochK||'N/A'} | StochRSI: ${srsiStr}
+- VWAP: ${vwapStr} | ATR: $${atr||'N/A'}
+- ปริมาณ: ${volRatio}x ${volRatio>=1.5?'(สูงผิดปกติ 🔥)':volRatio<=0.7?'(ต่ำผิดปกติ)':'(ปกติ)'} | OBV: ${obvTrend}
+- เทรนด์: ${adxStr}
+- Ichimoku: ${ichimokuStr}
+- รูปแบบแท่งเทียน: ${patternStr}
+- ${scoreStr}
 
-🌍 ภาพรวมตลาดวันนี้:
-${getMarketContextStr()}
+📊 Volume Profile: ${vpStr}
+💪 ความแข็งแกร่งเทียบตลาด: ${rsStr}
 
-📰 ข่าวล่าสุด:
+🎯 ระดับสำคัญ:
+- แนวรับ: S1 $${lvl.s1?lvl.s1.toFixed(2):'N/A'} | S2 $${lvl.s2?lvl.s2.toFixed(2):'N/A'}
+- แนวต้าน: R1 $${lvl.r1?lvl.r1.toFixed(2):'N/A'} | R2 $${lvl.r2?lvl.r2.toFixed(2):'N/A'}
+
+🌍 ตลาด: ${getMarketContextStr()}
+
+📰 ข่าว:
 ${newsStr}
 
-กรุณาวิเคราะห์แบบเข้าใจง่าย ห้ามใช้ศัพท์เทคนิค ให้แปลเป็นภาษาธรรมดา เช่น "ราคาขึ้นมาเยอะแล้ว อาจมีคนขายทำกำไร" แทน "RSI overbought": 1) ตอนนี้ราคาหุ้นตัวนี้เป็นยังไง แพงหรือถูก ขึ้นหรือลง 2) จุดที่น่าซื้อหรือน่าขายคือราคาเท่าไหร่ 3) ความเสี่ยงที่ต้องระวัง 4) สรุปสั้นๆ ว่าตอนนี้ควรทำอะไร`,
+📋 ประวัติเทรดตัวนี้:
+${tradeLogStr}
+
+วิเคราะห์ให้ครบ 4 ข้อ:
+1) สรุปสถานการณ์ราคาตอนนี้ และ sector กำลังเป็นยังไง
+2) จุดเข้าซื้อที่ดีที่สุด ราคาเท่าไหร่ เงื่อนไขอะไร จำนวนหุ้นที่เหมาะกับ port
+3) จุดตัดขาดทุน ($) และเป้าหมายกำไร ($) พร้อม Risk/Reward ratio
+4) ความเสี่ยงหลัก โดยเฉพาะถ้าใกล้ประกาศผลไตรมาส`,
     chips
   };
 }
@@ -3897,8 +4015,8 @@ async function sendAIChat(t) {
   const ctx = await buildAIContext(t);
   const systemPrompt = ctx?.systemPrompt || 'คุณคือที่ปรึกษาหุ้นที่พูดภาษาไทยแบบเข้าใจง่าย ห้ามใช้ศัพท์เทคนิค ตอบกระชับ ตรงประเด็น';
 
-  // Build proper messages array — keep last 10 turns, first message always has full context
-  let messages = aiChatHistory[t].slice(-10).map(m => ({ role: m.role, content: m.content }));
+  // Build proper messages array — keep last 20 turns for better context
+  let messages = aiChatHistory[t].slice(-20).map(m => ({ role: m.role, content: m.content }));
 
   await streamClaude(
     systemPrompt,
@@ -3916,10 +4034,10 @@ async function sendAIChat(t) {
       } else {
         msgDiv.innerHTML = (full||'').replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         aiChatHistory[t].push({ role: 'assistant', content: full });
-        // Keep last 10 messages and limit total chars to ~6000
-        if (aiChatHistory[t].length > 10) aiChatHistory[t] = aiChatHistory[t].slice(-10);
+        // Keep last 20 messages and limit total chars to ~12000
+        if (aiChatHistory[t].length > 20) aiChatHistory[t] = aiChatHistory[t].slice(-20);
         let totalChars = aiChatHistory[t].reduce((sum,m)=>sum+m.content.length,0);
-        while(totalChars > 6000 && aiChatHistory[t].length > 2){
+        while(totalChars > 12000 && aiChatHistory[t].length > 2){
           aiChatHistory[t].shift();
           totalChars = aiChatHistory[t].reduce((sum,m)=>sum+m.content.length,0);
         }
@@ -4027,6 +4145,9 @@ function wsConnect(){
       // refresh up/dn counts
       document.getElementById('upCnt').textContent=stocks.filter(s=>s.c>=0).length;
       document.getElementById('dnCnt').textContent=stocks.filter(s=>s.c<0).length;
+      // ── WS ได้ราคาจริง → รีเซ็ต stale tracker ──
+      _lastSuccessfulPoll = Date.now();
+      document.getElementById('stale-banner')?.classList.remove('show');
     }catch{}
   };
   ws.onerror=()=>{
@@ -4086,6 +4207,29 @@ function wsDisconnect(){
 // Fallback HTTP poll (used when WebSocket fails or market closed)
 let httpPollTimer=null; // setInterval handle
 let _pollRunning=false;
+
+// ── Stale Price Detection ──
+let _lastSuccessfulPoll = 0; // timestamp ของ poll ที่ได้ราคาจริงครั้งล่าสุด
+const STALE_THRESHOLD = 5 * 60 * 1000; // 5 นาที
+const STALE_WARN      = 3 * 60 * 1000; // 3 นาที (ระดับเตือนก่อน)
+let _staleCheckTimer  = null;
+
+function _checkStaleBanner(){
+  const banner = document.getElementById('stale-banner');
+  if(!banner) return;
+  if(!_lastSuccessfulPoll){ banner.classList.remove('show'); return; }
+  const age = Date.now() - _lastSuccessfulPoll;
+  if(age >= STALE_THRESHOLD){
+    const mins = Math.floor(age / 60000);
+    const secs = Math.floor((age % 60000) / 1000);
+    const ageEl = document.getElementById('stale-age-text');
+    if(ageEl) ageEl.textContent = `ค่าเก่า ${mins} นาที ${secs} วินาที — ยังไม่ได้รับราคาใหม่`;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
 async function fallbackPoll(){
   if(!isLive||_pollRunning) return;
   // ถ้า WS ติดอยู่ → poll เฉพาะหุ้นที่เกิน WS limit
@@ -4132,6 +4276,11 @@ async function fallbackPoll(){
   st.innerHTML=`${_sess.label} · HTTP · อัปเดต ${ok} ตัว · ${now}`;
   document.getElementById('upCnt').textContent=stocks.filter(s=>s.c>=0).length;
   document.getElementById('dnCnt').textContent=stocks.filter(s=>s.c<0).length;
+  // ── อัปเดต stale tracker เมื่อดึงราคาสำเร็จ ──
+  if(ok > 0){
+    _lastSuccessfulPoll = Date.now();
+    document.getElementById('stale-banner')?.classList.remove('show');
+  }
   }finally{_pollRunning=false;}
 }
 
@@ -4860,6 +5009,9 @@ async function startup(){
       renderNewsTab(t);
     });
   },300000);
+  // ── เริ่ม stale price checker ทุก 30 วินาที ──
+  clearInterval(_staleCheckTimer);
+  _staleCheckTimer = setInterval(_checkStaleBanner, 30000);
   // 1. Auto-start Live ทันทีที่เปิดแอป
   // ตรวจตลาดเปิด/ปิดก่อน
   const _now = new Date();
@@ -5363,6 +5515,8 @@ async function doLogout(){
   // FIX: clear timers ที่อาจยังทำงานอยู่
   clearInterval(newsRefreshTimer); newsRefreshTimer=null;
   clearTimeout(_wsReconnectTimer); _wsReconnectTimer=null;
+  clearInterval(_staleCheckTimer); _staleCheckTimer=null;
+  _lastSuccessfulPoll=0;
   _wsReconnectCount=0;
   // FIX: clear caches ทั้งหมดเพื่อไม่ให้ข้อมูลเก่าปน session ใหม่
   Object.keys(liveCache).forEach(k=>delete liveCache[k]);
