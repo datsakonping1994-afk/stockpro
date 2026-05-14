@@ -2048,7 +2048,10 @@ function buildGrid(){
       <div class="card-header">
         <div class="card-header-row">
           <div>
-            <div class="ticker">${s.t}<span class="badge ${zone.cls==='accent'?'green':zone.cls}" id="badge-${s.t}">${zone.txt}</span></div>
+            <div class="ticker" style="display:flex;align-items:center;gap:6px">
+              ${(()=>{ const lu=_getLogoUrlAuto(s.t); return lu?`<img id="logo-${s.t}" src="${lu}" style="width:16px;height:16px;border-radius:3px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">`: `<img id="logo-${s.t}" style="display:none;width:16px;height:16px;border-radius:3px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">` })()}
+              ${s.t}<span class="badge ${zone.cls==='accent'?'green':zone.cls}" id="badge-${s.t}">${zone.txt}</span>
+            </div>
             <div class="company">${s.n}</div>
             ${(()=>{ const sess=_getSession(); return sess.type==='pre'?'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(255,180,0,0.15);border:1px solid rgba(255,180,0,0.4);color:#ffb400;margin-left:4px">PRE</span>':sess.type==='after'?'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);color:#c084fc;margin-left:4px">AH</span>':''; })()}
           </div>
@@ -2414,7 +2417,52 @@ function showToast(ticker, type, levelName, price, level){
   if(isS) checkBuySignal(ticker, price, level);
 }
 
-// ── Buy Signal Popup — เงื่อนไข B ──
+// ── Domain map สำหรับ Favicon logo ──
+const _stockDomain={
+  AAPL:'apple.com',GOOGL:'google.com',MSFT:'microsoft.com',NVDA:'nvidia.com',
+  META:'meta.com',AMZN:'amazon.com',NFLX:'netflix.com',
+  AMD:'amd.com',INTC:'intel.com',AVGO:'broadcom.com',ASML:'asml.com',
+  TSM:'tsmc.com',ARM:'arm.com',ANET:'arista.com',CRWD:'crowdstrike.com',
+  PLTR:'palantir.com',NOW:'servicenow.com',ISRG:'intuitivesurgical.com',
+  LLY:'lilly.com',NVO:'novonordisk.com',JPM:'jpmorganchase.com',
+  XOM:'exxonmobil.com',SPGI:'spglobal.com',MU:'micron.com',
+  HOOD:'robinhood.com',SOFI:'sofi.com',HIMS:'hims.com',
+  RKLB:'rocketlabusa.com',ASTS:'ast-science.com',OKLO:'oklo.com',
+  IONQ:'ionq.com',KTOS:'kratosdefense.com',TEM:'tempus.com',
+  CRWV:'coreweave.com',NBIS:'nebius.com',IREN:'iren.com',
+  CRDO:'credotechnology.com',VRT:'vertiv.com',NVTS:'navitassemi.com',
+  AXON:'axon.com',RBRK:'rubrik.com',MELI:'mercadolibre.com',
+  TMDX:'transmedics.com',AAOI:'ii-vi.com',MP:'mpmaterials.com',
+  EOSE:'eosenergy.com',AEHR:'aehr.com',ONDS:'ondasholdings.com',
+  OSS:'onestopsystems.com',SNDK:'sandisk.com',AVEX:'aevex.com',
+  SLNH:'solunaholdings.com',JPM:'jpmorganchase.com',
+};
+// ── Auto-fetch domain จาก Finnhub profile ──
+const _logoDomainCache={};
+async function _fetchLogoDomain(ticker){
+  if(_stockDomain[ticker]||_logoDomainCache[ticker]) return;
+  try{
+    const r=await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    if(!r.ok) return;
+    const d=await r.json();
+    if(d.weburl){
+      // แปลง URL → domain เช่น https://nvidia.com/... → nvidia.com
+      const domain=d.weburl.replace(/https?:\/\//,'').replace(/\/.*/,'').replace(/^www\./,'');
+      if(domain) _logoDomainCache[ticker]=domain;
+      // อัปเดตโลโก้บน card ถ้ามีอยู่แล้ว
+      const logoEl=document.getElementById('logo-'+ticker);
+      if(logoEl){
+        logoEl.src=`https://icons.duckduckgo.com/ip3/${domain}.ico`;
+        logoEl.style.display='inline';
+      }
+    }
+  }catch{}
+}
+function _getLogoUrlAuto(ticker){
+  const domain=_stockDomain[ticker]||_logoDomainCache[ticker];
+  if(!domain) return null;
+  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+}
 const _buyAlerted=new Set(); // ป้องกันแจ้งซ้ำ
 // ── Buy Signal Engine — EMA Bounce + Confirmation Score ──
 // MACD signal cache to avoid recalculating O(n²) per price tick
@@ -3971,6 +4019,8 @@ function addCustomTicker(){
   renderCustomTickerList();
   buildGrid();
   showToastMsg('✅ เพิ่ม '+t+' แล้ว');
+  // ดึง domain อัตโนมัติสำหรับโลโก้
+  _fetchLogoDomain(t);
 }
 function removeCustomTicker(t){
   const idx=stocks.findIndex(s=>s.t===t&&s._custom);
@@ -5220,7 +5270,18 @@ function renderMarketCtx(){
   el.innerHTML=row('SPY',spy)+row('QQQ',qqq)+overall;
 }
 
-// ตั้งค่าปุ่ม mute ตาม state ที่บันทึกไว้
+// ── Auto-fetch logo domain สำหรับหุ้นที่ไม่มีใน static map ──
+(()=>{
+  // รอให้ FINNHUB_KEY พร้อมก่อน แล้วค่อยดึง
+  const tryFetch=()=>{
+    if(!FINNHUB_KEY) return;
+    stocks.forEach(s=>{
+      if(!_stockDomain[s.t]) _fetchLogoDomain(s.t);
+    });
+  };
+  // ดึงหลัง app โหลด 3 วินาที
+  setTimeout(tryFetch, 3000);
+})();
 document.addEventListener('DOMContentLoaded', ()=>{
   const btn = document.getElementById('muteBtn');
   if(btn) btn.textContent = _audioMuted ? '🔇' : '🔔';
