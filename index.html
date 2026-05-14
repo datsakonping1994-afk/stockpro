@@ -3140,9 +3140,10 @@ function showBreakToast(ticker, price, s1){
   if(!c) return;
   const t=document.createElement('div');
   t.className='toast show';
-  t.style.cssText='background:#2a0005;border:2px solid #ff1744;color:#ff6b6b;font-family:IBM Plex Mono,monospace;font-size:12px;padding:10px 14px;border-radius:8px;max-width:290px;line-height:1.5;box-shadow:0 0 20px rgba(255,23,68,0.4)';
+  t.style.cssText='background:#2a0005;border:2px solid #ff1744;color:#ff6b6b;font-family:IBM Plex Mono,monospace;font-size:12px;padding:10px 14px;border-radius:8px;max-width:290px;line-height:1.5;box-shadow:0 0 20px rgba(255,23,68,0.4);cursor:pointer';
   const pct=s1>0?((price-s1)/s1*100).toFixed(2):0;
-  t.innerHTML='<strong style="color:#ff1744">🔴 ทะลุ S1!</strong> '+ticker+'<br>ราคา $'+price.toFixed(2)+' / S1 $'+s1.toFixed(2)+' ('+pct+'%)<br><span style="color:#ff9999;font-size:10px">⚠️ ระวัง — อาจลงต่อ</span>';
+  t.innerHTML='<strong style="color:#ff1744">🔴 ทะลุ S1!</strong> '+ticker+'<br>ราคา $'+price.toFixed(2)+' / S1 $'+s1.toFixed(2)+' ('+pct+'%)<br><span style="color:#ff9999;font-size:10px">⚠️ ระวัง — อาจลงต่อ · แตะเพื่อดู</span>';
+  t.onclick=()=>{ goCard(ticker); t.remove(); };
   c.appendChild(t);
   setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(20px)';setTimeout(()=>t.remove(),400);},8000);
 }
@@ -4070,8 +4071,34 @@ function addCustomTicker(){
   document.getElementById('addTickerInput').value='';
   document.getElementById('addTickerName').value='';
   renderCustomTickerList();
+  // reset filter + search ก่อนแสดงการ์ดใหม่
+  currentFilter='all';
+  const sb=document.getElementById('searchBox');
+  if(sb) sb.value='';
+  ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.outline='none';
+  });
+  const allBtn=document.getElementById('filterAllBtn');
+  if(allBtn) allBtn.style.outline='1px solid currentColor';
   buildGrid();
-  showToastMsg('✅ เพิ่ม '+t+' แล้ว');
+  showToastMsg('✅ เพิ่ม '+t+' แล้ว — กำลังดึงราคา...');
+  // scroll ไปที่การ์ดใหม่
+  setTimeout(()=>{
+    const card=document.getElementById('card-'+t);
+    if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+  },200);
+  // ดึงราคาทันที
+  if(FINNHUB_KEY){
+    fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FINNHUB_KEY}`)
+      .then(r=>r.json()).then(d=>{
+        if(d.c){
+          const s=stocks.find(x=>x.t===t);
+          if(s){ s.p=d.c; s.c=d.dp||0; updateCard(s); }
+          showToastMsg(`✅ ${t} ดึงราคาสำเร็จ $${d.c}`);
+        }
+      }).catch(()=>{});
+  }
   // ดึง domain อัตโนมัติสำหรับโลโก้
   _fetchLogoDomain(t);
 }
