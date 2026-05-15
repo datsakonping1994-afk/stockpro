@@ -4004,6 +4004,7 @@ async function renderMacroNews(forceRefresh=false){
   }));
 
   const totalRaw=rawSections.reduce((s,x)=>s+x.rawItems.length,0);
+  _debugToast(totalRaw>0?`✅ RSS ได้ ${totalRaw} ข่าว — ส่ง AI แปล`:`❌ RSS ล้มหมด — ใช้ข้อมูล offline`,totalRaw>0);
   if(totalRaw===0){
     // ไม่มีข่าว live → ใช้ static fallback
     const staticSections=macroNewsData.map(sec=>({
@@ -5504,12 +5505,21 @@ function _parseTranslated(raw, batch){
   }
 }
 
+function _debugToast(msg,ok=false){
+  const t=document.createElement('div');
+  t.style.cssText=`position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:99999;background:${ok?'#051a0a':'#1a0508'};border:1px solid ${ok?'rgba(0,230,118,0.7)':'rgba(255,68,102,0.7)'};color:${ok?'#66ffaa':'#ff8899'};font-family:"IBM Plex Mono",monospace;font-size:11px;padding:8px 14px;border-radius:8px;max-width:90vw;word-break:break-all;box-shadow:0 4px 16px rgba(0,0,0,0.8);text-align:center`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),8000);
+}
+
 async function _translateBatch(batch){
   const systemPrompt='คุณคือนักแปลข่าวการเงิน แปลหัวข่าว (h) และสรุป (x) เป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown หรือข้อความอื่น';
   const userPrompt='แปลข่าวต่อไปนี้เป็นภาษาไทย: '+JSON.stringify(batch.map(n=>({h:n.h||'',x:(n.x||'').slice(0,200)})));
 
   // ── Phase 1: Claude ผ่าน WORKER ──
   try{
+    _debugToast('⏳ กำลังแปลผ่าน Claude Worker...');
     const _ctrl=new AbortController();
     const _timeout=setTimeout(()=>_ctrl.abort(),25000);
     const res=await fetch(WORKER,{
@@ -5529,13 +5539,18 @@ async function _translateBatch(batch){
       const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
       if(raw){
         const result=_parseTranslated(raw,batch);
-        if(result){ console.log('✅ แปลสำเร็จ (Claude WORKER)',batch.length,'ข่าว'); return result; }
-      }
+        if(result){ _debugToast('✅ แปลสำเร็จ (Claude)',true); console.log('✅ แปลสำเร็จ (Claude WORKER)',batch.length,'ข่าว'); return result; }
+        else _debugToast('❌ Claude ตอบแต่ parse JSON ไม่ได้: '+raw.slice(0,80));
+      } else _debugToast('❌ Claude ตอบ ok แต่ไม่มี text content — HTTP:'+res.status);
+    } else {
+      const errTxt=await res.text().catch(()=>'');
+      _debugToast('❌ Claude Worker HTTP '+res.status+': '+errTxt.slice(0,80));
     }
-  }catch(e){console.warn('translateBatch Claude WORKER failed:',e);}
+  }catch(e){_debugToast('❌ Claude Worker exception: '+e.message);console.warn('translateBatch Claude WORKER failed:',e);}
 
   // ── Phase 2: Gemini ผ่าน WORKER ──
   try{
+    _debugToast('⏳ ลอง Gemini fallback...');
     const _ctrl2=new AbortController();
     const _timeout2=setTimeout(()=>_ctrl2.abort(),20000);
     const res2=await fetch(WORKER+'/gemini/',{
@@ -5554,11 +5569,16 @@ async function _translateBatch(batch){
       const raw2=d2?.candidates?.[0]?.content?.parts?.[0]?.text||'';
       if(raw2){
         const result2=_parseTranslated(raw2,batch);
-        if(result2){ console.log('✅ แปลสำเร็จ (Gemini WORKER)',batch.length,'ข่าว'); return result2; }
-      }
+        if(result2){ _debugToast('✅ แปลสำเร็จ (Gemini)',true); console.log('✅ แปลสำเร็จ (Gemini WORKER)',batch.length,'ข่าว'); return result2; }
+        else _debugToast('❌ Gemini ตอบแต่ parse JSON ไม่ได้: '+raw2.slice(0,80));
+      } else _debugToast('❌ Gemini ตอบ ok แต่ไม่มี text — HTTP:'+res2.status);
+    } else {
+      const errTxt2=await res2.text().catch(()=>'');
+      _debugToast('❌ Gemini Worker HTTP '+res2.status+': '+errTxt2.slice(0,80));
     }
-  }catch(e){console.warn('translateBatch Gemini WORKER failed:',e);}
+  }catch(e){_debugToast('❌ Gemini exception: '+e.message);console.warn('translateBatch Gemini WORKER failed:',e);}
 
+  _debugToast('❌ แปลไม่สำเร็จทั้ง Claude+Gemini — แสดงภาษาอังกฤษ');
   console.warn('❌ แปลไม่สำเร็จ — คืนข่าวภาษาอังกฤษ',batch.length,'ข่าว');
   return batch;
 }
