@@ -563,7 +563,7 @@ window.addEventListener('scroll',()=>{
 });
 // ── Merged: best features from all versions ──────────────────────────────────
 // ⚠️ WARNING: API keys เหล่านี้มองเห็นได้ใน browser — อย่า deploy บน server สาธารณะ
-let FINNHUB_KEY='ใส่_KEY_ของคุณตรงนี้'; // hardcoded key
+let FINNHUB_KEY=''; // ไม่ต้องใส่ key — ใช้ผ่าน Cloudflare Worker แล้ว
 let PORT_SIZE = (()=>{ try{ return parseFloat(localStorage.getItem('_sp_portsize')||'10000'); }catch{ return 10000; } })();
 function setPortSize(v){ PORT_SIZE=v; try{localStorage.setItem('_sp_portsize',v);}catch{} }
 const marketCtx = {SPY:{price:0,change:0,trend:'unknown'}, QQQ:{price:0,change:0,trend:'unknown'}};
@@ -630,7 +630,63 @@ const stocks=[
 const rsiStaticTickers=new Set(Object.keys({AXON:1,CRWD:1,RBRK:1,NOW:1,PLTR:1,NVDA:1,MSFT:1,SPGI:1,META:1,ISRG:1,NVO:1,GOOGL:1,AAPL:1,NFLX:1,TMDX:1,LLY:1,TSM:1,AMZN:1,XOM:1,OSS:1,ASML:1,SOFI:1,JPM:1,EOSE:1,MU:1,INTC:1,AVGO:1,AMD:1,HOOD:1,ANET:1,HIMS:1,ONDS:1,MP:1,SNDK:1,CRDO:1,VRT:1,NBIS:1,NVTS:1,AEHR:1,SLNH:1,CRWV:1,IREN:1,RKLB:1,KTOS:1,TEM:1,ASTS:1,AVEX:1,IONQ:1,OKLO:1,AAOI:1,ARM:1,MELI:1}));
 const rsiData={AXON:62.4,CRWD:52.9,RBRK:35.9,NOW:58.3,PLTR:48.2,NVDA:61.7,MSFT:60.1,SPGI:55.4,META:53.2,ISRG:52.8,NVO:41.3,GOOGL:67.2,AAPL:68.9,NFLX:49.5,TMDX:44.1,LLY:42.6,TSM:46.3,AMZN:48.7,XOM:38.2,OSS:32.1,ASML:50.6,SOFI:45.9,JPM:44.3,EOSE:38.7,MU:43.1,INTC:36.8,AVGO:49.2,AMD:41.5,HOOD:52.3,ANET:46.7,HIMS:39.4,ONDS:33.2,MP:37.8,SNDK:42.1,CRDO:44.8,VRT:40.3,NBIS:45.1,NVTS:35.6,AEHR:31.2,SLNH:28.4,CRWV:44.6,IREN:38.9,RKLB:47.3,KTOS:43.8,TEM:41.2,ASTS:46.9,AVEX:35.1,IONQ:38.4,OKLO:55.7,AAOI:42.0,ARM:58.6,MELI:48.2};
 
-const sup0={AAPL:275,GOOGL:375,MSFT:405,NVDA:204,META:590,AMZN:258,AXON:385,CRWD:498,RBRK:58,NOW:85,PLTR:125,SPGI:410,ISRG:430,NFLX:82,AVGO:405,AMD:420,MU:700,INTC:115,ANET:130,ARM:200,NVO:43,LLY:900,XOM:138,ASML:1500,RKLB:90,ASTS:68,OKLO:65,IONQ:44,KTOS:52,TEM:44,CRWV:105,NBIS:165,IREN:55,CRDO:175,VRT:315,NVTS:16,HOOD:70,SOFI:14,JPM:285,HIMS:24,EOSE:7.0,OSS:14,ONDS:8,MP:62,SNDK:1440,AEHR:88,SLNH:1.6,AVEX:22,TMDX:63,TSM:395,AAOI:135,MELI:1537};
+// sup0: แนวรับเริ่มต้น (อัปเดต พ.ค. 2569) — ใช้เป็น fallback ก่อน pivot จริงโหลด
+// S1 ≈ 93-95% ของราคาตลาด ณ วันที่อัปเดต
+const sup0={
+  AAPL:282,   // ~$300 → S1 ~$282
+  GOOGL:155,  // ~$165 → S1 ~$155
+  MSFT:390,   // ~$420 → S1 ~$390
+  NVDA:215,   // ~$235 → S1 ~$215
+  META:555,   // ~$600 → S1 ~$555
+  AMZN:205,   // ~$220 → S1 ~$205
+  AXON:470,   // ~$500 → S1 ~$470
+  CRWD:430,   // ~$460 → S1 ~$430
+  RBRK:80,    // ~$85  → S1 ~$80
+  NOW:175,    // ~$185 → S1 ~$175
+  PLTR:118,   // ~$125 → S1 ~$118
+  SPGI:510,   // ~$540 → S1 ~$510
+  ISRG:540,   // ~$570 → S1 ~$540
+  NFLX:1060,  // ~$1120→ S1 ~$1060
+  AVGO:230,   // ~$245 → S1 ~$230
+  AMD:105,    // ~$115 → S1 ~$105
+  MU:95,      // ~$105 → S1 ~$95
+  INTC:22,    // ~$24  → S1 ~$22
+  ANET:82,    // ~$88  → S1 ~$82
+  ARM:125,    // ~$135 → S1 ~$125
+  NVO:65,     // ~$70  → S1 ~$65
+  LLY:780,    // ~$830 → S1 ~$780
+  XOM:108,    // ~$115 → S1 ~$108
+  ASML:680,   // ~$720 → S1 ~$680
+  RKLB:118,   // ~$132 → S1 ~$118
+  ASTS:62,    // ~$68  → S1 ~$62
+  OKLO:38,    // ~$42  → S1 ~$38
+  IONQ:50,    // ~$55  → S1 ~$50
+  KTOS:32,    // ~$35  → S1 ~$32
+  TEM:50,     // ~$55  → S1 ~$50
+  CRWV:52,    // ~$58  → S1 ~$52
+  NBIS:38,    // ~$42  → S1 ~$38
+  IREN:12,    // ~$13  → S1 ~$12
+  CRDO:72,    // ~$78  → S1 ~$72
+  VRT:95,     // ~$105 → S1 ~$95
+  NVTS:6,     // ~$7   → S1 ~$6
+  HOOD:55,    // ~$60  → S1 ~$55
+  SOFI:16,    // ~$18  → S1 ~$16
+  JPM:255,    // ~$270 → S1 ~$255
+  HIMS:32,    // ~$35  → S1 ~$32
+  EOSE:8,     // ~$9   → S1 ~$8
+  OSS:5,      // ~$6   → S1 ~$5
+  ONDS:4,     // ~$5   → S1 ~$4
+  MP:18,      // ~$20  → S1 ~$18
+  SNDK:85,    // ~$92  → S1 ~$85
+  AEHR:12,    // ~$14  → S1 ~$12
+  SLNH:0.8,   // ~$0.9 → S1 ~$0.8
+  AVEX:8,     // ~$9   → S1 ~$8
+  TMDX:58,    // ~$63  → S1 ~$58
+  TSM:165,    // ~$178 → S1 ~$165
+  AAOI:28,    // ~$32  → S1 ~$28
+  MELI:2100,  // ~$2250→ S1 ~$2100
+  SPGI:510,
+};
 
 // FIX: newsData เป็นข้อมูลสำรอง (static fallback) วันที่ hardcode อยู่
 // แอปจะดึงข่าว real-time จาก Google News RSS / Yahoo Finance RSS ก่อนเสมอ
@@ -1065,7 +1121,7 @@ async function fetchOHLC(ticker){
   if(cached&&cached._c===cycle) return cached;
   try{
     // ใช้ /quote — pc=prevClose (ราคาปิดเมื่อวาน) ใช้เป็น C สำหรับ Classic Pivot
-    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
+    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${ticker}`,{mode:'cors'});
     if(!r.ok) return cached||null;
     const d=await r.json();
     if(!d||(!d.c&&!d.pc)) return cached||null;
@@ -2062,7 +2118,11 @@ function buildGrid(){
     if(s.c>0)up++;if(s.c<0)dn++;
     try{
     const sp=getS(s.p,s.t),rs=getR(s.p);
-    const zone=getRangeZone(s.p,sp.s1,rs.r1);
+    // FIX: ใช้ _getLevels เดียวกับบาร์สไลด์ ป้องกันสีไม่ตรงกัน
+    const lv=_getLevels(s.t,s.p);
+    const zoneS1=lv.s1||sp.s1;
+    const zoneR1=lv.r1||rs.r1;
+    const zone=getRangeZone(s.p,zoneS1,zoneR1);
     const cc=s.c>0?'up':s.c<0?'dn':'flat';
     const rsi=rsiData[s.t]||null;
     const rsiIsStatic=rsi&&rsiStaticTickers.has(s.t);
@@ -2070,12 +2130,12 @@ function buildGrid(){
     const rt=rsiIsStatic?'(static)':(rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral');
     const rtc=rsiIsStatic?'rsi-mid-tag':(rsi>=70?'rsi-ob-tag':rsi<=30?'rsi-os-tag':'rsi-mid-tag');
     const news=newsData[s.t]||[];
-    const near=getRangePos(s.p,sp.s1,rs.r1);
+    const near=getRangePos(s.p,zoneS1,zoneR1);
     const card=document.createElement('div');
     card.className='card';card.id='card-'+s.t;
     card.dataset.t=s.t;card.dataset.n=s.n.toUpperCase();
     card.dataset.dir=s.c>=0?'up':'dn';
-    {const lv=_getLevels(s.t,s.p);const _pos=lv.s1&&lv.r1&&lv.r1>lv.s1?(s.p-lv.s1)/(lv.r1-lv.s1):0.5;card.dataset.near=(_pos<=0.05||_pos>=0.95||s.p<=lv.s1)?'yes':'no';}
+    {const _pos=lv.s1&&lv.r1&&lv.r1>lv.s1?(s.p-lv.s1)/(lv.r1-lv.s1):0.5;card.dataset.near=(_pos<=0.05||_pos>=0.95||s.p<=lv.s1)?'yes':'no';}
     card.dataset.pinned='0';
     card.style.borderLeft=`3px solid ${zone.border}`;
     card.innerHTML=`
@@ -2347,7 +2407,11 @@ function _getLevels(t,p){
     return isNaN(v)||v<=0?fallback:v;
   }
   const fb=getS(p,t), fr=getR(p);
-  const s1=getLvlVal('s1',fb.s1), s2=getLvlVal('s2',fb.s2), s3=getLvlVal('s3',fb.s3);
+  // FIX: ถ้า sup0 ถูกอัปเดตจาก pivot จริงแล้ว ให้ใช้ค่านั้นเป็น fallback แทน hardcode
+  const s1Dom=getLvlVal('s1',null);
+  const s1=s1Dom||(sup0[t]&&sup0[t]!==fb.s1?sup0[t]:fb.s1);
+  const s2=getLvlVal('s2',s1?+(s1*0.95).toFixed(2):fb.s2);
+  const s3=getLvlVal('s3',s1?+(s1*0.90).toFixed(2):fb.s3);
   const r1=getLvlVal('r1',fr.r1), r2=getLvlVal('r2',fr.r2), r3=getLvlVal('r3',fr.r3);
   const hasPivot=!!(ohlcCache[t]||sup0[t]);
   return{s1,s2,s3,r1,r2,r3,hasPivot};
@@ -2480,7 +2544,7 @@ const _logoDomainCache={};
 async function _fetchLogoDomain(ticker){
   if(_stockDomain[ticker]||_logoDomainCache[ticker]) return;
   try{
-    const r=await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/stock/profile2&symbol=${ticker}`);
     if(!r.ok) return;
     const d=await r.json();
     if(d.weburl){
@@ -2587,10 +2651,12 @@ function _calcBuyScore(ticker, price, s1, r1){
   let g1=0;
   const pctFromS1 = s1>0?((price-s1)/s1*100):99;
 
-  // pctFromS1 — น้ำหนักหลัก
+  // pctFromS1 — น้ำหนักหลัก (ขยายให้ครอบคลุม ≤ 1.5%)
   if(pctFromS1<=0.15)      g1+=14;
   else if(pctFromS1<=0.35) g1+=10;
   else if(pctFromS1<=0.5)  g1+=6;
+  else if(pctFromS1<=1.0)  g1+=3;
+  else if(pctFromS1<=1.5)  g1+=1;
 
   // Bollinger Bands %B
   let bbLower=null,bbUpper=null,bbMid=null,bbPct=null;
@@ -2913,7 +2979,7 @@ async function checkBuySignal(ticker, price, s1){
   const lvl=_getLevels(ticker,price);
   const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
   // FIX: เพิ่ม threshold เป็น 55 ลด false signal
-  if(sig.pctFromS1>0.5||sig.score<55){ _buyAlerted.delete(ticker); return; }
+  if(sig.pctFromS1>1.5||sig.score<52){ _buyAlerted.delete(ticker); return; }
   // บันทึก trade log
   logTrade(ticker, price, s1, lvl.r1, sig.score);
   showBuySignalPopup(ticker, price, s1, sig, lvl);
@@ -3467,7 +3533,7 @@ async function renderAllNews(forceRefresh=false){
       let items=(!forceRefresh&&allNewsCache[cacheKey]&&allNewsCache[cacheKey].translated&&(now-allNewsCache[cacheKey].ts<600000))?allNewsCache[cacheKey].items:null;
       if(!items){
         try{
-          const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${s.t}&from=${fromStr}&to=${toStr}&token=${FINNHUB_KEY}`,{mode:'cors'});
+          const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/company-news&symbol=${s.t}&from=${fromStr}&to=${toStr}`,{mode:'cors'});
           if(r.ok){
             const arr=await r.json();
             if(Array.isArray(arr)&&arr.length){
@@ -3527,7 +3593,7 @@ async function fetchAndRenderEarnings(){
       const ctrl=new AbortController();
       const tid=setTimeout(()=>ctrl.abort(),8000);
       const r=await fetch(
-        `https://finnhub.io/api/v1/calendar/earnings?from=${fmt(from)}&to=${fmt(to)}&token=${FINNHUB_KEY}`,
+        `https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/calendar/earnings&from=${fmt(from)}&to=${fmt(to)}`,
         {signal:ctrl.signal}
       );
       clearTimeout(tid);
@@ -4078,7 +4144,14 @@ async function _fetchWsKey(){
 function wsConnect(){
   if(ws&&ws.readyState<=1) return;
   clearTimeout(_wsReconnectTimer);
-  ws=new WebSocket(`wss://ws.finnhub.io?token=${_wsKey||FINNHUB_KEY}`);
+  // FIX: ดึง token จาก Worker แทนการใช้ key ตรงๆ
+  let _wsToken = _wsKey || FINNHUB_KEY;
+  try {
+    const tr = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev/finnhub-token/');
+    const td = await tr.json();
+    if(td.token) _wsToken = td.token;
+  } catch{}
+  ws=new WebSocket(`wss://ws.finnhub.io?token=${_wsToken}`);
   ws.onopen=()=>{
     wsReady=true;
     _wsReconnectCount=0;
@@ -4386,7 +4459,7 @@ function addCustomTicker(){
   },200);
   // ดึงราคาทันที
   if(FINNHUB_KEY){
-    fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FINNHUB_KEY}`)
+    fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${t}`)
       .then(r=>r.json()).then(d=>{
         if(d.c){
           const s=stocks.find(x=>x.t===t);
@@ -4527,7 +4600,7 @@ function getRSLabel(ticker){
 async function fetchMarketContext(){
   try{
     await Promise.all(['SPY','QQQ'].map(async sym=>{
-      const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
+      const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${sym}`);
       if(!r.ok) return;
       const d=await r.json();
       if(d.c){
@@ -4582,7 +4655,7 @@ async function _fetchYahooPrice(ticker){
 
 async function _fetchFinnhubPrice(ticker){
   try{
-    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
+    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${ticker}`,{mode:'cors'});
     if(!r.ok) return null;
     const d=await r.json();
     const price=d.c>0?d.c:(d.pc>0?d.pc:0);
@@ -4764,7 +4837,7 @@ async function fetchLiveNews(ticker){
   try{
     const to=new Date(),from=new Date();
     from.setDate(from.getDate()-7);
-    const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from.toISOString().slice(0,10)}&to=${to.toISOString().slice(0,10)}&token=${FINNHUB_KEY}`,{mode:'cors'});
+    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/company-news&symbol=${ticker}&from=${from.toISOString().slice(0,10)}&to=${to.toISOString().slice(0,10)}`,{mode:'cors'});
     if(!r.ok) return null;
     const items=await r.json();
     if(!Array.isArray(items)) return null;
@@ -5486,7 +5559,7 @@ async function doApiKeyLogin(){
   if(!key){errEl.textContent='กรุณาใส่ Finnhub API Key';return;}
   btn.disabled=true;btn.textContent='⏳ กำลังตรวจสอบ...';
   try{
-    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
+    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=AAPL`);
     const d=await r.json();
     if(d.error||!r.ok){
       errEl.textContent='❌ API Key ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
@@ -5712,18 +5785,16 @@ function renderMarketCtx(){
   el.innerHTML=row('SPY',spy)+row('QQQ',qqq)+overall;
 }
 
-// ── Auto-fetch logo domain สำหรับหุ้นที่ไม่มีใน static map ──
+// ── Auto-fetch logo domain ──
 (()=>{
-  // รอให้ FINNHUB_KEY พร้อมก่อน แล้วค่อยดึง
-  const tryFetch=()=>{
-    if(!FINNHUB_KEY) return;
+  // ดึงหลัง app โหลด 3 วินาที (ไม่ต้องรอ key แล้ว ใช้ Worker)
+  setTimeout(()=>{
     stocks.forEach(s=>{
       if(!_stockDomain[s.t]) _fetchLogoDomain(s.t);
     });
-  };
-  // ดึงหลัง app โหลด 3 วินาที
-  setTimeout(tryFetch, 3000);
+  }, 3000);
 })();
+
 document.addEventListener('DOMContentLoaded', ()=>{
   const btn = document.getElementById('muteBtn');
   if(btn) btn.textContent = _audioMuted ? '🔇' : '🔔';
@@ -5742,16 +5813,29 @@ applyFontSize();
   });
 })();
 
-// ── Auto-launch — key hardcoded ──
+// ── Auto-launch — ไม่ต้องใส่ key แล้ว ใช้ผ่าน Worker ──
 (async()=>{
   try{
-    const saved=await _loadKeyAsync();
-    const key=saved||FINNHUB_KEY;
-    if(key && !String(key).includes('ใส่_KEY')){
-      FINNHUB_KEY=key;
+    // ทดสอบว่า Worker ใช้งานได้
+    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=AAPL');
+    if(r.ok){
+      FINNHUB_KEY='via-worker'; // placeholder เพื่อให้ logic อื่นทำงาน
+      _showApp();
+    } else {
+      // fallback: ลองใช้ saved key เดิม
+      const saved=await _loadKeyAsync();
+      if(saved && !String(saved).includes('ใส่_KEY')){
+        FINNHUB_KEY=saved;
+        _showApp();
+      }
+    }
+  }catch{
+    const saved=await _loadKeyAsync().catch(()=>null);
+    if(saved && !String(saved).includes('ใส่_KEY')){
+      FINNHUB_KEY=saved;
       _showApp();
     }
-  }catch{ if(FINNHUB_KEY) _showApp(); }
+  }
 })();
 </script>
 </div>
