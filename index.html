@@ -3871,28 +3871,65 @@ ${newsStr}
 - ถ้าไม่กระทบหุ้นในพอร์ตเลย ให้ impact เป็น []
 - note อธิบายสั้นๆ ว่าทำไมกระทบ`;
 
+  const sysPrompt='คุณคือนักวิเคราะห์ข่าวเศรษฐกิจ ตอบเป็น JSON เท่านั้น ห้าม markdown ห้าม preamble';
+
+  function _parseMacroJSON(raw){
+    try{
+      const match=raw.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);
+      if(!match) return null;
+      return JSON.parse(match[0]);
+    }catch(e){ return null; }
+  }
+
+  // Phase 1: Claude ผ่าน WORKER
   try{
     const _ctrl=new AbortController();
     const _tid=setTimeout(()=>_ctrl.abort(),30000);
-    const res=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
+    const res=await fetch(WORKER,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-haiku-4-5-20251001',
         max_tokens:3000,
-        system:'คุณคือนักวิเคราะห์ข่าวเศรษฐกิจ ตอบเป็น JSON เท่านั้น ห้าม markdown ห้าม preamble',
+        system:sysPrompt,
         messages:[{role:'user',content:prompt}]
       }),
       signal:_ctrl.signal
     });
     clearTimeout(_tid);
-    if(!res.ok) return null;
-    const d=await res.json();
-    const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
-    if(!raw) return null;
-    const clean=raw.replace(/```json|```/g,'').trim();
-    return JSON.parse(clean);
-  }catch(e){console.warn('macro AI analysis failed:',e);return null;}
+    if(res.ok){
+      const d=await res.json();
+      const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+      const parsed=_parseMacroJSON(raw);
+      if(parsed){ console.log('✅ macro Claude OK'); return parsed; }
+    }
+  }catch(e){console.warn('macro Claude failed:',e);}
+
+  // Phase 2: Gemini ผ่าน WORKER
+  try{
+    const _ctrl2=new AbortController();
+    const _tid2=setTimeout(()=>_ctrl2.abort(),25000);
+    const res2=await fetch(WORKER+'/gemini/',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        system_instruction:{parts:[{text:sysPrompt}]},
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{maxOutputTokens:3000,temperature:0.3}
+      }),
+      signal:_ctrl2.signal
+    });
+    clearTimeout(_tid2);
+    if(res2.ok){
+      const d2=await res2.json();
+      const raw2=d2?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      const parsed2=_parseMacroJSON(raw2);
+      if(parsed2){ console.log('✅ macro Gemini OK'); return parsed2; }
+    }
+  }catch(e){console.warn('macro Gemini failed:',e);}
+
+  console.warn('❌ macro analysis failed — showing English');
+  return null;
 }
 
 // render impact chips
