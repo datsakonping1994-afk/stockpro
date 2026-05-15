@@ -5431,15 +5431,17 @@ async function fetchLiveNews(ticker){
 }
 
 
-// ── Translate news items via Gemini ──
+// ── Translate news items via Gemini (with Claude fallback) ──
 async function translateNewsItems(items){
   if(!items||!items.length) return items;
+  const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
+  const systemPrompt='แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown หรือ preamble';
+  const userPrompt=`input: ${JSON.stringify(toTranslate)}`;
+
+  // ── Phase 1: ลอง Gemini ก่อน ──
   try{
-    const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
-    const systemPrompt='แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown หรือ preamble';
-    const userPrompt=`input: ${JSON.stringify(toTranslate)}`;
     const _trCtrl=new AbortController();
-    const _trTimeout=setTimeout(()=>_trCtrl.abort(),30000);
+    const _trTimeout=setTimeout(()=>_trCtrl.abort(),15000);
     const res = await fetch(WORKER + '/gemini/', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -5451,17 +5453,48 @@ async function translateNewsItems(items){
       signal:_trCtrl.signal
     });
     clearTimeout(_trTimeout);
-    if(!res.ok) return items;
-    const d=await res.json();
-    const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    if(raw){
-      const clean=raw.replace(/```json|```/g,'').trim();
-      const arr=JSON.parse(clean);
-      if(Array.isArray(arr)&&arr.length===items.length){
-        return items.map((n,i)=>({...n,h:arr[i]?.h||n.h,x:arr[i]?.x||n.x}));
+    if(res.ok){
+      const d=await res.json();
+      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      if(raw){
+        const clean=raw.replace(/```json|```/g,'').trim();
+        const arr=JSON.parse(clean);
+        if(Array.isArray(arr)&&arr.length===items.length){
+          return items.map((n,i)=>({...n,h:arr[i]?.h||n.h,x:arr[i]?.x||n.x}));
+        }
       }
     }
-  }catch(e){console.warn('translateNewsItems failed:',e);}
+  }catch(e){console.warn('translateNewsItems Gemini failed, trying Claude...',e);}
+
+  // ── Phase 2: Fallback ใช้ Claude ──
+  try{
+    const _clCtrl=new AbortController();
+    const _clTimeout=setTimeout(()=>_clCtrl.abort(),20000);
+    const res2=await fetch(WORKER,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:4000,
+        system:'คุณคือนักแปลข่าวการเงิน ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown ห้ามมี preamble',
+        messages:[{role:'user',content:userPrompt}]
+      }),
+      signal:_clCtrl.signal
+    });
+    clearTimeout(_clTimeout);
+    if(res2.ok){
+      const d2=await res2.json();
+      const raw2=d2?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+      if(raw2){
+        const clean2=raw2.replace(/```json|```/g,'').trim();
+        const arr2=JSON.parse(clean2);
+        if(Array.isArray(arr2)&&arr2.length===items.length){
+          return items.map((n,i)=>({...n,h:arr2[i]?.h||n.h,x:arr2[i]?.x||n.x}));
+        }
+      }
+    }
+  }catch(e){console.warn('translateNewsItems Claude fallback failed:',e);}
+
   return items;
 }
 
