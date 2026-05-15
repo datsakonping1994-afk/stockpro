@@ -51,11 +51,51 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .summary{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .chip{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text2);}
 .chip .val{font-size:18px;font-weight:600;display:block;color:var(--text);}
+/* ── New Toolbar ── */
+.toolbar{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+.toolbar-left{display:flex;align-items:center;gap:5px;flex:1;min-width:0;}
+.toolbar-right{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.toolbar-divider{width:1px;height:20px;background:var(--border);flex-shrink:0;}
 .controls{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
 .btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:8px 14px;border-radius:7px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap;transition:all 0.15s;}
 .btn:hover{border-color:var(--accent);color:var(--accent);}
-.search{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:7px;font-family:'IBM Plex Mono',monospace;font-size:12px;width:130px;}
+/* ── Filter Pills (แถวบน) ── */
+.filter-bar{display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap;}
+.fpill{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 13px;border-radius:20px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;transition:all 0.15s;line-height:1;}
+.fpill:hover{border-color:var(--accent);color:var(--accent);}
+.fpill.active{background:rgba(0,212,255,0.12);border-color:var(--accent);color:var(--accent);}
+.fpill.up-pill{border-color:rgba(0,230,118,0.25);color:var(--green);}
+.fpill.up-pill.active{background:rgba(0,230,118,0.12);border-color:var(--green);}
+.fpill.dn-pill{border-color:rgba(255,68,102,0.25);color:var(--red);}
+.fpill.dn-pill.active{background:rgba(255,68,102,0.1);border-color:var(--red);}
+.fpill.warn-pill{border-color:rgba(255,215,0,0.25);color:var(--yellow);}
+.fpill.warn-pill.active{background:rgba(255,215,0,0.1);border-color:var(--yellow);}
+/* ── Action buttons (กลุ่มขวา) ── */
+.action-bar{display:flex;align-items:center;gap:5px;margin-bottom:8px;}
+.abtn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 11px;border-radius:7px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;transition:all 0.15s;display:flex;align-items:center;gap:4px;}
+.abtn:hover{border-color:var(--accent);color:var(--accent);}
+.abtn.live-on{color:var(--green);border-color:rgba(0,230,118,0.4);background:rgba(0,230,118,0.06);}
+/* ── Sector pills (horizontal scroll) ── */
+.sector-scroll{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin-bottom:6px;}
+.sector-scroll::-webkit-scrollbar{display:none;}
+.spill{background:transparent;border:1px solid var(--border);color:var(--dim);padding:4px 11px;border-radius:20px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;white-space:nowrap;transition:all 0.15s;flex-shrink:0;}
+.spill:hover{border-color:var(--text2);color:var(--text2);}
+.spill.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.08);}
+/* ── Sort / View / Ind bar ── */
+.meta-bar{display:flex;align-items:center;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
+.meta-lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;padding:0 2px;flex-shrink:0;}
+.mbtn{background:transparent;border:1px solid transparent;color:var(--dim);padding:3px 9px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;white-space:nowrap;transition:all 0.15s;}
+.mbtn:hover{border-color:var(--border);color:var(--text2);}
+.mbtn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.08);}
+.mbtn.active-v{border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.08);}
+.meta-sep{width:1px;height:14px;background:var(--border);margin:0 2px;flex-shrink:0;}
+.search{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 11px;border-radius:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;width:120px;}
 .search:focus{outline:none;border-color:var(--accent);}
+@media(max-width:600px){
+  .search{width:90px;}
+  .filter-bar{gap:4px;}
+  .action-bar{gap:4px;}
+}
 .statusbar{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);margin-bottom:10px;min-height:16px;}
 .alert-panel{background:#0f0f1a;border:1px solid rgba(255,215,0,0.6);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:none;}
 .alert-panel.show{display:block;}
@@ -428,19 +468,23 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--green);letter-spacing:1px;margin-bottom:4px" id="alertRLabel">🟢 ใกล้แนวต้าน</div>
   <div class="alert-list" id="alertListR"></div>
 </div>
-<div class="controls">
+<!-- ── Filter bar ── -->
+<div class="filter-bar">
   <input type="text" class="search" id="searchBox" placeholder="ค้นหา..." oninput="filterCards()">
-  <button class="btn" style="color:var(--green);border-color:rgba(0,230,118,0.3)" id="liveBtn" onclick="toggleLive()">▶ Live</button>
-  <button class="btn" id="filterAllBtn" onclick="setFilter('all')">ทั้งหมด</button>
-  <button class="btn up" id="filterUpBtn" onclick="setFilter('up')">▲ บวก</button>
-  <button class="btn dn" id="filterDnBtn" onclick="setFilter('dn')">▼ ลบ</button>
-  <button class="btn" style="color:var(--yellow)" id="filterNearBtn" onclick="setFilter('near')">⚠ แนวรับ</button>
-  <button class="btn" style="color:#ff9966;border-color:rgba(255,153,102,0.3)" onclick="togglePanel('newsPanel')">📰 ข่าวทุกหุ้น</button>
-  <button class="btn" style="color:var(--purple);border-color:rgba(168,85,247,0.3)" onclick="toggleEarnings()">📅 รายงานผลประกอบการ</button>
-  <button class="ai-summary-btn" id="aiSummaryBtn" onclick="runAIMarketSummary()">🤖 AI Summary</button>
-  <button class="btn" id="muteBtn" style="font-size:14px;padding:6px 10px" onclick="toggleMute()" title="เปิด/ปิดเสียง">🔔</button>
-  <button class="btn" style="font-size:11px;padding:6px 10px" onclick="showSettingsPanel()">⚙️ ตั้งค่า</button>
+  <button class="fpill active" id="filterAllBtn" onclick="setFilter('all')">ทั้งหมด</button>
+  <button class="fpill up-pill" id="filterUpBtn" onclick="setFilter('up')">▲ บวก</button>
+  <button class="fpill dn-pill" id="filterDnBtn" onclick="setFilter('dn')">▼ ลบ</button>
+  <button class="fpill warn-pill" id="filterNearBtn" onclick="setFilter('near')">⚠ แนวรับ</button>
+  <div style="flex:1"></div>
+  <!-- Action group -->
+  <button class="abtn" id="liveBtn" onclick="toggleLive()">▶ Live</button>
+  <button class="abtn" onclick="togglePanel('newsPanel')">📰 ข่าว</button>
+  <button class="abtn" style="color:var(--purple);border-color:rgba(168,85,247,0.25)" onclick="toggleEarnings()">📅 งบไตรมาส</button>
+  <button class="abtn ai-summary-btn" id="aiSummaryBtn" onclick="runAIMarketSummary()">🤖 AI</button>
+  <button class="abtn" onclick="showSettingsPanel()" title="ตั้งค่า">⚙️</button>
 </div>
+<!-- hidden mute btn ยังคง ID ไว้เพื่อ JS -->
+<button id="muteBtn" onclick="toggleMute()" style="display:none">🔔</button>
 <!-- FIX: settingsPanel อยู่นอก .controls div เพื่อให้ layout ถูกต้อง -->
 <div id="settingsPanel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:8px;margin-bottom:8px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -503,36 +547,36 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <hr style="border-color:var(--border);margin:10px 0">
   <button class="btn" style="font-size:11px;padding:6px 12px;width:100%;border-color:var(--yellow);color:var(--yellow)" onclick="exportTradeLog()">📥 Export Trade Log (CSV)</button>
 </div>
-<div class="sort-row" id="sector-filter-row">
-  <span class="sort-lbl">SECTOR:</span>
-  <button class="sort-btn active" id="sector-all" onclick="setSectorFilter('all',this)">ทั้งหมด</button>
-  <button class="sort-btn" id="sector-semi" onclick="setSectorFilter('เซมิคอนดักเตอร์',this)">💾 Semi</button>
-  <button class="sort-btn" id="sector-sw" onclick="setSectorFilter('ซอฟต์แวร์ / คลาวด์',this)">☁️ Cloud</button>
-  <button class="sort-btn" id="sector-ai" onclick="setSectorFilter('AI Infrastructure',this)">🤖 AI Infra</button>
-  <button class="sort-btn" id="sector-space" onclick="setSectorFilter('อวกาศ / กลาโหม',this)">🚀 Space</button>
-  <button class="sort-btn" id="sector-health" onclick="setSectorFilter('ชีวเทค / สุขภาพ',this)">🧬 Health</button>
-  <button class="sort-btn" id="sector-fin" onclick="setSectorFilter('การเงิน / ฟินเทค',this)">💰 Fin</button>
-  <button class="sort-btn" id="sector-energy" onclick="setSectorFilter('พลังงาน / วัตถุดิบ',this)">⚡ Energy</button>
+<!-- ── Sector scroll ── -->
+<div class="sector-scroll" id="sector-filter-row">
+  <button class="spill active" id="sector-all" onclick="setSectorFilter('all',this)">ทั้งหมด</button>
+  <button class="spill" id="sector-semi" onclick="setSectorFilter('เซมิคอนดักเตอร์',this)">💾 Semi</button>
+  <button class="spill" id="sector-sw" onclick="setSectorFilter('ซอฟต์แวร์ / คลาวด์',this)">☁️ Cloud</button>
+  <button class="spill" id="sector-ai" onclick="setSectorFilter('AI Infrastructure',this)">🤖 AI Infra</button>
+  <button class="spill" id="sector-space" onclick="setSectorFilter('อวกาศ / กลาโหม',this)">🚀 Space</button>
+  <button class="spill" id="sector-health" onclick="setSectorFilter('ชีวเทค / สุขภาพ',this)">🧬 Health</button>
+  <button class="spill" id="sector-fin" onclick="setSectorFilter('การเงิน / ฟินเทค',this)">💰 Fin</button>
+  <button class="spill" id="sector-energy" onclick="setSectorFilter('พลังงาน / วัตถุดิบ',this)">⚡ Energy</button>
 </div>
-<div class="sort-row">
-  <span class="sort-lbl">SORT:</span>
-  <button class="sort-btn active" id="sort-chg" onclick="sortGrid('chg',this)">%Change</button>
-  <button class="sort-btn" id="sort-rsi" onclick="sortGrid('rsi',this)">RSI</button>
-  <button class="sort-btn" id="sort-mcap" onclick="sortGrid('mcap',this)">Mkt Cap</button>
-  <button class="sort-btn" id="sort-name" onclick="sortGrid('name',this)">A–Z</button>
-  <span style="margin-left:6px;color:var(--border)">|</span>
-  <span class="sort-lbl">VIEW:</span>
-  <button class="view-btn active" id="view-grid" onclick="setView('grid',this)">⊞ Cards</button>
-  <button class="view-btn" id="view-heat" onclick="setView('heat',this)">🔥 Heatmap</button>
-  <span style="margin-left:6px;color:var(--border)">|</span>
-  <span class="sort-lbl" style="color:var(--accent)">IND:</span>
-  <button class="sort-btn active" id="gind-classic" onclick="setGlobalIndicator('classic',this)" title="Classic Pivot">Classic</button>
-  <button class="sort-btn" id="gind-camarilla" onclick="setGlobalIndicator('camarilla',this)" title="Camarilla">Cam</button>
-  <button class="sort-btn" id="gind-fibonacci" onclick="setGlobalIndicator('fibonacci',this)" title="Fibonacci">Fib</button>
-  <button class="sort-btn" id="gind-atr" onclick="setGlobalIndicator('atr',this)" title="ATR">ATR</button>
-  <button class="sort-btn" id="gind-woodie" onclick="setGlobalIndicator('woodie',this)" title="Woodie">Woodie</button>
-  <span style="margin-left:6px;color:var(--border)">|</span>
-  <button class="btn" id="refreshAllBtn" style="padding:3px 10px;font-size:11px;color:#fff;background:rgba(0,212,255,0.12);border-color:rgba(0,212,255,0.5);font-weight:600" onclick="refreshAll()">🔄 รีเฟรช</button>
+<!-- ── Meta bar: Sort / View / Indicator ── -->
+<div class="meta-bar">
+  <span class="meta-lbl">SORT</span>
+  <button class="mbtn active" id="sort-chg" onclick="sortGrid('chg',this)">%Chg</button>
+  <button class="mbtn" id="sort-rsi" onclick="sortGrid('rsi',this)">RSI</button>
+  <button class="mbtn" id="sort-mcap" onclick="sortGrid('mcap',this)">MCap</button>
+  <button class="mbtn" id="sort-name" onclick="sortGrid('name',this)">A–Z</button>
+  <div class="meta-sep"></div>
+  <button class="mbtn active-v" id="view-grid" onclick="setView('grid',this)">⊞ Cards</button>
+  <button class="mbtn" id="view-heat" onclick="setView('heat',this)">🔥 Heat</button>
+  <div class="meta-sep"></div>
+  <span class="meta-lbl">IND</span>
+  <button class="mbtn active" id="gind-classic" onclick="setGlobalIndicator('classic',this)">Classic</button>
+  <button class="mbtn" id="gind-camarilla" onclick="setGlobalIndicator('camarilla',this)">Cam</button>
+  <button class="mbtn" id="gind-fibonacci" onclick="setGlobalIndicator('fibonacci',this)">Fib</button>
+  <button class="mbtn" id="gind-atr" onclick="setGlobalIndicator('atr',this)">ATR</button>
+  <button class="mbtn" id="gind-woodie" onclick="setGlobalIndicator('woodie',this)">Woodie</button>
+  <div style="flex:1"></div>
+  <button class="abtn" id="refreshAllBtn" onclick="refreshAll()">🔄</button>
 </div>
 <div class="statusbar" id="statusbar">กด ▶ Live เพื่อดึงราคา Real-Time</div>
 
@@ -1926,18 +1970,17 @@ function parseMcap(str){
 }
 
 function sortGrid(mode, btn){
-  // Fix 1: ถ้ากด sort ขณะที่ near filter ทำงานอยู่ ให้ reset filter กลับเป็น all ก่อน
   if(currentFilter==='near'){
     currentFilter='all';
     ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
       const el=document.getElementById(id);
-      if(el) el.style.outline='none';
+      if(el) el.classList.remove('active');
     });
     const allBtn=document.getElementById('filterAllBtn');
-    if(allBtn) allBtn.style.outline='1px solid currentColor';
+    if(allBtn) allBtn.classList.add('active');
     document.querySelectorAll('.card').forEach(c=>c.classList.remove('hidden'));
   }
-  document.querySelectorAll('.sort-btn:not([id^="sector-"])').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.mbtn[id^="sort-"]').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(currentSort===mode) sortAsc=!sortAsc; else { currentSort=mode; sortAsc=false; }
   const grid=document.getElementById('grid');
@@ -1959,8 +2002,8 @@ function sortGrid(mode, btn){
 }
 
 function setView(mode, btn){
-  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+  document.querySelectorAll('.mbtn[id^="view-"]').forEach(b=>{b.classList.remove('active');b.classList.remove('active-v');});
+  btn.classList.add('active-v');
   currentView=mode;
   const grid=document.getElementById('grid');
   const heat=document.getElementById('heatmap');
@@ -3509,18 +3552,17 @@ function goCard(t){
 }
 function setFilter(f){
   currentFilter=f;
-  // เคลียร์ search box เมื่อกด "ทั้งหมด"
   if(f==='all'){
     const sb=document.getElementById('searchBox');
     if(sb) sb.value='';
   }
   ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el) el.style.outline='none';
+    if(el) el.classList.remove('active');
   });
   const map={all:'filterAllBtn',up:'filterUpBtn',dn:'filterDnBtn',near:'filterNearBtn'};
   const activeBtn=document.getElementById(map[f]);
-  if(activeBtn) activeBtn.style.outline='1px solid currentColor';
+  if(activeBtn) activeBtn.classList.add('active');
   filterCards();
 }
 function filterCards(){
@@ -4515,10 +4557,10 @@ function addCustomTicker(){
   if(sb) sb.value='';
   ['filterAllBtn','filterUpBtn','filterDnBtn','filterNearBtn'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el) el.style.outline='none';
+    if(el) el.classList.remove('active');
   });
   const allBtn=document.getElementById('filterAllBtn');
-  if(allBtn) allBtn.style.outline='1px solid currentColor';
+  if(allBtn) allBtn.classList.add('active');
   buildGrid();
   showToastMsg('✅ เพิ่ม '+t+' แล้ว — กำลังดึงราคา...');
   // scroll ไปที่การ์ดใหม่
@@ -4614,9 +4656,8 @@ const _tickerSectorMap={};
 
 function setSectorFilter(sector, btn){
   _currentSector=sector;
-  document.querySelectorAll('#sector-filter-row .sort-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#sector-filter-row .spill').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  // แสดง/ซ่อน card ตาม sector
   stocks.forEach(s=>{
     const card=document.getElementById('card-'+s.t);
     if(!card) return;
@@ -4627,7 +4668,6 @@ function setSectorFilter(sector, btn){
       card.style.display=cardSector===sector?'':'none';
     }
   });
-  // อัปเดต counter
   const visible=sector==='all'?stocks.length:stocks.filter(s=>(_tickerSectorMap[s.t]||'อื่นๆ')===sector).length;
   const totalEl=document.getElementById('totalCnt');
   if(totalEl) totalEl.textContent=visible;
@@ -4873,22 +4913,19 @@ async function toggleLive(){
     isLive=false;
     wsDisconnect();
     clearInterval(httpPollTimer);
-    btn.textContent='▶ Live';btn.style.color='var(--green)';
+    btn.textContent='▶ Live';btn.classList.remove('live-on');
     document.getElementById('statusbar').innerHTML='⏸ หยุด Live';
   } else {
     isLive=true;
     _wsReconnectCount=0;
-    btn.textContent='⏸ Stop';btn.style.color='var(--red)';
+    btn.textContent='⏸ Stop';btn.classList.add('live-on');
     document.getElementById('statusbar').innerHTML='🔄 กำลังเชื่อมต่อ...';
-    // WS เป็นหลัก (real-time) + HTTP poll เป็น backup
-    // fetch WS key ก่อนแล้วค่อย connect
     try{
       await _fetchWsKey();
       wsConnect();
     }catch(e){ console.warn('WS connect failed:',e); }
     await fallbackPoll();
     clearInterval(httpPollTimer);
-    // ตอนเริ่ม WS ยังไม่พร้อม → poll ทุก 5s ก่อน (wsOpen จะเปลี่ยนเป็น 30s เอง)
     httpPollTimer=setInterval(async()=>{ if(isLive&&!wsReady) await fallbackPoll(); },5000);
   }
 }
