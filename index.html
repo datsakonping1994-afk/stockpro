@@ -482,7 +482,34 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   </div>
   <!-- Export Trade Log -->
   <hr style="border-color:var(--border);margin:10px 0">
+  <!-- Line Notify -->
+  <div style="margin-bottom:10px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-bottom:6px">📲 Line Notify Token — แจ้งเตือน Buy Signal</div>
+    <div style="display:flex;gap:6px">
+      <input id="lineTokenInput" type="text" placeholder="Token จาก notify.line.me" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px;font-family:'IBM Plex Mono',monospace;flex:1">
+      <button class="btn" style="font-size:11px;padding:6px 12px;border-color:var(--green);color:var(--green)" onclick="saveLineToken()">บันทึก</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+      <label style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:4px;cursor:pointer">
+        <input type="checkbox" id="lineNotifyEnabled" onchange="toggleLineNotify(this.checked)" style="accent-color:var(--green)">
+        เปิดแจ้งเตือน Line
+      </label>
+      <button class="btn" style="font-size:10px;padding:3px 8px;border-color:var(--accent);color:var(--accent)" onclick="testLineNotify()">🧪 ทดสอบ</button>
+    </div>
+  </div>
+  <hr style="border-color:var(--border);margin:10px 0">
   <button class="btn" style="font-size:11px;padding:6px 12px;width:100%;border-color:var(--yellow);color:var(--yellow)" onclick="exportTradeLog()">📥 Export Trade Log (CSV)</button>
+</div>
+<div class="sort-row" id="sector-filter-row">
+  <span class="sort-lbl">SECTOR:</span>
+  <button class="sort-btn active" id="sector-all" onclick="setSectorFilter('all',this)">ทั้งหมด</button>
+  <button class="sort-btn" id="sector-semi" onclick="setSectorFilter('เซมิคอนดักเตอร์',this)">💾 Semi</button>
+  <button class="sort-btn" id="sector-sw" onclick="setSectorFilter('ซอฟต์แวร์ / คลาวด์',this)">☁️ Cloud</button>
+  <button class="sort-btn" id="sector-ai" onclick="setSectorFilter('AI Infrastructure',this)">🤖 AI Infra</button>
+  <button class="sort-btn" id="sector-space" onclick="setSectorFilter('อวกาศ / กลาโหม',this)">🚀 Space</button>
+  <button class="sort-btn" id="sector-health" onclick="setSectorFilter('ชีวเทค / สุขภาพ',this)">🧬 Health</button>
+  <button class="sort-btn" id="sector-fin" onclick="setSectorFilter('การเงิน / ฟินเทค',this)">💰 Fin</button>
+  <button class="sort-btn" id="sector-energy" onclick="setSectorFilter('พลังงาน / วัตถุดิบ',this)">⚡ Energy</button>
 </div>
 <div class="sort-row">
   <span class="sort-lbl">SORT:</span>
@@ -657,7 +684,7 @@ const sup0={
   LLY:780,    // ~$830 → S1 ~$780
   XOM:108,    // ~$115 → S1 ~$108
   ASML:680,   // ~$720 → S1 ~$680
-  RKLB:118,   // ~$132 → S1 ~$118
+  RKLB:124,   // ~$132 → S1 ~$124 (pivot จริง $124.85)
   ASTS:62,    // ~$68  → S1 ~$62
   OKLO:38,    // ~$42  → S1 ~$38
   IONQ:50,    // ~$55  → S1 ~$50
@@ -685,7 +712,6 @@ const sup0={
   TSM:165,    // ~$178 → S1 ~$165
   AAOI:28,    // ~$32  → S1 ~$28
   MELI:2100,  // ~$2250→ S1 ~$2100
-  SPGI:510,
 };
 
 // FIX: newsData เป็นข้อมูลสำรอง (static fallback) วันที่ hardcode อยู่
@@ -2983,6 +3009,15 @@ async function checkBuySignal(ticker, price, s1){
   // บันทึก trade log
   logTrade(ticker, price, s1, lvl.r1, sig.score);
   showBuySignalPopup(ticker, price, s1, sig, lvl);
+  // FIX: ส่ง Line Notify เมื่อมี Buy Signal
+  const s=stocks.find(x=>x.t===ticker);
+  sendLineNotify(
+    `\n🔔 Buy Signal: ${ticker} (${s?.n||ticker})`+
+    `\n💰 ราคา: $${price} | Score: ${sig.score}/100`+
+    `\n📊 แนวรับ S1: $${(lvl.s1||s1||0).toFixed(2)} | แนวต้าน R1: $${(lvl.r1||0).toFixed(2)}`+
+    `\n📏 ห่าง S1: ${sig.pctFromS1?.toFixed(1)||'—'}%`+
+    (sig.hammerPattern||sig.engulfingPattern||sig.morningStarPattern?`\n🕯️ ${sig.morningStarPattern?'Morning Star':sig.engulfingPattern?'แท่งกลืนขึ้น':'แท่งค้อน'}`:'')
+  );
 }
 
 function showBuySignalPopup(ticker, price, s1, sig, lvl){
@@ -3367,8 +3402,15 @@ function updateCard(s){
   if(staleEl) staleEl.remove();
   const ce=document.getElementById('chg-'+s.t);if(ce){ce.textContent=(s.c>0?'+':'')+s.c+'%';ce.className='chg '+cc;}
   const rsel=document.getElementById('rs-'+s.t);if(rsel) rsel.innerHTML=getRSLabel(s.t);
-  // always use indicator levels (Classic Pivot by default, or whatever is selected)
+  // always use indicator levels — ถ้า Technical tab ยังไม่เปิด ใช้ sup0 ที่ sync จาก pivot แล้ว
   const {s1,r1}=_getLevels(s.t,s.p);
+  // FIX: ถ้า s1 ยังเป็นค่า hardcode เก่า (ก่อน pivot โหลด) ให้ trigger setIndicator เพื่อ sync
+  if(s1&&sup0[s.t]&&Math.abs(s1-sup0[s.t])/sup0[s.t]>0.15&&!ohlcCache[s.t]){
+    // ต่างกันเกิน 15% แสดงว่า DOM ยังไม่ได้ update → เรียก indicator ให้ sync
+    const indMode=tickerIndicator[s.t]||'classic';
+    const btn=document.querySelector(`#indselector-${s.t} .ind-btn.active`);
+    if(btn) setTimeout(()=>setIndicator(s.t,indMode,btn),100);
+  }
   updateRangeBar(s.t,s.p,s1,r1);
   card.dataset.dir=s.c>=0?'up':'dn';
   const pos=getRangePos(s.p,s1,r1);
@@ -4519,7 +4561,88 @@ function showSettingsPanel(){
     const pi=document.getElementById('portSizeInput');
     if(pi) pi.value=PORT_SIZE;
     renderCustomTickerList();
+    // โหลด Line token
+    const lt=document.getElementById('lineTokenInput');
+    if(lt) lt.value=localStorage.getItem('lineToken')||'';
+    const le=document.getElementById('lineNotifyEnabled');
+    if(le) le.checked=localStorage.getItem('lineNotifyEnabled')==='true';
   }
+}
+
+// ── Sector Filter ──
+let _currentSector='all';
+const _tickerSectorMap={};
+(()=>{
+  Object.entries(sectorMap).forEach(([sec,tickers])=>tickers.forEach(t=>{_tickerSectorMap[t]=sec;}));
+})();
+
+function setSectorFilter(sector, btn){
+  _currentSector=sector;
+  document.querySelectorAll('#sector-filter-row .sort-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  // แสดง/ซ่อน card ตาม sector
+  stocks.forEach(s=>{
+    const card=document.getElementById('card-'+s.t);
+    if(!card) return;
+    if(sector==='all'){
+      card.style.display='';
+    } else {
+      const cardSector=_tickerSectorMap[s.t]||'อื่นๆ';
+      card.style.display=cardSector===sector?'':'none';
+    }
+  });
+  // อัปเดต counter
+  const visible=sector==='all'?stocks.length:stocks.filter(s=>(_tickerSectorMap[s.t]||'อื่นๆ')===sector).length;
+  const totalEl=document.getElementById('totalCnt');
+  if(totalEl) totalEl.textContent=visible;
+}
+
+// ── Line Notify ──
+function saveLineToken(){
+  const token=document.getElementById('lineTokenInput')?.value?.trim();
+  if(!token){showToastMsg('⚠️ กรุณาใส่ Token ก่อน');return;}
+  localStorage.setItem('lineToken',token);
+  showToastMsg('✅ บันทึก Line Token แล้ว');
+}
+
+function toggleLineNotify(enabled){
+  localStorage.setItem('lineNotifyEnabled', enabled?'true':'false');
+  showToastMsg(enabled?'🟢 เปิดแจ้งเตือน Line แล้ว':'🔴 ปิดแจ้งเตือน Line แล้ว');
+}
+
+async function sendLineNotify(msg){
+  const token=localStorage.getItem('lineToken');
+  const enabled=localStorage.getItem('lineNotifyEnabled')==='true';
+  if(!token||!enabled) return;
+  try{
+    await fetch('https://notify-api.line.me/api/notify',{
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer '+token,
+        'Content-Type':'application/x-www-form-urlencoded'
+      },
+      body:'message='+encodeURIComponent(msg)
+    });
+  }catch(e){console.warn('Line Notify error:',e);}
+}
+
+async function testLineNotify(){
+  const token=document.getElementById('lineTokenInput')?.value?.trim()||localStorage.getItem('lineToken');
+  if(!token){showToastMsg('⚠️ ใส่ Token ก่อนทดสอบ');return;}
+  localStorage.setItem('lineToken',token);
+  showToastMsg('📲 กำลังส่งทดสอบ...');
+  try{
+    const r=await fetch('https://notify-api.line.me/api/notify',{
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer '+token,
+        'Content-Type':'application/x-www-form-urlencoded'
+      },
+      body:'message='+encodeURIComponent('\n🧪 Stock Pro ทดสอบแจ้งเตือน\nระบบพร้อมใช้งานแล้ว ✅')
+    });
+    if(r.ok) showToastMsg('✅ ส่ง Line สำเร็จ!');
+    else showToastMsg('❌ Token ไม่ถูกต้อง');
+  }catch(e){showToastMsg('❌ ส่งไม่ได้: '+e.message);}
 }
 function showToastMsg(msg){
   const c=document.getElementById('toast-container');
