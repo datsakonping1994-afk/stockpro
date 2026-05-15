@@ -5431,29 +5431,29 @@ async function fetchLiveNews(ticker){
 }
 
 
-// ── Translate news items via Claude Worker ──
+// ── Translate news items via Gemini ──
 async function translateNewsItems(items){
   if(!items||!items.length) return items;
   try{
     const toTranslate=items.map(n=>({h:n.h||'',x:(n.x||'').slice(0,300)}));
-    // ใช้ Claude proxy แทน callGemini ที่ไม่ได้นิยาม
+    const systemPrompt='แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown หรือ preamble';
+    const userPrompt=`input: ${JSON.stringify(toTranslate)}`;
     const _trCtrl=new AbortController();
     const _trTimeout=setTimeout(()=>_trCtrl.abort(),30000);
-    const res = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev', {
+    const res = await fetch(WORKER + '/gemini/', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:4000,
-        system:'แปลข่าวการเงินเป็นภาษาไทยให้เป็นธรรมชาติ ตอบเป็น JSON array ของ [{h,x},...] เท่านั้น ห้ามมี markdown หรือ preamble',
-        messages:[{role:'user',content:`input: ${JSON.stringify(toTranslate)}`}]
+        system_instruction:{parts:[{text:systemPrompt}]},
+        contents:[{parts:[{text:userPrompt}]}],
+        generationConfig:{maxOutputTokens:4000,temperature:0.3}
       }),
       signal:_trCtrl.signal
     });
     clearTimeout(_trTimeout);
     if(!res.ok) return items;
     const d=await res.json();
-    const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+    const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||'';
     if(raw){
       const clean=raw.replace(/```json|```/g,'').trim();
       const arr=JSON.parse(clean);
