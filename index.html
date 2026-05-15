@@ -563,7 +563,7 @@ window.addEventListener('scroll',()=>{
 });
 // ── Merged: best features from all versions ──────────────────────────────────
 // ⚠️ WARNING: API keys เหล่านี้มองเห็นได้ใน browser — อย่า deploy บน server สาธารณะ
-let FINNHUB_KEY=''; // ไม่ต้องใส่ key — ใช้ผ่าน Cloudflare Worker แล้ว
+let FINNHUB_KEY=''; // ใส่ key ผ่านหน้า login
 let PORT_SIZE = (()=>{ try{ return parseFloat(localStorage.getItem('_sp_portsize')||'10000'); }catch{ return 10000; } })();
 function setPortSize(v){ PORT_SIZE=v; try{localStorage.setItem('_sp_portsize',v);}catch{} }
 const marketCtx = {SPY:{price:0,change:0,trend:'unknown'}, QQQ:{price:0,change:0,trend:'unknown'}};
@@ -1121,7 +1121,7 @@ async function fetchOHLC(ticker){
   if(cached&&cached._c===cycle) return cached;
   try{
     // ใช้ /quote — pc=prevClose (ราคาปิดเมื่อวาน) ใช้เป็น C สำหรับ Classic Pivot
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${ticker}`,{mode:'cors'});
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
     if(!r.ok) return cached||null;
     const d=await r.json();
     if(!d||(!d.c&&!d.pc)) return cached||null;
@@ -2544,7 +2544,7 @@ const _logoDomainCache={};
 async function _fetchLogoDomain(ticker){
   if(_stockDomain[ticker]||_logoDomainCache[ticker]) return;
   try{
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/stock/profile2&symbol=${ticker}`);
+    const r=await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`);
     if(!r.ok) return;
     const d=await r.json();
     if(d.weburl){
@@ -3533,7 +3533,7 @@ async function renderAllNews(forceRefresh=false){
       let items=(!forceRefresh&&allNewsCache[cacheKey]&&allNewsCache[cacheKey].translated&&(now-allNewsCache[cacheKey].ts<600000))?allNewsCache[cacheKey].items:null;
       if(!items){
         try{
-          const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/company-news&symbol=${s.t}&from=${fromStr}&to=${toStr}`,{mode:'cors'});
+          const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${s.t}&from=${fromStr}&to=${toStr}&token=${FINNHUB_KEY}`,{mode:'cors'});
           if(r.ok){
             const arr=await r.json();
             if(Array.isArray(arr)&&arr.length){
@@ -3593,7 +3593,7 @@ async function fetchAndRenderEarnings(){
       const ctrl=new AbortController();
       const tid=setTimeout(()=>ctrl.abort(),8000);
       const r=await fetch(
-        `https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/calendar/earnings&from=${fmt(from)}&to=${fmt(to)}`,
+        `https://finnhub.io/api/v1/calendar/earnings?from=${fmt(from)}&to=${fmt(to)}&token=${FINNHUB_KEY}`,
         {signal:ctrl.signal}
       );
       clearTimeout(tid);
@@ -4144,14 +4144,7 @@ async function _fetchWsKey(){
 function wsConnect(){
   if(ws&&ws.readyState<=1) return;
   clearTimeout(_wsReconnectTimer);
-  // FIX: ดึง token จาก Worker แทนการใช้ key ตรงๆ
-  let _wsToken = _wsKey || FINNHUB_KEY;
-  try {
-    const tr = await fetch('https://anthropic-proxy.datsakonping1994.workers.dev/finnhub-token/');
-    const td = await tr.json();
-    if(td.token) _wsToken = td.token;
-  } catch{}
-  ws=new WebSocket(`wss://ws.finnhub.io?token=${_wsToken}`);
+  ws=new WebSocket(`wss://ws.finnhub.io?token=${_wsKey||FINNHUB_KEY}`);
   ws.onopen=()=>{
     wsReady=true;
     _wsReconnectCount=0;
@@ -4459,7 +4452,7 @@ function addCustomTicker(){
   },200);
   // ดึงราคาทันที
   if(FINNHUB_KEY){
-    fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${t}`)
+    fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=${FINNHUB_KEY}`)
       .then(r=>r.json()).then(d=>{
         if(d.c){
           const s=stocks.find(x=>x.t===t);
@@ -4600,7 +4593,7 @@ function getRSLabel(ticker){
 async function fetchMarketContext(){
   try{
     await Promise.all(['SPY','QQQ'].map(async sym=>{
-      const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${sym}`);
+      const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
       if(!r.ok) return;
       const d=await r.json();
       if(d.c){
@@ -4655,7 +4648,7 @@ async function _fetchYahooPrice(ticker){
 
 async function _fetchFinnhubPrice(ticker){
   try{
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=${ticker}`,{mode:'cors'});
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`,{mode:'cors'});
     if(!r.ok) return null;
     const d=await r.json();
     const price=d.c>0?d.c:(d.pc>0?d.pc:0);
@@ -4837,7 +4830,7 @@ async function fetchLiveNews(ticker){
   try{
     const to=new Date(),from=new Date();
     from.setDate(from.getDate()-7);
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/company-news&symbol=${ticker}&from=${from.toISOString().slice(0,10)}&to=${to.toISOString().slice(0,10)}`,{mode:'cors'});
+    const r=await fetch(`https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from.toISOString().slice(0,10)}&to=${to.toISOString().slice(0,10)}&token=${FINNHUB_KEY}`,{mode:'cors'});
     if(!r.ok) return null;
     const items=await r.json();
     if(!Array.isArray(items)) return null;
@@ -5559,7 +5552,7 @@ async function doApiKeyLogin(){
   if(!key){errEl.textContent='กรุณาใส่ Finnhub API Key';return;}
   btn.disabled=true;btn.textContent='⏳ กำลังตรวจสอบ...';
   try{
-    const r=await fetch(`https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=AAPL`);
+    const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=AAPL&token=${key}`);
     const d=await r.json();
     if(d.error||!r.ok){
       errEl.textContent='❌ API Key ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
@@ -5787,12 +5780,13 @@ function renderMarketCtx(){
 
 // ── Auto-fetch logo domain ──
 (()=>{
-  // ดึงหลัง app โหลด 3 วินาที (ไม่ต้องรอ key แล้ว ใช้ Worker)
-  setTimeout(()=>{
+  const tryFetch=()=>{
+    if(!FINNHUB_KEY) return;
     stocks.forEach(s=>{
       if(!_stockDomain[s.t]) _fetchLogoDomain(s.t);
     });
-  }, 3000);
+  };
+  setTimeout(tryFetch, 3000);
 })();
 
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -5813,29 +5807,16 @@ applyFontSize();
   });
 })();
 
-// ── Auto-launch — ไม่ต้องใส่ key แล้ว ใช้ผ่าน Worker ──
+// ── Auto-launch — ใช้ saved key ──
 (async()=>{
   try{
-    // ทดสอบว่า Worker ใช้งานได้
-    const r=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev/finnhub/?path=/quote&symbol=AAPL');
-    if(r.ok){
-      FINNHUB_KEY='via-worker'; // placeholder เพื่อให้ logic อื่นทำงาน
-      _showApp();
-    } else {
-      // fallback: ลองใช้ saved key เดิม
-      const saved=await _loadKeyAsync();
-      if(saved && !String(saved).includes('ใส่_KEY')){
-        FINNHUB_KEY=saved;
-        _showApp();
-      }
-    }
-  }catch{
-    const saved=await _loadKeyAsync().catch(()=>null);
-    if(saved && !String(saved).includes('ใส่_KEY')){
-      FINNHUB_KEY=saved;
+    const saved=await _loadKeyAsync();
+    const key=saved||FINNHUB_KEY;
+    if(key && !String(key).includes('ใส่_KEY') && key.length>10){
+      FINNHUB_KEY=key;
       _showApp();
     }
-  }
+  }catch{ if(FINNHUB_KEY&&FINNHUB_KEY.length>10) _showApp(); }
 })();
 </script>
 </div>
