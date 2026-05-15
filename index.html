@@ -1132,9 +1132,9 @@ const earningsData=[
 function fmt(n){if(!n||n===0)return'—';if(n>=1000)return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});return n<10?n.toFixed(3):n.toFixed(2);}
 function getS(p,t){const s1=sup0[t]||(p>0?p*0.95:null);if(!s1)return{s1:null,s2:null,s3:null};return{s1:+s1.toFixed(2),s2:+(s1*0.95).toFixed(2),s3:+(s1*0.90).toFixed(2)};}
 function getR(p){return{r1:+(p*1.05).toFixed(2),r2:+(p*1.10).toFixed(2),r3:+(p*1.20).toFixed(2)};}
-function getDist(p,s1){return p>0?+((p-s1)/p*100).toFixed(2):99;}
+function getDist(p,s1){return s1>0?+((p-s1)/s1*100).toFixed(2):99;}
 function getBg(d){return d<=2?{cls:'red',txt:'🔴 ใกล้แนวรับ',border:'var(--red)'}:d<=5?{cls:'yellow',txt:'🟡 เฝ้าระวัง',border:'var(--yellow)'}:{cls:'green',txt:'🟢 ปลอดภัย',border:'var(--green)'};}
-function getBar(d){return d<=2?'#ff4466':d<=4?'#ffd700':'#00e676';}
+function getBar(d){return d<=2?'#ff4466':d<=5?'#ffd700':'#00e676';}
 
 // Range bar: position 0-100% from S1 to R1, needle shows where price sits
 function getRangePos(price, s1, r1){
@@ -1144,17 +1144,15 @@ function getRangePos(price, s1, r1){
 }
 function getRangeZone(price, s1, r1){
   if(!s1||!r1) return{cls:'mid',txt:'—',border:'var(--dim)'};
-  const pos=(price-s1)/(r1-s1);
-  // คำนวณ % ห่างจาก S1 และ R1 (แม่นยำกว่าใช้ position ratio)
+  // % ห่างจาก S1 และ R1 — ใช้สูตรเดียวกับ getDist (หาร s1/r1)
   const pctFromS1=s1>0?((price-s1)/s1*100):999;
   const pctFromR1=r1>0?((r1-price)/r1*100):999;
-  if(price<=s1)        return{cls:'red',   txt:'🔴 ต่ำกว่าแนวรับ', border:'var(--red)',   zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
-  if(pctFromS1<=0.25)  return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก', border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
-  if(pctFromS1<=0.5)   return{cls:'red',   txt:'🔴 ใกล้แนวรับ',    border:'var(--red)',   zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
-  if(pctFromR1<=0.25)  return{cls:'green', txt:'🟢 ใกล้แนวต้านมาก',border:'var(--green)', zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
-  if(pctFromR1<=0.5)   return{cls:'green', txt:'🟢 ใกล้แนวต้าน',   border:'var(--green)', zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
-  if(pctFromS1<=2||pos<=0.15) return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลางช่วง'};
-  if(pctFromR1<=12||pos>=0.65) return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลางช่วง'};
+  if(price<=s1)     return{cls:'red',   txt:'🔴 ต่ำกว่าแนวรับ',  border:'var(--red)',    zone:'near-s', ztxt:'⚠ ต่ำกว่า S1'};
+  if(pctFromS1<=1)  return{cls:'red',   txt:'🔴 ใกล้แนวรับมาก', border:'var(--red)',    zone:'near-s', ztxt:'🔴 ใกล้แนวรับมาก'};
+  if(pctFromS1<=2)  return{cls:'red',   txt:'🔴 ใกล้แนวรับ',    border:'var(--red)',    zone:'near-s', ztxt:'🔴 ใกล้แนวรับ'};
+  if(pctFromS1<=5)  return{cls:'yellow',txt:'🟡 เฝ้าระวัง',      border:'var(--yellow)', zone:'mid',    ztxt:'🟡 เฝ้าระวัง'};
+  if(pctFromR1<=1)  return{cls:'green', txt:'🟢 ใกล้แนวต้านมาก',border:'var(--green)',  zone:'near-r', ztxt:'🟢 ใกล้แนวต้านมาก'};
+  if(pctFromR1<=2)  return{cls:'green', txt:'🟢 ใกล้แนวต้าน',   border:'var(--green)',  zone:'near-r', ztxt:'🟢 ใกล้แนวต้าน'};
   return{cls:'accent',txt:'🔵 กลางช่วง', border:'var(--accent)', zone:'safe', ztxt:'🔵 กลาง S1–R1'};
 }
 
@@ -2760,12 +2758,12 @@ function _calcBuyScore(ticker, price, s1, r1){
   let g1=0;
   const pctFromS1 = s1>0?((price-s1)/s1*100):99;
 
-  // pctFromS1 — น้ำหนักหลัก (ขยายให้ครอบคลุม ≤ 1.5%)
-  if(pctFromS1<=0.15)      g1+=14;
-  else if(pctFromS1<=0.35) g1+=10;
-  else if(pctFromS1<=0.5)  g1+=6;
-  else if(pctFromS1<=1.0)  g1+=3;
-  else if(pctFromS1<=1.5)  g1+=1;
+  // pctFromS1 — น้ำหนักหลัก (สอดคล้องกับ zone: <=1%=red, <=2%=red, <=5%=yellow)
+  if(pctFromS1<=1.0)       g1+=14;
+  else if(pctFromS1<=2.0)  g1+=10;
+  else if(pctFromS1<=3.0)  g1+=6;
+  else if(pctFromS1<=4.0)  g1+=3;
+  else if(pctFromS1<=5.0)  g1+=1;
 
   // Bollinger Bands %B
   let bbLower=null,bbUpper=null,bbMid=null,bbPct=null;
@@ -3088,7 +3086,7 @@ async function checkBuySignal(ticker, price, s1){
   const lvl=_getLevels(ticker,price);
   const sig=_calcBuyScore(ticker,price,s1,lvl.r1);
   // FIX: เพิ่ม threshold เป็น 55 ลด false signal
-  if(sig.pctFromS1>1.5||sig.score<52){ _buyAlerted.delete(ticker); return; }
+  if(sig.pctFromS1>5.0||sig.score<52){ _buyAlerted.delete(ticker); return; }
   // บันทึก trade log
   logTrade(ticker, price, s1, lvl.r1, sig.score);
   showBuySignalPopup(ticker, price, s1, sig, lvl);
