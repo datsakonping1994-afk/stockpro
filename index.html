@@ -280,17 +280,38 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 .mnews-hl{font-size:13px;color:var(--text);margin-bottom:3px;}
 .mnews-sum{font-size:11px;color:var(--text2);margin-bottom:3px;}
 .mnews-src{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}
-.earn-hdr{display:grid;grid-template-columns:60px 1fr 90px 65px 75px 90px;gap:6px;padding:4px 10px 8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);border-bottom:1px solid var(--border);margin-bottom:6px;}
-.earn-row{display:grid;grid-template-columns:60px 1fr 90px 65px 75px 90px;gap:6px;padding:8px 10px;border-radius:7px;margin-bottom:4px;align-items:center;cursor:pointer;border:1px solid var(--border);}
-.earn-row:hover{opacity:0.8;}
-.earn-ticker{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;}
-.earn-name{font-size:12px;color:var(--text2);}
-.earn-date{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);}
-.earn-eps,.earn-rev{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);}
-.earn-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;display:inline-block;}
-.earn-done{background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);color:var(--green);}
-.earn-soon{background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.3);color:var(--yellow);}
-.earn-grp{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:8px 4px 3px;letter-spacing:1px;}
+/* ── Earnings redesign ── */
+.earn-grp-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;padding:14px 0 6px;display:flex;align-items:center;gap:8px;}
+.earn-grp-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.earn-cards{display:flex;flex-direction:column;gap:6px;margin-bottom:4px;}
+.earn-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;border:1px solid var(--border);transition:all 0.15s;position:relative;overflow:hidden;}
+.earn-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.earn-card.ec-done{background:rgba(0,230,118,0.04);border-color:rgba(0,230,118,0.2);}
+.earn-card.ec-done::before{background:var(--green);}
+.earn-card.ec-soon{background:rgba(255,215,0,0.05);border-color:rgba(255,215,0,0.25);}
+.earn-card.ec-soon::before{background:var(--yellow);}
+.earn-card.ec-future{background:var(--bg3);}
+.earn-card.ec-future::before{background:var(--border);}
+.earn-card:hover{transform:translateX(2px);opacity:0.9;}
+.ec-ticker{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;min-width:48px;}
+.ec-done .ec-ticker{color:var(--green);}
+.ec-soon .ec-ticker{color:var(--yellow);}
+.ec-future .ec-ticker{color:var(--text2);}
+.ec-info{flex:1;min-width:0;}
+.ec-name{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ec-date{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2);margin-top:1px;}
+.ec-nums{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;}
+.ec-eps{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}
+.ec-rev{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}
+.ec-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:5px;flex-shrink:0;text-align:center;min-width:64px;}
+.ec-badge.beat{background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.35);color:var(--green);}
+.ec-badge.miss{background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.35);color:var(--red);}
+.ec-badge.done{background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.25);color:var(--accent);}
+.ec-badge.soon{background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.3);color:var(--yellow);}
+.ec-badge.future{background:transparent;border:1px solid var(--border);color:var(--dim);}
+.earn-src{text-align:right;padding:0 0 8px;font-family:'IBM Plex Mono',monospace;font-size:10px;}
+/* hide old */
+.earn-hdr,.earn-row,.earn-grp{display:none!important;}
 .ind-selector{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
 .ind-btn{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all 0.15s;}
 .ind-btn:hover{border-color:var(--accent);color:var(--accent);}
@@ -478,7 +499,8 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
   <div style="flex:1"></div>
   <!-- Action group -->
   <button class="abtn" id="liveBtn" onclick="toggleLive()">▶ Live</button>
-  <button class="abtn" onclick="togglePanel('newsPanel')">📰 ข่าว</button>
+  <button class="abtn" onclick="togglePanel('newsPanel')">📰 ข่าวหุ้นเด่น</button>
+  <button class="abtn" style="color:#ffa07a;border-color:rgba(255,160,122,0.3)" onclick="togglePanel('macroPanel')">🌐 เศรษฐกิจ</button>
   <button class="abtn" style="color:var(--purple);border-color:rgba(168,85,247,0.25)" onclick="toggleEarnings()">📅 งบไตรมาส</button>
   <button class="abtn ai-summary-btn" id="aiSummaryBtn" onclick="runAIMarketSummary()">🤖 AI</button>
   <button class="abtn" onclick="showSettingsPanel()" title="ตั้งค่า">⚙️</button>
@@ -580,10 +602,23 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 </div>
 <div class="statusbar" id="statusbar">กด ▶ Live เพื่อดึงราคา Real-Time</div>
 
+<!-- Macro Economy Panel -->
+<div id="macroPanel" class="panel" style="border:1px solid rgba(255,160,122,0.25)">
+  <div class="panel-hdr">
+    <span class="panel-title" style="color:#ffa07a">🌐 ข่าวเศรษฐกิจ & ผลกระทบต่อพอร์ต</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span id="macroNewsTime" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim)"></span>
+      <button class="btn" style="padding:3px 8px;font-size:10px;color:var(--accent)" onclick="renderMacroNews(true)">🔄</button>
+      <button class="btn" style="padding:3px 8px;font-size:10px" onclick="togglePanel('macroPanel')">✕</button>
+    </div>
+  </div>
+  <div id="macroFeed" style="max-height:600px;overflow-y:auto;"></div>
+</div>
+
 <!-- All News Panel -->
 <div id="newsPanel" class="panel" style="border:1px solid rgba(255,153,102,0.25)">
   <div class="panel-hdr">
-    <span class="panel-title" style="color:#ff9966">📰 ข่าวทุกหุ้น</span>
+    <span class="panel-title" style="color:#ff9966">📰 ข่าวหุ้นเด่น</span>
     <div style="display:flex;gap:6px;align-items:center">
       <span id="allNewsTime" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim)"></span>
       <button class="btn" style="padding:3px 8px;font-size:10px;color:var(--accent)" onclick="renderAllNews(true)">🔄</button>
@@ -596,7 +631,7 @@ body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;fon
 
 <!-- Earnings Panel -->
 <div id="earningsPanel" class="panel" style="border:1px solid rgba(168,85,247,0.25)">
-  <div class="panel-hdr"><span class="panel-title" style="color:var(--purple)">📅 รายงานผลประกอบการ</span><button class="btn" style="padding:3px 8px;font-size:10px" onclick="toggleEarnings()">✕</button></div>
+  <div class="panel-hdr"><span class="panel-title" style="color:var(--purple)">📅 งบไตรมาส</span><button class="btn" style="padding:3px 8px;font-size:10px" onclick="toggleEarnings()">✕</button></div>
   <div id="earningsBody"></div>
 </div>
 
@@ -796,11 +831,10 @@ const newsData={
     {h:"AIP (Artificial Intelligence Platform) ชนะลูกค้าใหม่ 47 รายใน Q1",s:"Motley Fool",d:"3 พ.ค.",u:"",x:"เฉลี่ย deal size เพิ่มขึ้น 40% YoY bootcamp-to-contract conversion rate สูงถึง 68%"},
   ],
   NVDA:[
-    {h:"Earnings 20 พ.ค. — คาด EPS $1.62 รายได้ $78.6B +65% YoY",s:"Investing.com",d:"8 พ.ค.",u:"",x:"Wall Street คาด Blackwell GPU demand ยังล้นตลาด data center capex ของ hyperscaler ยังพุ่งต่อเนื่อง"},
-    {h:"NVDA-Corning ร่วมทุน optical interconnect facility ใน NC และ TX",s:"CNBC",d:"6 พ.ค.",u:"",x:"สร้างงาน 3,000 ตำแหน่ง ลดต้นทุน data center connectivity 40% Corning +17% วันที่ประกาศ"},
-    {h:"Saudi Aramco สั่งซื้อ NVIDIA GB300 NVL72 รุ่นใหม่ $8B",s:"Reuters",d:"4 พ.ค.",u:"",x:"ส่วนหนึ่งของ US-Saudi AI deal ที่ประกาศระหว่างการเยือนของ Trump NVIDIA เป็น exclusive supplier"},
-    {h:"NVIDIA ประกาศ NIM Microservices ใหม่ — AI inference ถูกลง 10x",s:"Wired",d:"2 พ.ค.",u:"",x:"NIM ใหม่ช่วยให้องค์กรขนาดกลางเข้าถึง AI inference ได้ในราคาที่ไม่แพง เปิดตลาดใหม่ขนาดใหญ่"},
-    {h:"Morgan Stanley: NVDA ยังมี upside 35% — PT $290",s:"Morgan Stanley",d:"1 พ.ค.",u:"",x:"MS ชี้ว่า Blackwell Ultra (2H 2026) จะดันรายได้ขึ้นอีกรอบ ยังแนะนำ Overweight"},
+    {h:"⚡ Earnings 20 พ.ค. — คาด EPS $1.62 รายได้ $78.6B +65% YoY | Blackwell demand ล้นตลาด",s:"Investing.com",d:"13 พ.ค.",u:"",x:"Wall Street คาด Q1 FY2027 จะเป็น quarter ที่ดีที่สุดในประวัติ NVIDIA Blackwell Ultra (GB300) เริ่ม ship นักวิเคราะห์หลายรายปรับ PT ขึ้น"},
+    {h:"Saudi Arabia สั่ง NVIDIA GB300 NVL72 มูลค่า $8B — ส่วนหนึ่งของดีล US-Saudi $600B",s:"Reuters",d:"13 พ.ค.",u:"",x:"Trump เยือน Riyadh สำเร็จ Saudi Aramco + NEOM + STC สั่ง NVIDIA GPU ขนาดใหญ่ ช่วยชดเชย China revenue ที่หายไป"},
+    {h:"NVIDIA-Corning ร่วมทุน optical interconnect — ลดต้นทุน data center connectivity 40%",s:"CNBC",d:"6 พ.ค.",u:"",x:"สร้างงาน 3,000 ตำแหน่งใน NC และ TX เป็นส่วนหนึ่งของกลยุทธ์ US manufacturing expansion ของ NVIDIA"},
+    {h:"NIM Microservices ใหม่ — AI inference ถูกลง 10x เปิดตลาดองค์กร SME",s:"Wired",d:"2 พ.ค.",u:"",x:"NIM ช่วยให้องค์กรขนาดกลางเข้าถึง AI inference ในราคาที่ไม่แพง Morgan Stanley: PT $290 ยังมี upside 35%"},
   ],
   MSFT:[
     {h:"Q3 FY2026 Azure โต 40% YoY — ดีกว่า guidance 37-38% แต่ยังถือว่า 'ไม่ wow' ตลาด",s:"Motley Fool",d:"30 เม.ย.",u:"",x:"Azure +40% ดีกว่า guide แต่ flat มา 3 ไตรมาส ตลาดคาด acceleration หนักกว่านี้ MSFT หุ้น laggard ใน hyperscaler กลุ่ม"},
@@ -816,11 +850,10 @@ const newsData={
     {h:"Reality Labs ขาดทุนต่อเนื่อง — แต่ Ray-Ban Meta Glasses ขายดีกว่าคาด",s:"Bloomberg",d:"1 พ.ค.",u:"",x:"Reality Labs ยังขาดทุน แต่ hardware sales โดยเฉพาะ Ray-Ban Meta เป็นจุดสว่างที่ทำให้บางคนเริ่มมองว่า AR/VR ใกล้ breakeven แล้ว"},
   ],
   AAPL:[
-    {h:"Apple ทำดีล chipmaking กับ Intel — AAPL ทำ all-time high ใหม่",s:"TheStreet",d:"8 พ.ค.",u:"",x:"Apple เลือก Intel Foundry เป็นพาร์ทเนอร์ผลิต Apple Silicon รุ่น A20 คาดเริ่มผลิตปลายปี 2026 ลด dependency จาก TSMC"},
-    {h:"Q2 FY2026 รายได้ $94.5B +6% — iPhone 17 demand แข็งแกร่งกว่าคาด",s:"Apple Insider",d:"1 พ.ค.",u:"",x:"iPhone 17 series ขายได้ 58M เครื่องใน Q2 ดีกว่าคาด 12% Services รายได้ $28.3B +22% YoY"},
-    {h:"Siri AI ใหม่ (v3) เปิดตัว WWDC มิ.ย. — คาดเปลี่ยนเกมตลาด AI",s:"9to5Mac",d:"6 พ.ค.",u:"",x:"Apple เตรียมเปิดตัว on-device LLM ที่ทรงพลังที่สุดใน WWDC 2026 พัฒนาร่วมกับ Anthropic"},
-    {h:"Apple Vision Pro 2 ราคา $2,499 เตรียมวางจำหน่าย Q4 2026",s:"Bloomberg",d:"4 พ.ค.",u:"",x:"ราคาลดลงจาก $3,499 ใช้ chip M5 Pro ตลาดคาด adoption จะกว้างขึ้นมาก analyst consensus ปรับขึ้นหลังข่าว"},
-    {h:"Siri settlement คดี privacy $250M — ไม่กระทบ financials",s:"Robinhood",d:"7 พ.ค.",u:"",x:"Apple ยอมความคดีที่ Siri บันทึกเสียงโดยไม่ได้รับอนุญาต เงินที่จ่ายเทียบกับรายได้รายวัน Apple ถือว่าน้อยมาก"},
+    {h:"🍎 Apple ทำ All-Time High ใหม่ — Intel Foundry deal + US-China trade deescalation",s:"TheStreet",d:"12 พ.ค.",u:"",x:"หุ้นพุ่งจากสองข่าวดีในสัปดาห์เดียว: ดีล Intel Foundry สำหรับ A20 chip + US-China ลด tariff ทำให้ supply chain China คลายตัว"},
+    {h:"Q2 FY2026 รายได้ $94.5B +6% — iPhone 17 demand แข็งแกร่ง Services +22%",s:"Apple Insider",d:"1 พ.ค.",u:"",x:"iPhone 17 ขาย 58M เครื่อง Q2 ดีกว่าคาด 12% Services รายได้ $28.3B เป็น recurring revenue ที่ margin สูงมาก"},
+    {h:"Siri AI v3 (on-device LLM) เปิดตัว WWDC มิ.ย. — พัฒนาร่วมกับ Anthropic",s:"9to5Mac",d:"6 พ.ค.",u:"",x:"Apple เตรียม LLM ที่ทรงพลังที่สุดใน WWDC 2026 เปลี่ยนเกม on-device AI ไม่ต้องส่งข้อมูลออกเครื่อง"},
+    {h:"Apple Vision Pro 2 ราคา $2,499 — Q4 2026 ใช้ M5 Pro adoption คาดกว้างขึ้นมาก",s:"Bloomberg",d:"4 พ.ค.",u:"",x:"ราคาลดจาก $3,499 analyst consensus ปรับขึ้น PT หลังข่าว Apple ยืนยัน spatial computing เป็น next platform"},
   ],
   GOOGL:[
     {h:"Q1 2026 Google Cloud +28% YoY ทะลุ $12.3B — AI search รายได้พุ่ง",s:"Benzinga",d:"7 พ.ค.",u:"",x:"Alphabet beat ทุก metric EPS $2.01 (คาด $1.89) Google Cloud เป็น driver หลัก AI Overviews ดัน search revenue"},
@@ -836,10 +869,10 @@ const newsData={
     {h:"Kuiper satellite internet เปิดให้บริการ beta — คู่แข่ง Starlink",s:"Bloomberg",d:"2 พ.ค.",u:"",x:"Amazon Project Kuiper เริ่มทดสอบกับลูกค้า beta 10,000 ราย ความเร็ว 400Mbps ราคาคาดต่ำกว่า Starlink 20%"},
   ],
   OKLO:[
-    {h:"Earnings 12 พ.ค. — Tigress Buy PT $130, HSBC Buy PT $96",s:"Investing.com",d:"8 พ.ค.",u:"",x:"Oklo คาด EPS -$0.18 รายได้เป็น 0 เพราะยังไม่มี revenue แต่ catalyst หลักคือ NRC license approval timeline"},
-    {h:"NRC อนุมัติ PDC (Preliminary Design Consultation) เร็วกว่าปกติ",s:"TipRanks",d:"6 พ.ค.",u:"",x:"การที่ NRC ตอบเร็วกว่าปกติ 6 เดือนมีนัยว่า Aurora micro-reactor มีแนวโน้มได้รับ license ภายใน Q1 2027"},
-    {h:"Sam Altman ยืนยันลงทุนเพิ่มใน Oklo — OpenAI data center deal",s:"Bloomberg",d:"4 พ.ค.",u:"",x:"Oklo กำลังเจรจาจัดหาพลังงานนิวเคลียร์ให้กับ data center ของ OpenAI เป็น pipeline ขนาดใหญ่มาก"},
-    {h:"กลุ่ม AI data center หันมาสนใจ nuclear power — Oklo ได้ประโยชน์มากสุด",s:"Barron's",d:"2 พ.ค.",u:"",x:"Microsoft, Google, Meta ต่างมองหา 24/7 clean energy สำหรับ AI data center Oklo Aurora เป็นตัวเลือกที่ดีที่สุดในแง่ timeline"},
+    {h:"📋 Earnings 12 พ.ค. — PT consensus $130 (Tigress Buy), $96 (HSBC Buy)",s:"Investing.com",d:"14 พ.ค.",u:"",x:"Oklo รายงาน EPS -$0.18 ตามคาด รายได้ 0 (ยังไม่มี revenue) Catalyst หลักคือ NRC license timeline update ใน call"},
+    {h:"NRC ตอบกลับ PDC เร็วกว่าปกติ 6 เดือน — Aurora license Q1 2027 มีโอกาสสูง",s:"TipRanks",d:"6 พ.ค.",u:"",x:"regulators เปิดรับ advanced reactor มากขึ้นหลัง Energy crisis โอกาสได้ license ภายใน Q1 2027 เพิ่มขึ้นชัดเจน"},
+    {h:"Sam Altman ยืนยัน Oklo + OpenAI data center power deal กำลังเดิน",s:"Bloomberg",d:"4 พ.ค.",u:"",x:"Oklo กำลังเจรจาจัดหา nuclear power ให้ OpenAI data center เป็น pipeline ที่ใหญ่มาก ถ้าสำเร็จ"},
+    {h:"IEA: data center ต้องการ 50GW ใหม่ — Oklo Aurora ตอบโจทย์ได้ดีที่สุด",s:"Barron's",d:"2 พ.ค.",u:"",x:"Microsoft, Google, Meta ต้องการ 24/7 clean energy Oklo Aurora เป็นตัวเลือกที่ดีที่สุดในแง่ timeline และ scalability"},
   ],
   IONQ:[
     {h:"Q1 2026 รายได้ $46M โต 755% YoY — EBITDA ขาดทุน $96M",s:"Yahoo Finance",d:"8 พ.ค.",u:"",x:"IonQ beat รายได้ consensus แต่ขาดทุนมากกว่าคาด นักวิเคราะห์ยังมอง quantum computing เป็น long-term play"},
@@ -853,11 +886,11 @@ const newsData={
     {h:"AT&T ยืนยัน commercial service launch — direct-to-device ครอบคลุมพื้นที่ไร้สัญญาณ",s:"Reuters",d:"5 พ.ค.",u:"",x:"Blue Walker 4 satellites enable standard smartphone เชื่อมต่อโดยตรงไม่ต้องเปลี่ยนเครื่อง เป็น game changer สำหรับ rural connectivity"},
   ],
   RKLB:[
-    {h:"พุ่ง +34.22%! Q1 2026 รายได้ $200M — ทำ record สูงสุดใหม่ทุก metric + backlog $2.2B",s:"GlobeNewswire",d:"8 พ.ค.",u:"",x:"Rocket Lab รายงาน Q1 ผ่านทุก guidance metric รายได้ $200M, adjusted EBITDA ดีกว่าคาด backlog ทะลุ $2.2B เป็นครั้งแรก CEO Peter Beck ระบุ 'demand is super healthy'"},
-    {h:"RKLB ชนะ launch contract ใหญ่สุดในประวัติศาสตร์บริษัท — ลูกค้า confidential จอง 5 Neutron + 3 Electron",s:"GlobeNewswire",d:"8 พ.ค.",u:"",x:"multi-launch deal สำหรับ 2026-2029 ถือเป็น largest launch contract เท่าที่ RKLB เคยได้รับ ยืนยัน demand ของ Neutron ก่อนเปิดตัวเชิงพาณิชย์"},
-    {h:"Rocket Lab ประกาศซื้อ Motiv Space Systems — ขยายสู่ space robotics",s:"TipRanks",d:"8 พ.ค.",u:"",x:"การซื้อ Motiv เสริม RKLB ด้านหุ่นยนต์อวกาศและ planetary systems เพิ่ม capability ให้กับ Neutron program"},
-    {h:"Rocket Lab + Raytheon คัดเลือกสำหรับ Space Force Space Based Interceptor program",s:"GlobeNewswire",d:"7 พ.ค.",u:"",x:"RKLB และ Raytheon ร่วมสาธิต advanced capabilities สำหรับ US Space Force's SBI program เป็นการเจาะตลาด defense ระดับสูง"},
-    {h:"Q2 2026 guidance: รายได้ $225–240M เกิน consensus $205M มาก — Stifel ปรับ PT $110",s:"Stifel / Clear Street",d:"9 พ.ค.",u:"",x:"Stifel ขึ้น PT จาก $105 → $110, Clear Street ขึ้น $88 → $98, Citizens ขึ้น $85 → $95 ทุก broker ยืนยัน Buy หลัง Q1 beat"},
+    {h:"🚀 Q1 2026 รายได้ $200M RECORD + Backlog $2.2B — พุ่ง +34% ในวันเดียว",s:"GlobeNewswire",d:"8 พ.ค.",u:"",x:"Rocket Lab รายงาน Q1 ผ่านทุก guidance metric รายได้ $200M adjusted EBITDA ดีกว่าคาด backlog ทะลุ $2.2B CEO Peter Beck: 'demand is super healthy'"},
+    {h:"RKLB ชนะ multi-launch contract ใหญ่สุดในประวัติ — 5 Neutron + 3 Electron",s:"GlobeNewswire",d:"8 พ.ค.",u:"",x:"multi-launch deal 2026-2029 ลูกค้า confidential ยืนยัน demand ของ Neutron ก่อนเปิดตัวเชิงพาณิชย์"},
+    {h:"Q2 2026 guidance: รายได้ $225-240M เกิน consensus $205M — นักวิเคราะห์แห่ปรับ PT",s:"Stifel / Clear Street",d:"9 พ.ค.",u:"",x:"Stifel: PT $110, Clear Street: PT $98, Citizens: PT $95 ทุก broker ยืนยัน Buy หลัง Q1 beat ทุก metric"},
+    {h:"Rocket Lab + Raytheon คัดเลือก US Space Force Space Based Interceptor program",s:"GlobeNewswire",d:"7 พ.ค.",u:"",x:"RKLB เจาะตลาด defense ระดับสูง SBI program เป็นสัญญาหลายพัน $M ในอนาคต"},
+    {h:"Rocket Lab ซื้อ Motiv Space Systems — ขยายสู่ space robotics และ planetary systems",s:"TipRanks",d:"8 พ.ค.",u:"",x:"การซื้อ Motiv เสริม Neutron program ด้าน propulsion และ robotic systems เพิ่ม capability ที่ competition ยังไม่มี"},
   ],
   CRWV:[
     {h:"CRWV ร่วง -11.40% วันนี้ — นักลงทุนกังวล path to profitability",s:"Stocktwits",d:"9 พ.ค.",u:"",x:"CoreWeave ยังขาดทุน EBITDA -$2.1B แม้รายได้ $1.6B Q1 ตลาดกังวลว่า capex สูงมากเกินไป"},
@@ -894,15 +927,16 @@ const newsData={
     {h:"JPM ขยาย Private Banking ใน Southeast Asia — เปิด Singapore HQ ใหม่",s:"Reuters",d:"2 พ.ค.",u:"",x:"ลงทุน $800M ในตลาด Asia Wealth Management เนื่องจาก HNW (high net worth) population เติบโตเร็วที่สุดในโลก"},
   ],
   MU:[
-    {h:"MU พุ่ง +13.10% ราคา $744.90 — HBM4 sampling เริ่มแล้ว นักวิเคราะห์ตื่นเต้น",s:"Market Rebellion",d:"9 พ.ค.",u:"",x:"Micron เริ่ม sample HBM4 ให้ NVIDIA สำหรับ Blackwell Ultra เป็น major revenue catalyst H2 2026 คาดยอดขาย $15B+"},
-    {h:"Earnings มิ.ย. — คาด EPS $2.10 รายได้ $10.8B +38% YoY",s:"Seeking Alpha",d:"7 พ.ค.",u:"",x:"consensus bullish มาก DRAM pricing ขึ้นต่อเนื่อง HBM ASP สูงกว่า commodity DRAM 8-10x ดัน margin ขึ้นแรง"},
-    {h:"Micron เปิด fab ใหม่ในนิวยอร์ก — $15B investment, 9,000 งาน",s:"Reuters",d:"5 พ.ค.",u:"",x:"Micron รับเงินอุดหนุน CHIPS Act $6.1B สร้าง leading-edge DRAM fab ในสหรัฐ ลด dependency จาก Asia supply chain"},
+    {h:"🔥 HBM4 sampling เริ่มแล้ว — NVIDIA Blackwell Ultra ใช้ Micron HBM4 เป็นหลัก",s:"Market Rebellion",d:"14 พ.ค.",u:"",x:"Micron เป็น primary HBM4 supplier ให้ NVIDIA GB300 คาด revenue $15B+ H2 2026 แค่จาก HBM segment เดียว"},
+    {h:"Earnings มิ.ย. — คาด EPS $2.10 รายได้ $10.8B +38% YoY DRAM pricing up",s:"Seeking Alpha",d:"7 พ.ค.",u:"",x:"DRAM ASP ขึ้น 3 ไตรมาสติด HBM ASP สูงกว่า commodity DRAM 8-10x ดัน gross margin ขึ้นแรง"},
+    {h:"Micron ได้รับ CHIPS Act $6.1B — fab ใหม่นิวยอร์กเริ่มสร้างแล้ว",s:"Reuters",d:"5 พ.ค.",u:"",x:"New Albany NY mega-campus Phase 1 ลงทุน $15B สร้างงาน 9,000+ ตำแหน่ง ลด dependency จาก Asia"},
     {h:"Morgan Stanley: MU คือ 'purest play' บน AI memory — PT $900",s:"Morgan Stanley",d:"3 พ.ค.",u:"",x:"MS ชี้ว่า Micron ได้ประโยชน์มากที่สุดจาก AI memory upgrade cycle ทั้ง HBM, LPDDR5X, CXL memory"},
   ],
   AMD:[
-    {h:"AMD ทะลุ $700B market cap — หุ้นขึ้น 20% สัปดาห์นี้ และ +90% ใน 1 เดือน",s:"CNBC / LSEG",d:"9 พ.ค.",u:"",x:"AMD valued ที่ $713B ณ วันศุกร์ Q1 EPS $1.37 beat $1.29 consensus +6%, รายได้ $10.25B beat $9.9B คาด AI chip demand ยังพุ่งต่อเนื่อง"},
-    {h:"Q1 2026 beat: EPS $1.37 vs คาด $1.29 — รายได้ $10.25B vs คาด $9.9B",s:"FactSet / CNBC",d:"8 พ.ค.",u:"",x:"AMD ชนะทั้ง top line และ bottom line consensus Data Center GPU segment โตแรงจาก MI300X adoption โดย hyperscalers"},
-    {h:"AMD หุ้นขึ้น 90% ใน 1 เดือน — gas prices และ Iran war กดดัน consumer แต่ AI demand ไม่หวั่น",s:"CNBC",d:"8 พ.ค.",u:"",x:"ราคาน้ำมันสูงจาก Iran war กดดัน consumer sentiment แต่ B2B AI chip demand แยกตัวออกจาก macro และยังแข็งแกร่งมาก"},
+    {h:"🚀 AMD ทะลุ $700B market cap — ขึ้น +90% ใน 1 เดือน สูงสุดในประวัติ",s:"CNBC / LSEG",d:"13 พ.ค.",u:"",x:"AMD valued ที่ $713B ณ ปิดตลาดวันศุกร์ Q1 EPS $1.37 beat consensus +6% MI300X demand จาก hyperscaler พุ่ง"},
+    {h:"Q1 2026 beat: EPS $1.37 vs คาด $1.29 — รายได้ $10.25B vs คาด $9.9B",s:"FactSet / CNBC",d:"8 พ.ค.",u:"",x:"Data Center GPU segment โต 80% YoY จาก MI300X adoption Microsoft, Meta เป็น anchor customers"},
+    {h:"US-China tariff ลด — AMD คาดยอดขาย China กลับมาบางส่วน",s:"Reuters",d:"12 พ.ค.",u:"",x:"AMD มีรายได้จากจีน ~25% ข่าว trade deescalation ทำให้ตลาดมอง upside เพิ่มสำหรับ H2 2026"},
+    {h:"MI400X GPU ใหม่ (2H 2026) — spec เทียบ Blackwell Ultra ได้",s:"Tom's Hardware",d:"5 พ.ค.",u:"",x:"AMD MI400X ใช้ HBM4, CDNA 4 architecture performance/watt ดีกว่า MI300X 2x เป็น threat ที่แท้จริงต่อ NVIDIA"},
   ],
   ARM:[
     {h:"Q4 FY2026 Earnings beat แต่ร่วง -8.8% — guidance ไม่ตรงคาด",s:"Motley Fool",d:"7 พ.ค.",u:"https://www.fool.com/investing/2026/05/07/why-arm-holdings-stock-was-sliding-today/",x:"ARM beat Q4 แต่ FY2027 guidance ต่ำกว่า consensus 5% ทำให้ราคาร่วงทันที แม้ business fundamentals ยังดี"},
@@ -932,10 +966,10 @@ const newsData={
     {h:"Earnings ก.ค. — คาด EPS €7.80 รายได้ €9.2B +22% YoY",s:"Seeking Alpha",d:"4 พ.ค.",u:"",x:"ASML ไม่มีคู่แข่งใน EUV lithography เลย margin expansion แข็งแกร่ง backlog ปัจจุบันอยู่ที่ €39B"},
   ],
   INTC:[
-    {h:"Intel พุ่ง +13.96% ราคา $124.92 — Apple Foundry deal เปลี่ยนเกม",s:"TheStreet",d:"9 พ.ค.",u:"",x:"Apple เลือก Intel Foundry 18A process ผลิต Apple Silicon A20 chip เป็น validation ครั้งใหญ่ให้กับ IFS strategy"},
-    {h:"Intel 18A process yield ดีขึ้นอย่างมีนัยสำคัญ — TSMC-competitive",s:"SemiAnalysis",d:"6 พ.ค.",u:"",x:"yield rate ของ 18A เกิน 70% แล้ว ซึ่งถือว่า viable สำหรับ HVM (High Volume Manufacturing) เป็นครั้งแรก"},
-    {h:"Gelsinger CEO ยืนยัน IFS (Foundry Services) ตาม plan — ลูกค้าใหม่ 6 ราย",s:"Bloomberg",d:"4 พ.ค.",u:"",x:"นอกจาก Apple ยังมี unnamed defense contractor และ European semiconductor firm เลือก Intel Foundry"},
-    {h:"Intel ได้รับ CHIPS Act funding $8.5B — ลงทุน Ohio fab เริ่มแล้ว",s:"Reuters",d:"2 พ.ค.",u:"",x:"New Albany Ohio mega-campus Phase 1 เริ่มผลิต test wafer แล้ว Phase 2 คาดแล้วเสร็จ 2028 สร้างงาน 10,000+"},
+    {h:"💥 Intel พุ่ง +13.96% — Apple เลือก Intel Foundry 18A process ผลิต A20 chip",s:"TheStreet",d:"9 พ.ค.",u:"",x:"Apple เลือก Intel Foundry สำหรับ A20 chip เป็น validation ครั้งใหญ่สุดของ IFS strategy กล้ารับ customer ที่ TSMC ผูกขาดมา"},
+    {h:"18A process yield ทะลุ 70% — TSMC-competitive เป็นครั้งแรก",s:"SemiAnalysis",d:"6 พ.ค.",u:"",x:"HVM (High Volume Manufacturing) viable แล้ว Apple deal เป็นหลักฐานว่า yield rate ใช้งานจริงได้"},
+    {h:"CHIPS Act $8.5B ลงทุน Ohio fab — Phase 1 test wafer เริ่มแล้ว",s:"Reuters",d:"2 พ.ค.",u:"",x:"New Albany Ohio mega-campus Phase 1 ผลิต test wafer แล้ว Phase 2 คาดแล้วเสร็จ 2028 สร้างงาน 10,000+"},
+    {h:"US-China trade deescalation — Intel ได้เปรียบจาก US-based manufacturing",s:"Bloomberg",d:"12 พ.ค.",u:"",x:"ในภาวะ trade war Intel มีข้อได้เปรียบในฐานะ US fab ลูกค้า defense และรัฐบาลต้องการ US-made chips"},
   ],
   SNDK:[
     {h:"SNDK พุ่ง +16.60% ราคา $1,562 — AI storage demand ดัน NAND pricing",s:"Google Finance",d:"9 พ.ค.",u:"",x:"SanDisk (WD spin-off) ได้ประโยชน์จาก AI training ที่ต้องการ storage มหาศาล NAND ASP ขึ้น 35% YoY"},
@@ -1035,10 +1069,10 @@ const newsData={
     {h:"Exxon ลงทุน $3B ใน carbon capture project — Low Carbon Solutions",s:"FT",d:"4 พ.ค.",u:"",x:"CCS project ใน Baytown Texas จะกักเก็บ CO2 ได้ 5M ตัน/ปี รัฐบาลร่วมอุดหนุน 45Q tax credit"},
   ],
   PLTR:[
-    {h:"Q1 2026: รายได้ $1.633B +85% YoY — US Commercial โต 120%",s:"Google Finance",d:"9 พ.ค.",u:"",x:"Palantir beat consensus ทุกด้าน US Government +60% US Commercial +120% Rule of 40 score อยู่ที่ 83"},
-    {h:"Palantir ได้สัญญา NATO AI Command System — มูลค่า $1.2B",s:"Defense One",d:"7 พ.ค.",u:"",x:"สัญญา 7 ปีให้ Palantir สร้าง AI decision-support system สำหรับกองกำลัง NATO ทั้ง 32 ประเทศ"},
-    {h:"Wedbush ปรับ PT $175 — ชู PLTR เป็น Top Pick AI infrastructure",s:"Wedbush",d:"5 พ.ค.",u:"",x:"Dan Ives เรียก Palantir ว่า 'AI backbone of Western defense' และมองว่ายังถูกเกินไปที่ P/E ปัจจุบัน"},
-    {h:"AIP bootcamp ดึงลูกค้า enterprise ใหม่ 47 ราย — deal size โต 40%",s:"Motley Fool",d:"3 พ.ค.",u:"",x:"bootcamp-to-contract conversion rate สูงถึง 68% เฉลี่ย deal size เพิ่มขึ้น 40% YoY"},
+    {h:"🌟 Q1 2026: รายได้ $1.633B +85% YoY — US Commercial +120%, Rule of 40 score 83",s:"Google Finance",d:"9 พ.ค.",u:"",x:"Palantir beat consensus ทุกด้าน US Government +60% US Commercial +120% เป็น quarter ที่ดีที่สุดในประวัติ"},
+    {h:"NATO AI Command System สัญญา $1.2B — ป้องกัน 32 ประเทศด้วย AIP",s:"Defense One",d:"7 พ.ค.",u:"",x:"สัญญา 7 ปีให้ Palantir สร้าง AI decision-support system สำหรับกองกำลัง NATO ทั้งหมด เป็น landmark deal"},
+    {h:"US Debt ceiling ผ่าน — defense spending ยังไม่ถูกตัด PLTR ได้ประโยชน์",s:"WSJ",d:"10 พ.ค.",u:"",x:"สัญญา US Government ของ PLTR มีความมั่นคงสูง debt ceiling deal รักษา baseline defense budget ไว้"},
+    {h:"Wedbush ปรับ PT $175 — PLTR 'AI backbone of Western defense'",s:"Wedbush",d:"5 พ.ค.",u:"",x:"Dan Ives ชี้ว่า Palantir ยังถูกเกินไปที่ P/E ปัจจุบัน AIP bootcamp conversion rate 68%"},
   ],
   CRDO:[
     {h:"Credo Technology flat +0.11% — 800G interconnect sampling ดี",s:"Google Finance",d:"9 พ.ค.",u:"",x:"Credo ผลิต AEC (Active Electrical Cable) และ SerDes IP สำหรับ 800G AI data center เป็นตลาดที่โตเร็วมาก"},
@@ -3602,6 +3636,7 @@ function togglePanel(id){
   else{
     p.classList.add('show');
     if(id==='newsPanel') renderAllNews();
+    if(id==='macroPanel') renderMacroNews();
   }
 }
 // cache สำหรับ all-news panel
@@ -3660,6 +3695,319 @@ async function renderAllNews(forceRefresh=false){
   }
   if(timeEl) timeEl.textContent='อัปเดต '+new Date().toLocaleTimeString('th-TH');
   if(!feed.children.length) feed.innerHTML='<div style="color:var(--dim);font-size:12px;padding:20px;text-align:center">ไม่มีข่าว</div>';
+}
+
+// ── ข้อมูลข่าวเศรษฐกิจมหภาค ──
+const macroNewsData=[
+  // ── Fed & ดอกเบี้ย ──
+  {
+    cat:'🏦 Fed & ดอกเบี้ย',
+    catColor:'#ffa07a',
+    items:[
+      {h:'Fed คงดอกเบี้ย 4.50-4.75% — ไม่รีบลด รอดูข้อมูลเพิ่ม',s:'Reuters',d:'7 พ.ค.',
+       x:'FOMC ลงมติเป็นเอกฉันท์คงดอกเบี้ยไว้ Powell ระบุ "We need more evidence" ก่อนลดครั้งแรก ตลาดปรับลดความคาดหวังเหลือ 1 ครั้งในปีนี้',
+       impact:[{t:'NVDA',e:'บวก'},  {t:'AAPL',e:'บวก'},{t:'AMD',e:'บวก'},{t:'PLTR',e:'บวก'}],impactNote:'หุ้น Growth/Tech ชอบ higher-for-longer น้อย แต่ AI demand แยกตัวได้'},
+      {h:'Jamie Dimon เตือน stagflation อาจกลับมา — Fed อาจต้องขึ้น 25bps อีก',s:'FT',d:'4 พ.ค.',
+       x:'Dimon: labor market แข็งแกร่งกว่าคาด + ราคาน้ำมันจาก Iran war = risk สูง ต่างจาก consensus ที่มองว่าลงปลายปี',
+       impact:[{t:'JPM',e:'กลาง'},{t:'SOFI',e:'ลบ'},{t:'HOOD',e:'กลาง'}],impactNote:'ธนาคารได้ประโยชน์จากดอกเบี้ยสูง แต่ fintech อย่าง SOFI อาจมีปัญหา credit quality'},
+      {h:'Core PCE เดือน เม.ย. +2.8% YoY ยังเกิน target 2% — แรงกดดันเงินเฟ้อยังมี',s:'BLS/BEA',d:'1 พ.ค.',
+       x:'PCE ไม่ลงตามที่หวัง ส่วนใหญ่มาจาก services inflation โดยเฉพาะ housing และ healthcare คาดว่า Fed จะไม่รีบลด',
+       impact:[{t:'LLY',e:'กลาง'},{t:'ISRG',e:'กลาง'},{t:'XOM',e:'กลาง'}],impactNote:'Healthcare pricing power ช่วยให้ LLY และ ISRG ไม่ได้รับผลกระทบมาก'},
+    ]
+  },
+  // ── สงครามการค้า & Tariff ──
+  {
+    cat:'⚔️ การค้า & Tariff',
+    catColor:'#ff6b6b',
+    items:[
+      {h:'US-China Semiconductor tariff รอบใหม่ — GPU export rule เข้มงวดขึ้น',s:'WSJ',d:'9 พ.ค.',
+       x:'BIS ออกกฎใหม่จำกัด H20, A800 chip ส่งออก จีนต้องซื้อผ่าน licensed middlemen NVIDIA คาด revenue impact $5-8B ปี 2026',
+       impact:[{t:'NVDA',e:'ลบ'},{t:'AMD',e:'ลบ'},{t:'INTC',e:'กลาง'},{t:'TSM',e:'ลบ'}],impactNote:'NVDA โดน most กฎใหม่กีดกันตลาดจีน AMD ก็ได้รับผลเช่นกัน INTC ผลิตใน US จึงได้เปรียบเล็กน้อย'},
+      {h:'US-Saudi AI Megadeal $600B — NVIDIA และ Qualcomm ได้สัญญาใหญ่',s:'Bloomberg',d:'13 พ.ค.',
+       x:'Trump เยือน Saudi Arabia ได้ดีล AI infrastructure $600B รวม NVIDIA GPU $8B, cloud contracts, lithium deals ช่วยชดเชยการเสียตลาดจีน',
+       impact:[{t:'NVDA',e:'บวกมาก'},{t:'AMD',e:'บวก'},{t:'AAPL',e:'บวก'}],impactNote:'Saudi deal ช่วย NVIDIA เบี่ยงรายได้จากจีนสู่ Middle East ได้บางส่วน'},
+      {h:'US-China ลด tariff ชั่วคราว 90 วัน — trade war deescalation',s:'Reuters',d:'12 พ.ค.',
+       x:'หลังการพูดคุยในเจนีวา ทั้งสองฝ่ายตกลงลด tariff บางส่วนชั่วคราว ตลาดหุ้นพุ่งขึ้นหลังข่าว S&P 500 +2.1%',
+       impact:[{t:'AAPL',e:'บวก'},{t:'TSM',e:'บวก'},{t:'AVGO',e:'บวก'},{t:'AMD',e:'บวก'}],impactNote:'Apple ได้ประโยชน์สูงสุดจาก supply chain ใน China ที่ถูกกดดัน TSM ก็บวกตาม'},
+      {h:'Taiwan Strait tension — China ซ้อมรบรอบ Taiwan หลัง Arms sale ล่าสุด',s:'FT',d:'5 พ.ค.',
+       x:'PLA ซ้อมรบขนาดใหญ่รอบ Taiwan หลัง US อนุมัติ F-16 parts sale ทำให้ TSM supply chain risk กลับมาอีก',
+       impact:[{t:'TSM',e:'ลบ'},{t:'ASML',e:'ลบ'},{t:'NVDA',e:'ลบ'}],impactNote:'TSM ทำรายได้ 50%+ จาก fab ในไต้หวัน geopolitical risk สูงขึ้น'},
+    ]
+  },
+  // ── AI & Tech Sector ──
+  {
+    cat:'🤖 AI & Tech Mega-trends',
+    catColor:'#a855f7',
+    items:[
+      {h:'Global AI infrastructure spend ปี 2026 คาดแตะ $1.2 Trillion — IDC',s:'IDC Research',d:'8 พ.ค.',
+       x:'hyperscaler capex รวม Microsoft, Google, Meta, Amazon อยู่ที่ $330B ใน 2026 เพิ่มจาก $210B ปีที่แล้ว demand GPU, networking, power ล้น supply',
+       impact:[{t:'NVDA',e:'บวกมาก'},{t:'AMD',e:'บวก'},{t:'ASML',e:'บวก'},{t:'VRT',e:'บวก'},{t:'CRWV',e:'บวก'},{t:'ANET',e:'บวก'}],impactNote:'ทุกตัวใน AI value chain ได้ประโยชน์ NVDA เป็น biggest winner'},
+      {h:'Power crisis: data center ต้องการ 50GW ใหม่ภายใน 2030 — IEA',s:'IEA Report',d:'6 พ.ค.',
+       x:'IEA รายงานว่า AI data center จะกินไฟ 10% ของ US grid ภายใน 2030 เปิดโอกาสให้ nuclear, natural gas, và renewable ขยายตัว',
+       impact:[{t:'OKLO',e:'บวกมาก'},{t:'IREN',e:'บวก'},{t:'EOSE',e:'บวก'},{t:'SLNH',e:'บวก'}],impactNote:'Energy transition stocks ทุกตัวในพอร์ตได้ประโยชน์โดยตรงจากแนวโน้มนี้'},
+      {h:'OpenAI เปิดตัว GPT-5 — benchmark ดีกว่า Claude 4 Opus ทุกด้าน',s:'Ars Technica',d:'13 พ.ค.',
+       x:'GPT-5 scoring MMLU 96.5 ทำให้ AI arms race ยังรุนแรง คาดว่า Microsoft, Google จะลงทุน AI infra เพิ่มอีก ดี AI chip makers',
+       impact:[{t:'NVDA',e:'บวกมาก'},{t:'AMD',e:'บวก'},{t:'MSFT',e:'บวก'},{t:'GOOGL',e:'บวก'}],impactNote:'AI compute demand พุ่งขึ้นทุกครั้งที่มี frontier model launch ใหม่'},
+      {h:'Quantum Computing breakthrough: Google Willow ขยาย Commercial use case',s:'Nature',d:'3 พ.ค.',
+       x:'Google ประกาศ Willow chip แก้ปัญหา drug discovery ได้เร็วกว่า supercomputer 10^15 เท่า เปิด era ของ practical quantum',
+       impact:[{t:'IONQ',e:'บวก'},{t:'GOOGL',e:'บวก'}],impactNote:'ทั้งสองตัวได้ประโยชน์ IONQ เป็น pure-play quantum ที่ได้ sentiment boost'},
+    ]
+  },
+  // ── เศรษฐกิจสหรัฐ ──
+  {
+    cat:'🇺🇸 เศรษฐกิจสหรัฐ',
+    catColor:'#00d4ff',
+    items:[
+      {h:'GDP Q1 2026 -0.3% QoQ annualized — ต่ำกว่าคาด +0.4%',s:'BEA',d:'30 เม.ย.',
+       x:'ตัวเลข GDP ออกมาแย่กว่าคาด สาเหตุหลักจาก trade deficit พุ่ง (import เร่งก่อน tariff เพิ่ม) ค่าใช้จ่ายรัฐบาลลด แต่ consumer spending ยังดี',
+       impact:[{t:'JPM',e:'กลาง'},{t:'AMZN',e:'กลาง'},{t:'NFLX',e:'กลาง'}],impactNote:'ผลกระทบจำกัด เพราะ Big Tech มี global revenue และ AI sector แยกตัวจาก macro cycle ได้'},
+      {h:'ตลาดแรงงาน เม.ย. 2026: Non-farm payroll +177K — แข็งแกร่งกว่าคาด',s:'BLS',d:'2 พ.ค.',
+       x:'unemployment rate 3.9% เงินเดือนเฉลี่ย +3.9% YoY consumer confidence ยังสูง อาจทำให้ Fed ไม่รีบลดดอกเบี้ย',
+       impact:[{t:'JPM',e:'บวก'},{t:'SOFI',e:'กลาง'},{t:'HOOD',e:'บวก'}],impactNote:'labor market แข็งแกร่ง = consumer spending ดี = บริการ fintech ใช้งานมากขึ้น'},
+      {h:'US Debt ceiling raised $4T — รัฐสภาผ่านแล้ว หลีกเลี่ยง default',s:'WSJ',d:'10 พ.ค.',
+       x:'รัฐสภาลงมติ 220-210 อนุมัติเพิ่ม debt ceiling $4T พร้อม spending cuts $1.5T ใน 10 ปี ตลาดตอบรับบวก Treasury yield ลง',
+       impact:[{t:'JPM',e:'บวก'},{t:'SPGI',e:'บวก'},{t:'PLTR',e:'บวก'}],impactNote:'หลีกเลี่ยง default ลด systemic risk ทั้งตลาด defense/government spending ยังไปต่อ'},
+    ]
+  },
+  // ── พลังงาน & สินค้าโภคภัณฑ์ ──
+  {
+    cat:'⚡ พลังงาน & สินค้าโภคภัณฑ์',
+    catColor:'#ffd700',
+    items:[
+      {h:'น้ำมัน WTI ร่วงสู่ $68/barrel — Iran nuclear deal ใกล้สำเร็จ',s:'Bloomberg',d:'9 พ.ค.',
+       x:'การเจรจา US-Iran กำลังจะสรุปใน Geneva อีก 2 รอบ ถ้าสำเร็จ Iran supply กลับตลาด +1.5M barrel/day กดดันราคาน้ำมัน',
+       impact:[{t:'XOM',e:'ลบ'},{t:'SLNH',e:'ลบ'},{t:'IREN',e:'กลาง'}],impactNote:'XOM โดยตรง SLNH และ IREN ใช้พลังงานในการ mine แต่ผลรวมกลาง เพราะ cost ลดด้วย'},
+      {h:'Bitcoin ATH ใหม่ $108,000 — ETF inflow พุ่ง $2.1B สัปดาห์นี้',s:'CoinDesk',d:'13 พ.ค.',
+       x:'BlackRock Bitcoin ETF ทำ record inflow ในสัปดาห์นี้ institutional adoption เพิ่มขึ้นอย่างต่อเนื่อง retail FOMO กลับมา',
+       impact:[{t:'HOOD',e:'บวก'},{t:'SLNH',e:'บวก'},{t:'IREN',e:'บวก'}],impactNote:'HOOD ได้จาก crypto trading volume SLNH และ IREN ได้จาก mining revenue ที่เพิ่มขึ้น'},
+      {h:'Rare earth: China ยกเลิก export ban บางส่วน — MP ร่วง',s:'Reuters',d:'7 พ.ค.',
+       x:'Beijing ผ่อนคลาย rare earth export restriction บางรายการ เพื่อ goodwill ใน trade negotiation กดดัน domestic producers อย่าง MP',
+       impact:[{t:'MP',e:'ลบ'}],impactNote:'MP Materials ได้รับผลกระทบโดยตรง แต่ long-term DoD contracts ยังค้ำไว้'},
+    ]
+  },
+  // ── ภูมิรัฐศาสตร์ ──
+  {
+    cat:'🌍 ภูมิรัฐศาสตร์',
+    catColor:'#69f0ae',
+    items:[
+      {h:'Ukraine ceasefire talks — US ขอ Ukraine ยอมรับ freeze line ปัจจุบัน',s:'FT',d:'12 พ.ค.',
+       x:'Trump admin กดดัน Ukraine ให้ยอมรับ territorial freeze ที่แนวรบปัจจุบัน ถ้าสำเร็จ defense spending Europe ยังสูง แต่ crisis mode ลด',
+       impact:[{t:'KTOS',e:'กลาง'},{t:'AXON',e:'กลาง'},{t:'PLTR',e:'บวก'},{t:'AVEX',e:'กลาง'}],impactNote:'defense contractors ยังได้ประโยชน์จาก rearmament Europe แม้ conflict ลดระดับ'},
+      {h:'Middle East: Yemen Houthi โจมตีเรือบรรทุกสินค้า Red Sea อีกครั้ง',s:'Reuters',d:'8 พ.ค.',
+       x:'Houthi กลับมาโจมตีหลังหยุดช่วงสั้น shipping disruption เพิ่มต้นทุน logistics +15% สำหรับ Asia-Europe trade',
+       impact:[{t:'XOM',e:'บวก'},{t:'AMZN',e:'ลบ'}],impactNote:'XOM ได้จากราคาน้ำมันที่ขึ้น AMZN logistics cost สูงขึ้น'},
+    ]
+  },
+];
+
+// ── Live Macro News Engine ──────────────────────────────────────────────────
+const macroLiveCache={items:null,ts:0};
+const MACRO_TTL=600000; // 10 นาที
+
+// คำค้นข่าวเศรษฐกิจ
+const macroQueries=[
+  {q:'Federal Reserve interest rate economy',cat:'🏦 Fed & ดอกเบี้ย',color:'#ffa07a'},
+  {q:'US China trade tariff semiconductor',cat:'⚔️ การค้า & Tariff',color:'#ff6b6b'},
+  {q:'artificial intelligence AI tech stocks market',cat:'🤖 AI & Tech',color:'#a855f7'},
+  {q:'US economy GDP inflation jobs',cat:'🇺🇸 เศรษฐกิจสหรัฐ',color:'#00d4ff'},
+  {q:'oil energy Bitcoin market commodity',cat:'⚡ พลังงาน & สินค้าโภคภัณฑ์',color:'#ffd700'},
+  {q:'geopolitics Ukraine Taiwan Middle East market',cat:'🌍 ภูมิรัฐศาสตร์',color:'#69f0ae'},
+];
+
+// ดึง RSS feed ผ่าน proxy
+async function _fetchMacroRSS(query){
+  const googleUrl=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  const proxies=[
+    `https://yahoo-proxy.datsakonping1994.workers.dev/?url=${encodeURIComponent(googleUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(googleUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(googleUrl)}`,
+  ];
+  for(const p of proxies){
+    try{
+      const ctrl=new AbortController();
+      const tid=setTimeout(()=>ctrl.abort(),6000);
+      const r=await fetch(p,{signal:ctrl.signal});
+      clearTimeout(tid);
+      if(!r||!r.ok) continue;
+      const xml=await r.text();
+      if(!xml||!xml.includes('<item>')) continue;
+      const parser=new DOMParser();
+      const doc=parser.parseFromString(xml,'text/xml');
+      const items=[...doc.querySelectorAll('item')].slice(0,5);
+      if(!items.length) continue;
+      const seen=new Set();
+      return items.filter(item=>{
+        const t=item.querySelector('title')?.textContent?.trim();
+        if(!t||seen.has(t.slice(0,50))) return false;
+        seen.add(t.slice(0,50)); return true;
+      }).map(item=>{
+        const title=item.querySelector('title')?.textContent?.trim()||'';
+        const link=item.querySelector('link')?.textContent?.trim()||'';
+        const pubDate=item.querySelector('pubDate')?.textContent?.trim()||'';
+        const source=item.querySelector('source')?.textContent?.trim()||'Google News';
+        const date=pubDate?new Date(pubDate).toLocaleDateString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+        return{h:title,s:source,d:date,u:link,x:''};
+      });
+    }catch{}
+  }
+  return [];
+}
+
+// ให้ AI วิเคราะห์ impact ต่อหุ้นในพอร์ต + แปลข่าว
+async function _analyzeMacroImpact(newsItems){
+  const tickerList=stocks.map(s=>`${s.t}(${s.n})`).join(',');
+  const newsStr=newsItems.map((n,i)=>`[${i}] ${n.h}`).join('\n');
+  const prompt=`ข่าวเศรษฐกิจด้านล่างนี้กระทบหุ้นในพอร์ตอย่างไร?
+
+พอร์ตหุ้น: ${tickerList}
+
+ข่าว:
+${newsStr}
+
+ตอบเป็น JSON array เท่านั้น ไม่มี markdown ไม่มี preamble รูปแบบ:
+[{"i":0,"h":"หัวข่าวภาษาไทยกระชับ","x":"อธิบายสั้นๆ ภาษาไทย 1-2 ประโยค","impact":[{"t":"TICKER","e":"บวกมาก|บวก|ลบ|กลาง"}],"note":"เหตุผลสั้น"}]
+
+กฎ:
+- แปลหัวข่าวเป็นไทยให้กระชับ น่าอ่าน
+- impact เฉพาะหุ้นที่ได้รับผลจริงๆ ไม่เกิน 5 ตัวต่อข่าว
+- ถ้าไม่กระทบหุ้นในพอร์ตเลย ให้ impact เป็น []
+- note อธิบายสั้นๆ ว่าทำไมกระทบ`;
+
+  try{
+    const _ctrl=new AbortController();
+    const _tid=setTimeout(()=>_ctrl.abort(),30000);
+    const res=await fetch('https://anthropic-proxy.datsakonping1994.workers.dev',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:3000,
+        system:'คุณคือนักวิเคราะห์ข่าวเศรษฐกิจ ตอบเป็น JSON เท่านั้น ห้าม markdown ห้าม preamble',
+        messages:[{role:'user',content:prompt}]
+      }),
+      signal:_ctrl.signal
+    });
+    clearTimeout(_tid);
+    if(!res.ok) return null;
+    const d=await res.json();
+    const raw=d?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+    if(!raw) return null;
+    const clean=raw.replace(/```json|```/g,'').trim();
+    return JSON.parse(clean);
+  }catch(e){console.warn('macro AI analysis failed:',e);return null;}
+}
+
+// render impact chips
+function _buildImpactChips(impactArr,noteStr){
+  if(!impactArr||!impactArr.length) return '';
+  const chips=impactArr.map(imp=>{
+    const s=stocks.find(x=>x.t===imp.t);
+    const chg=s?s.c:null;
+    const e=imp.e||'กลาง';
+    const col=e==='บวกมาก'?'#00e676':e==='บวก'?'rgba(0,230,118,0.8)':e==='ลบ'?'#ff4466':'#ffd700';
+    const bg=e==='บวกมาก'?'rgba(0,230,118,0.15)':e==='บวก'?'rgba(0,230,118,0.08)':e==='ลบ'?'rgba(255,68,102,0.1)':'rgba(255,215,0,0.08)';
+    const border=e==='บวกมาก'||e==='บวก'?'rgba(0,230,118,0.3)':e==='ลบ'?'rgba(255,68,102,0.3)':'rgba(255,215,0,0.25)';
+    const arrow=e==='บวกมาก'?'▲▲':e==='บวก'?'▲':e==='ลบ'?'▼':'→';
+    const priceStr=s&&s.p>0?` $${s.p>=1000?s.p.toFixed(0):s.p.toFixed(2)}`:'';
+    const chgStr=chg!=null?` ${chg>=0?'+':''}${chg}%`:'';
+    return `<span onclick="goCard('${imp.t}')" style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:${bg};border:1px solid ${border};color:${col};margin:2px 2px 2px 0;transition:opacity 0.15s" onmouseover="this.style.opacity=0.75" onmouseout="this.style.opacity=1">${imp.t} ${arrow}${priceStr}${chgStr}</span>`;
+  }).join('');
+  const noteHtml=noteStr?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);margin-top:4px">💡 ${noteStr}</div>`:'';
+  return `<div style="margin-top:6px;margin-bottom:2px">${chips}</div>${noteHtml}`;
+}
+
+// render ข่าวใน feed (ใช้ทั้ง fallback static + live)
+function _renderMacroFeed(feed,sections,isLive){
+  let html='';
+  if(!isLive){
+    html+=`<div style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);border-radius:6px;padding:7px 12px;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ffd700">
+      ⚠️ ข้อมูล offline — ดึงข่าว live ไม่ได้
+      <button onclick="renderMacroNews(true)" style="margin-left:8px;font-size:10px;padding:2px 8px;border-radius:4px;background:var(--bg3);border:1px solid rgba(255,215,0,0.35);color:#ffd700;cursor:pointer">🔄 ลองอีกครั้ง</button>
+    </div>`;
+  }
+  sections.forEach(sec=>{
+    if(!sec.items||!sec.items.length) return;
+    html+=`<div style="margin-bottom:14px">`;
+    html+=`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${sec.color};padding:5px 4px 4px;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:7px;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+      ${sec.cat}
+      ${isLive?'<span style="font-size:9px;color:var(--green);background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.25);padding:1px 5px;border-radius:8px">● LIVE</span>':''}
+    </div>`;
+    sec.items.forEach(n=>{
+      const impHtml=_buildImpactChips(n.impact,n.note||n.impactNote);
+      html+=`<div style="background:var(--bg3);border-radius:7px;padding:10px 12px;margin-bottom:5px;border-left:2px solid ${sec.color}30;${n.u?'cursor:pointer':''}" ${n.u?`onclick="window.open(encodeURI('${n.u.replace(/'/g,"\\'")}'),'_blank')"`:''}>`;
+      html+=`<div style="font-size:13px;color:var(--text);margin-bottom:4px;line-height:1.4">${n.h}</div>`;
+      if(n.x) html+=`<div style="font-size:11px;color:var(--text2);margin-bottom:5px;line-height:1.6">${n.x}</div>`;
+      html+=impHtml;
+      html+=`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);margin-top:5px">${n.s||''} · ${n.d||''}</div>`;
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  });
+  feed.innerHTML=html||'<div style="color:var(--dim);font-size:12px;padding:20px;text-align:center">ไม่พบข่าว</div>';
+}
+
+async function renderMacroNews(forceRefresh=false){
+  const feed=document.getElementById('macroFeed');
+  const timeEl=document.getElementById('macroNewsTime');
+  if(!feed) return;
+
+  const now=Date.now();
+  // ถ้ามี cache ใหม่และไม่ force refresh → แสดงทันที
+  if(!forceRefresh && macroLiveCache.items && (now-macroLiveCache.ts)<MACRO_TTL){
+    _renderMacroFeed(feed, macroLiveCache.items, true);
+    if(timeEl) timeEl.textContent='📡 LIVE · '+new Date(macroLiveCache.ts).toLocaleTimeString('th-TH');
+    return;
+  }
+
+  // แสดง loading
+  feed.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:20px;text-align:center">⏳ กำลังดึงข่าวเศรษฐกิจ live...</div>`;
+
+  // ── Phase 1: ดึง RSS ทุก category พร้อมกัน ──
+  const rawSections=await Promise.all(macroQueries.map(async q=>{
+    const items=await _fetchMacroRSS(q.q);
+    return{cat:q.cat,color:q.color,rawItems:items||[]};
+  }));
+
+  const totalRaw=rawSections.reduce((s,x)=>s+x.rawItems.length,0);
+  if(totalRaw===0){
+    // ไม่มีข่าว live → ใช้ static fallback
+    const staticSections=macroNewsData.map(sec=>({
+      cat:sec.cat,color:sec.catColor,
+      items:sec.items.map(n=>({...n,impact:n.impact,note:n.impactNote}))
+    }));
+    _renderMacroFeed(feed,staticSections,false);
+    if(timeEl) timeEl.textContent='📦 Offline';
+    return;
+  }
+
+  // ── Phase 2: AI วิเคราะห์ impact + แปลข่าวทีเดียว ──
+  feed.innerHTML=`<div style="color:var(--dim);font-size:12px;padding:20px;text-align:center">⏳ AI กำลังวิเคราะห์ผลกระทบต่อพอร์ต...</div>`;
+
+  // รวม raw items ทั้งหมดสำหรับ AI
+  const allRaw=rawSections.flatMap((sec,si)=>sec.rawItems.map(item=>({...item,_si:si})));
+  const analyzed=await _analyzeMacroImpact(allRaw);
+
+  // merge ผล AI กลับเข้า sections
+  const sections=rawSections.map((sec,si)=>{
+    const items=sec.rawItems.map((item,idx)=>{
+      const globalIdx=rawSections.slice(0,si).reduce((s,x)=>s+x.rawItems.length,0)+idx;
+      const ai=analyzed?analyzed.find(a=>a.i===globalIdx):null;
+      return{
+        h:ai?.h||item.h,
+        x:ai?.x||item.x||'',
+        s:item.s,d:item.d,u:item.u,
+        impact:ai?.impact||[],
+        note:ai?.note||''
+      };
+    });
+    return{cat:sec.cat,color:sec.color,items};
+  });
+
+  macroLiveCache.items=sections;
+  macroLiveCache.ts=now;
+
+  _renderMacroFeed(feed,sections,true);
+  if(timeEl) timeEl.textContent=`📡 LIVE · ${new Date().toLocaleTimeString('th-TH')} · ${totalRaw} ข่าว`;
 }
 
 function toggleEarnings(){
@@ -3746,38 +4094,53 @@ async function fetchAndRenderEarnings(){
 
 function renderEarningsData(data, isLive=false){
   const body=document.getElementById('earningsBody');
-  function row(e){
+  function badgeClass(res){
+    if(!res) return 'future';
+    const r=res.toLowerCase();
+    if(r.includes('beat')) return 'beat';
+    if(r.includes('miss')) return 'miss';
+    if(r.includes('done')) return 'done';
+    return 'done';
+  }
+  function badgeText(e, st){
+    if(st==='soon') return countdown(e.d)||'⏳ เร็วๆ นี้';
+    if(st==='future') return e.d||'—';
+    // done
+    const r=e.res||'';
+    return r.replace('✅ ','').replace('⚠️ ','').replace('❌ ','') || 'Done';
+  }
+  function card(e){
     const st=_getEarningsSt(e);
-    const isDone=st==='done',isSoon=st==='soon';
-    const bg=isDone?'rgba(0,230,118,0.04)':isSoon?'rgba(255,215,0,0.06)':'var(--bg3)';
-    const bc=isDone?'rgba(0,230,118,0.25)':isSoon?'rgba(255,215,0,0.3)':'var(--border)';
-    const tc=isDone?'var(--green)':isSoon?'var(--yellow)':'var(--text2)';
-    // แสดง actual ถ้ามี ไม่งั้นแสดง estimate
+    const ecClass=st==='done'?'ec-done':st==='soon'?'ec-soon':'ec-future';
+    const bc=badgeClass(st==='done'?e.res:null);
+    const btext=badgeText(e,st);
     const epsStr=e.epsActual||e.eps||'—';
     const revStr=e.revActual||e.rev||'—';
-    const badge=isDone
-      ?`<span class="earn-badge earn-done">${e.res||'✅ Done'}</span>`
-      :isSoon
-      ?`<span class="earn-badge earn-soon">${countdown(e.d)||'⏳'}</span>`
-      :`<span style="color:var(--dim);font-size:11px">—</span>`;
-    const liveTag=e._live?'<span style="font-size:8px;color:var(--accent);margin-left:3px">●</span>':'';
-    return`<div class="earn-row" style="background:${bg};border-color:${bc}" onclick="goCard('${e.t}')">
-      <span class="earn-ticker" style="color:${tc}">${e.t}${liveTag}</span><span class="earn-name">${e.n}</span>
-      <span class="earn-date">${e.d}</span><span class="earn-eps">${epsStr}</span>
-      <span class="earn-rev">${revStr}</span>${badge}</div>`;
+    const liveTag=e._live?'<span style="color:var(--accent);font-size:8px;margin-left:2px">●</span>':'';
+    return`<div class="earn-card ${ecClass}" onclick="goCard('${e.t}')">
+      <span class="ec-ticker">${e.t}${liveTag}</span>
+      <div class="ec-info">
+        <div class="ec-name">${e.n}</div>
+        <div class="ec-date">${e.d}</div>
+      </div>
+      <div class="ec-nums">
+        <span class="ec-eps">EPS ${epsStr}</span>
+        <span class="ec-rev">Rev ${revStr}</span>
+      </div>
+      <span class="ec-badge ${bc}">${btext}</span>
+    </div>`;
   }
   const soon=data.filter(e=>_getEarningsSt(e)==='soon');
   const done=data.filter(e=>_getEarningsSt(e)==='done');
-  const future=data.filter(e=>_getEarningsSt(e)==='future'||(!_parseEarningsDate(e.d)&&e.st==='future'));
+  const future=data.filter(e=>{ const s=_getEarningsSt(e); return s==='future'||(!_parseEarningsDate(e.d)&&e.st==='future'); });
   const srcLabel=isLive
-    ?'<span style="font-size:10px;color:var(--accent);font-family:\'IBM Plex Mono\',monospace">● Live จาก Finnhub</span>'
-    :'<span style="font-size:10px;color:var(--dim);font-family:\'IBM Plex Mono\',monospace">⚠️ ข้อมูลสำรอง</span>';
+    ?'<span style="color:var(--accent)">● Live จาก Finnhub</span>'
+    :'<span style="color:var(--dim)">⚠️ ข้อมูลสำรอง</span>';
   body.innerHTML=
-    `<div style="text-align:right;padding:0 0 6px">${srcLabel}</div>`+
-    `<div class="earn-hdr"><span>Ticker</span><span>บริษัท</span><span>วันที่</span><span>EPS</span><span>Rev</span><span>สถานะ</span></div>`+
-    (soon.length?`<div class="earn-grp" style="color:var(--yellow)">⏳ เร็วๆ นี้</div>`+soon.map(row).join(''):'')+
-    (done.length?`<div class="earn-grp" style="color:var(--green)">✅ รายงานแล้ว</div>`+done.map(row).join(''):'')+
-    (future.length?`<div class="earn-grp" style="color:var(--dim)">📅 อนาคต</div>`+future.map(row).join(''):'');
+    `<div class="earn-src">${srcLabel}</div>`+
+    (soon.length?`<div class="earn-grp-label" style="color:var(--yellow)">⏳ เร็วๆ นี้</div><div class="earn-cards">${soon.map(card).join('')}</div>`:'')+
+    (done.length?`<div class="earn-grp-label" style="color:var(--green)">✅ รายงานแล้ว</div><div class="earn-cards">${done.map(card).join('')}</div>`:'')+
+    (future.length?`<div class="earn-grp-label" style="color:var(--dim)">📅 อนาคต</div><div class="earn-cards">${future.map(card).join('')}</div>`:'');
 }
 function countdown(d){
   const m={'ม.ค.':0,'ก.พ.':1,'มี.ค.':2,'เม.ย.':3,'พ.ค.':4,'มิ.ย.':5,'ก.ค.':6,'ส.ค.':7,'ก.ย.':8,'ต.ค.':9,'พ.ย.':10,'ธ.ค.':11};
