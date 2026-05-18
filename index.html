@@ -1368,6 +1368,9 @@ function _saveAiHistory(){
 // ดู: https://developers.cloudflare.com/workers/runtime-apis/kv/
 // ══════════════════════════════════════════════════════════
 const WORKER='https://anthropic-proxy.datsakonping1994.workers.dev';
+const _GNEWS_KEY='04e902741e046e76b09896b84f17b83b';
+const _NEWSAPI_KEY='29dc935760054d8f8892dfc729f5a5da';
+const _MARKETAUX_KEY='6NR1RtHOSzR5Bx4DiyznD2uGc0EuhVoVGYSo7qFN';
 
 // FIX: key อยู่ที่ Worker — client ไม่ต้องตรวจสอบ key เอง
 // hasApiKey() คืน true เสมอ (Worker จัดการ error เองถ้า key ไม่ถูก)
@@ -4186,6 +4189,7 @@ function loadSettings(){
     const ck=localStorage.getItem('cohereKey')||'';
     const ckEl=document.getElementById('cohereKeyInput');
     if(ckEl) ckEl.value=ck;
+    if(gneEl) gneEl.value=gne;
   }catch{}
 }
 function saveSettings(){
@@ -4210,6 +4214,8 @@ function saveSettings(){
     const ck=document.getElementById('cohereKeyInput')?.value?.trim()||'';
     if(ck){ localStorage.setItem('cohereKey',ck); COHERE_KEY=ck; }
     else localStorage.removeItem('cohereKey');
+  }catch{}
+  try{
   }catch{}
   stopLive();
   setTimeout(()=>{ startLive(); toast('✅ บันทึกแล้ว'); }, 300);
@@ -6831,76 +6837,106 @@ async function refreshNewsManual(){
   if(btn){btn.textContent='🔄';btn.disabled=false;}
 }
 
-// ── loadEconNews: ดึงทุกหมวดพร้อมกัน รวมเป็นฟีดเดียว เรียงวันที่ใหม่สุดก่อน ──
+// ── loadEconNews: ดึงข่าว 3 วัน รวมเป็นฟีดเดียว คัด 8 สำคัญ ──
 async function loadEconNews(){
   const body=document.getElementById('econNewsBody');
   if(!body) return;
-  // cache 10 นาที
-  if(_econNewsCache['all']&&_econNewsCache['all'][0]?.titleTH&&(Date.now()-(_econNewsCacheTime['all']||0)<_ECON_NEWS_TTL)){
-    renderEconNews(_econNewsCache['all'], body);
-    return;
+  if(_econNewsCache['all']?.length&&_econNewsCache['all'][0]?.titleTH&&(Date.now()-(_econNewsCacheTime['all']||0)<_ECON_NEWS_TTL)){
+    renderEconNews(_econNewsCache['all'],body); return;
   }
   body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:40px">⏳ กำลังโหลดข่าว...</div>';
 
-  // ดึงทุก query พร้อมกัน
-  const allQueries=Object.values(_econQueries);
-  const cutoff24h=Date.now()-24*3600*1000;
-  const results=await Promise.allSettled(allQueries.map(q=>_fetchEconNews(q)));
+  // ดึง 2 query แทน 5 เพื่อไม่ overwhelm worker
+  const mainQueries=[
+    'Federal Reserve inflation CPI GDP earnings trade war AI tech',
+    'stock market economy jobs recession tariff earnings results',
+  ];
+  const results=await Promise.allSettled(mainQueries.map(q=>_fetchEconNews(q)));
 
-  // keywords บ่งข่าวสำคัญ
-  const _highKw=['federal reserve','fomc','interest rate','rate decision','rate hike','rate cut','powell',
-    'inflation','cpi','ppi','gdp','jobs report','nonfarm','unemployment','recession',
-    'earnings','beat','miss','revenue','profit','trade war','tariff','sanction',
-    'war','conflict','taiwan','nvidia','openai','ai regulation','antitrust','merger','acquisition',
-    'crash','surge','plunge','collapse','record high','record low','bankruptcy','crisis'];
-  const _topSrc=['reuters','bloomberg','cnbc','wsj','financial times','marketwatch','ap news','bbc'];
-
-  function _score(item){
-    const txt=((item.title||'')+(item.source||'')).toLowerCase();
-    let s=0;
-    _highKw.forEach(kw=>{if(txt.includes(kw))s+=10;});
-    if(_topSrc.some(src=>txt.includes(src)))s+=15;
-    return s;
-  }
-
-  // รวม + dedup
   const seen=new Set();
   let merged=[];
   results.forEach(r=>{
-    if(r.status!=='fulfilled'||!r.value?.length) return;
+    if(r.status!=='fulfilled'||!Array.isArray(r.value)||!r.value.length) return;
     r.value.forEach(item=>{
       const key=(item.title||'').slice(0,60).toLowerCase();
       if(seen.has(key)) return;
       seen.add(key);
-      if(item.pubDate){const ts=new Date(item.pubDate).getTime();if(!isNaN(ts)&&ts<cutoff24h) return;}
-      item._score=_score(item);
       merged.push(item);
     });
   });
 
-  // เรียง score สูงก่อน, เท่ากันให้ใหม่กว่าก่อน
-  merged.sort((a,b)=>{
-    if(b._score!==a._score) return b._score-a._score;
-    const tsA=a.pubDate?new Date(a.pubDate).getTime():0;
-    const tsB=b.pubDate?new Date(b.pubDate).getTime():0;
-    return tsB-tsA;
-  });
-
-  // เอาแค่ 8 ข่าวสำคัญ
-  merged=merged.slice(0,8);
-
   if(!merged.length){
-    body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:40px">ไม่พบข่าวสำคัญวันนี้ ลองกด 🔄</div>';
+    body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:40px">🤖 กำลังเรียก AI สร้างข่าว...<br><span style="font-size:10px;opacity:0.5;display:block;margin-top:6px">Server ข่าวไม่ตอบสนอง ใช้ AI สรุปแทน</span></div>';
+    const aiItems=await _fetchEconNewsAI();
+    if(aiItems.length){
+      _econNewsCache['all']=aiItems;
+      _econNewsCacheTime['all']=Date.now();
+      const tsEl=document.getElementById('newsLastUpdated');
+      if(tsEl){const d=new Date();tsEl.innerHTML=`<span style="background:rgba(100,210,255,0.12);border:1px solid rgba(100,210,255,0.25);border-radius:8px;padding:2px 7px;color:var(--ice);font-weight:600">🤖 AI</span> ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;}
+      renderEconNews(aiItems,body);
+    } else {
+      body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px 16px"><div style="font-size:28px;margin-bottom:10px">📡</div><div style="color:var(--text2);font-weight:600;margin-bottom:6px">ไม่สามารถโหลดข่าวได้</div><div style="color:var(--text3);line-height:1.8">กด <span style="color:var(--gold)">🔄</span> เพื่อลองใหม่</div></div>';
+    }
     return;
   }
 
-  body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:40px">🤖 กำลังแปลเป็นภาษาไทย...</div>';
-  const translated=await _translateNewsGemini(merged);
-  _econNewsCache['all']=translated;
+  // score ความสำคัญ
+  const _highKw=['federal reserve','fomc','interest rate','rate hike','rate cut','powell',
+    'inflation','cpi','ppi','gdp','jobs report','nonfarm','unemployment','recession',
+    'earnings','beat','miss','trade war','tariff','sanction','war','conflict',
+    'nvidia','openai','ai','crash','surge','plunge','record high','bankruptcy','crisis'];
+  const _topSrc=['reuters','bloomberg','cnbc','wsj','financial times','marketwatch','ap','bbc'];
+  merged.forEach(item=>{
+    const txt=((item.title||'')+(item.source||'')).toLowerCase();
+    let s=0;
+    _highKw.forEach(kw=>{if(txt.includes(kw))s+=10;});
+    if(_topSrc.some(src=>txt.includes(src)))s+=15;
+    item._score=s;
+  });
+
+  // เรียง score ก่อน → ใหม่กว่าก่อน
+  merged.sort((a,b)=>{
+    if(b._score!==a._score) return b._score-a._score;
+    return (new Date(b.pubDate||0))-(new Date(a.pubDate||0));
+  });
+  merged=merged.slice(0,8);
+
+  // ถ้า Server ส่งข่าวน้อยกว่า 4 ใบ เติมด้วย AI
+  let usedAI=false;
+  if(merged.length<4){
+    body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:40px">🤖 ข่าวจาก Server น้อยเกินไป เติมด้วย AI...</div>';
+    const aiExtra=await _fetchEconNewsAI();
+    const existKeys=new Set(merged.map(i=>i.title.slice(0,50).toLowerCase()));
+    const toAdd=aiExtra.filter(i=>!existKeys.has(i.title.slice(0,50).toLowerCase()));
+    merged=[...merged,...toAdd].slice(0,8);
+    usedAI=true;
+  }
+
+  // แยก: items ที่มี titleTH แล้ว (AI) vs ต้องแปล (Server)
+  const needsTrans=merged.filter(it=>!it.titleTH);
+  const alreadyTH=merged.filter(it=>!!it.titleTH);
+  let finalItems;
+  if(needsTrans.length>0){
+    body.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:40px">🤖 กำลังแปลเป็นภาษาไทย...</div>';
+    let translated=await _translateNewsGemini(needsTrans);
+    // safety: ถ้าแปลไม่ได้ ใช้ title ภาษอังกฤษไปก่อน
+    if(!translated.length) translated=needsTrans.map(it=>({...it,titleTH:_escHtml(_stripNewsSource(it.title)),summaryTH:''}));
+    // รวมกับ AI items แล้วเรียง score
+    finalItems=[...translated,...alreadyTH].sort((a,b)=>((b._score||0)-(a._score||0))).slice(0,8);
+  } else {
+    finalItems=alreadyTH.slice(0,8);
+  }
+  _econNewsCache['all']=finalItems;
   _econNewsCacheTime['all']=Date.now();
   const tsEl=document.getElementById('newsLastUpdated');
-  if(tsEl){const d=new Date();tsEl.textContent=`อัพเดท ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;}
-  renderEconNews(translated, body);
+  if(tsEl){const d=new Date();const hh=d.getHours().toString().padStart(2,'0');const mm=d.getMinutes().toString().padStart(2,'0');
+    if(usedAI){
+      tsEl.innerHTML=`<span style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);border-radius:8px;padding:2px 7px;color:var(--gold);font-weight:600">🌐+🤖 Mix</span> ${hh}:${mm}`;
+    } else {
+      tsEl.innerHTML=`<span style="background:rgba(0,230,118,0.12);border:1px solid rgba(0,230,118,0.25);border-radius:8px;padding:2px 7px;color:var(--green);font-weight:600">🌐 Server</span> ${hh}:${mm}`;
+    }
+  }
+  renderEconNews(finalItems,body);
 }
 
 // ── ตัด " - Source" ท้ายชื่อข่าว (Google News ติดชื่อสำนักข่าวมาด้วย) ──
@@ -6987,57 +7023,55 @@ async function _translateNewsGemini(items){
   return items.map(it=>({...it,titleTH:_escHtml(_stripNewsSource(it.title)),summaryTH:'',titleOrig:it.title}));
 }
 
+// ── _fetchEconNews: Worker ──
 async function _fetchEconNews(query){
-  const rssUrl=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-  const proxies=[
-    `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
-    `https://yahoo-proxy.datsakonping1994.workers.dev/?url=${encodeURIComponent(rssUrl)}`,
-  ];
-  // ลองพร้อมกันทุก proxy เอาตัวแรกที่สำเร็จ
+  // Worker only
   try{
-    const items = await Promise.any(proxies.map(async url=>{
-      const ctrl=new AbortController();
-      const tid=setTimeout(()=>ctrl.abort(),8000);
-      try{
-        const r=await fetch(url,{signal:ctrl.signal});
-        clearTimeout(tid);
-        if(!r.ok) throw new Error('not ok');
-        let text=await r.text();
-        if(text.includes('"contents"')){try{text=JSON.parse(text).contents;}catch{}}
-        const parser=new DOMParser();
-        const doc=parser.parseFromString(text,'text/xml');
-        const limit=_econNewsLimit[_currentNewsCat]||5;
-        const cutoff7d=Date.now()-7*86400000; // กรองข่าวเก่าเกิน 7 วัน
-        const topSrc=['Reuters','Bloomberg','CNBC','WSJ','Financial Times','MarketWatch','AP','BBC'];
-        const list=Array.from(doc.querySelectorAll('item')).slice(0,30).map(item=>({
-          title:item.querySelector('title')?.textContent||'',
-          link:item.querySelector('link')?.textContent||'#',
-          pubDate:item.querySelector('pubDate')?.textContent||'',
-          source:item.querySelector('source')?.textContent||'',
-        })).filter(i=>i.title)
-        // กรองข่าวเก่าเกิน 7 วัน (ถ้ามี pubDate)
-        .filter(i=>{
-          if(!i.pubDate) return true;
-          const ts=new Date(i.pubDate).getTime();
-          return isNaN(ts)||ts>=cutoff7d;
-        })
-        // sort: วันที่ใหม่สุดก่อน โดยให้ bonus แหล่งข่าวใหญ่ (ไม่ดันข่าวเก่าขึ้นมา)
-        .sort((a,b)=>{
-          const tsA=a.pubDate?new Date(a.pubDate).getTime():0;
-          const tsB=b.pubDate?new Date(b.pubDate).getTime():0;
-          const aTop=topSrc.findIndex(s=>a.source?.includes(s))>=0?3600000:0; // bonus 1 ชั่วโมง
-          const bTop=topSrc.findIndex(s=>b.source?.includes(s))>=0?3600000:0;
-          return (tsB+bTop)-(tsA+aTop);
-        }).slice(0,limit);
-        if(list.length>0) return list;
-        throw new Error('empty');
-      }catch(e){clearTimeout(tid);throw e;}
-    }));
-    return items;
-  }catch{}
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),25000);
+    const r=await fetch(`${WORKER}/api/econ-news?q=${encodeURIComponent(query)}`,{
+      mode:'cors',signal:ctrl.signal
+    });
+    clearTimeout(tid);
+    if(r.ok){
+      const data=await r.json();
+      if(Array.isArray(data)&&data.length>0) return data;
+    }
+  }catch(e){console.warn('econ-news worker:',e.message);}
+  return null;
+}
+
+// ── _fetchEconNewsAI: AI-generated news when endpoint is down ──
+async function _fetchEconNewsAI(){
+  const sys='Return ONLY a JSON array. No explanation, no markdown, no extra text. Start with [';
+  const prompt=`Generate 7 financial news items for today covering Fed/rates, inflation, earnings, trade, AI/tech.
+Format: [{"title":"...","source":"Reuters","titleTH":"ประโยคภาษาไทย...","summaryTH":"สรุป 1 ประโยค..."},...]
+Sources: Reuters/Bloomberg/CNBC/MarketWatch/AP only. titleTH=Thai title. summaryTH=Thai 1-sentence summary.`;
+
+  // ลองทุก AI ตามลำดับ
+  const callers=[
+    ()=>callAI_Brief(sys,prompt,1000),
+    ()=>callGemini(sys,prompt,1000),
+    ()=>callAI_Quick(sys,prompt,1000),
+  ];
+  for(const fn of callers){
+    try{
+      const raw=await fn();
+      if(!raw) continue;
+      // พยายาม parse JSON เป็น array
+      const parsed=_parseNewsJson(raw);
+      if(!parsed.length) continue;
+      const now=new Date().toISOString();
+      return parsed.map(it=>({
+        title:it.title||'',
+        source:it.source||'Reuters',
+        pubDate:now,
+        link:'#',
+        titleTH:it.titleTH||it.title||'',
+        summaryTH:it.summaryTH||'',
+      }));
+    }catch(e){console.warn('_fetchEconNewsAI attempt failed:',e.message);}
+  }
   return [];
 }
 
@@ -7051,11 +7085,13 @@ function renderEconNews(items, body){
     const ago=item.pubDate?_timeAgo(new Date(item.pubDate)):'';
     const titleDisplay=item.titleTH||_escHtml(_stripNewsSource(item.title));
     const isTop=topSrc.some(s=>item.source?.includes(s));
+    const isAI=!item.link||item.link==='#';
     const srcBadge=isTop
       ?`<span style="background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:1px 7px;font-size:9px;color:var(--gold);font-weight:700">${_escHtml(item.source)}</span>`
       :`<span style="font-size:10px;color:var(--text3)">${_escHtml(item.source||'News')}</span>`;
     return`<a href="${_escHtml(item.link||'#')}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">
       <div style="background:var(--bg2);border:1px solid ${isTop?'rgba(201,168,76,0.2)':'var(--border)'};border-radius:14px;padding:14px;transition:all 0.15s">
+        ${isAI?'<div style="font-size:9px;color:var(--ice);background:rgba(100,210,255,0.08);border:1px solid rgba(100,210,255,0.2);border-radius:6px;padding:2px 7px;display:inline-block;margin-bottom:6px;font-family:Syne,sans-serif;font-weight:700;letter-spacing:0.5px">🤖 AI GENERATED</div>':''}
         <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.5;margin-bottom:6px">${titleDisplay}</div>
         ${item.summaryTH?`<div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:8px">${item.summaryTH}</div>`:''}
         <div style="display:flex;justify-content:space-between;align-items:center">
