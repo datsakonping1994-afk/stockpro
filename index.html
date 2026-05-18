@@ -43,7 +43,7 @@ body{font-family:'Inter',sans-serif;display:flex;flex-direction:column}
 /* ── LAYOUT ── */
 #app{flex:1;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 #topbar{flex-shrink:0;z-index:100}
-#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:80px}
+#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:80px;will-change:scroll-position;transform:translateZ(0)}
 #bottomnav{flex-shrink:0;position:fixed;bottom:0;left:0;right:0;z-index:200}
 
 /* ── TOP BAR ── */
@@ -89,7 +89,7 @@ body{font-family:'Inter',sans-serif;display:flex;flex-direction:column}
 .nav-label{font-size:10px;color:var(--text3);letter-spacing:0.5px;font-family:'Syne',sans-serif;font-weight:600;text-transform:uppercase}
 
 /* ── PAGES ── */
-.page{display:none;animation:fadeIn 0.2s ease}
+.page{display:none;animation:slideIn 0.25s cubic-bezier(0.4,0,0.2,1)}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @keyframes cardIn{from{opacity:0;transform:translateY(10px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -295,8 +295,11 @@ canvas.spark{width:100%;height:52px;display:block}
   display:flex;flex-direction:column;
   background:var(--bg1);
   transform:translateY(100%);
-  transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  transition:transform 0.42s cubic-bezier(0.34,1.56,0.64,1);
   padding-bottom:env(safe-area-inset-bottom);
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
 }
 #drawer.open{transform:translateY(0)}
 .drawer-handle{width:36px;height:4px;border-radius:2px;background:var(--bg4);margin:10px auto 0}
@@ -309,7 +312,7 @@ canvas.spark{width:100%;height:52px;display:block}
 .drawer-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 16px;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;white-space:nowrap;flex-shrink:0}
 .drawer-tab{padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;font-family:'Syne',sans-serif;transition:all 0.15s;flex-shrink:0}
 .drawer-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
-.drawer-body{flex:1;overflow-y:auto;padding:16px}
+.drawer-body{flex:1;overflow-y:auto;padding:16px;transition:opacity 0.18s ease;-webkit-overflow-scrolling:touch;will-change:scroll-position;transform:translateZ(0)}
 
 /* Chart area */
 .big-chart{height:220px;background:var(--bg2);border-radius:16px;overflow:hidden;position:relative;margin-bottom:16px;border:1px solid var(--border)}
@@ -500,6 +503,7 @@ canvas.bigchart{width:100%;height:100%}
 .unlock-btn:active{background:rgba(255,77,106,0.25)}
 
 /* ── SCROLLBAR ── */
+#content{scroll-behavior:smooth}
 #content::-webkit-scrollbar{width:3px}
 #content::-webkit-scrollbar-track{background:transparent}
 #content::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
@@ -993,6 +997,7 @@ canvas.bigchart{width:100%;height:100%}
     <div class="drawer-price">
       <div class="drawer-price-val" id="drawerPrice">--</div>
       <div class="card-chg" id="drawerChg">--</div>
+      <div id="drawerExtPrice" style="display:none"></div>
     </div>
 
   </div>
@@ -1339,7 +1344,16 @@ let currentDrawerTab='tech';
 let watchlist=new Set((()=>{ try{ return JSON.parse(localStorage.getItem('_sp_watchlist')||'[]'); }catch{ return []; } })());
 let showWatchlistOnly=false;
 let priceAlerts=(()=>{ try{ return JSON.parse(localStorage.getItem('_sp_alerts')||'[]'); }catch{ return []; } })(); // [{ticker,price,dir,triggered}]
-const _alertFired=new Set();
+// ── Persistent cooldown (survives reload/background) ──
+const _cooldown = {
+  _key: '_sp_cooldown',
+  _data: (()=>{ try{ const d=JSON.parse(localStorage.getItem('_sp_cooldown')||'{}'); const now=Date.now(); Object.keys(d).forEach(k=>{ if(d[k]<now) delete d[k]; }); return d; }catch{ return {}; } })(),
+  _save(){ try{ localStorage.setItem(this._key, JSON.stringify(this._data)); }catch{} },
+  has(k){ const v=this._data[k]; if(v&&v>Date.now()) return true; if(v) { delete this._data[k]; this._save(); } return false; },
+  add(k, ms){ this._data[k]=Date.now()+ms; this._save(); },
+  delete(k){ delete this._data[k]; this._save(); }
+};
+const _alertFired = _cooldown;
 let marketCtx={SPY:{change:0,price:0},QQQ:{change:0,price:0}};
 // FIX: aiHistory — โหลดจาก localStorage เพื่อให้ประวัติไม่หายเมื่อปิดแอป
 const _AI_HISTORY_KEY='_sp_aiHistory';
@@ -1368,6 +1382,16 @@ function _saveAiHistory(){
 // ดู: https://developers.cloudflare.com/workers/runtime-apis/kv/
 // ══════════════════════════════════════════════════════════
 const WORKER='https://anthropic-proxy.datsakonping1994.workers.dev';
+const ALERT_WORKER='https://stock-alert.datsakonping1994.workers.dev'; // Worker ตัวใหม่
+// ── Sync alerts + portfolio ขึ้น Worker (background) ──
+function syncAlertsToWorker(){
+  try{
+    const portfolio=(()=>{try{return JSON.parse(localStorage.getItem('_sp_portfolio')||'[]');}catch{return[];}})();
+    fetch(ALERT_WORKER+'/alerts',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({alerts:priceAlerts,portfolio:portfolio.map(p=>({t:p.ticker||p.t,avgPrice:p.avgPrice||p.cost||0}))})
+    }).catch(()=>{});
+  }catch{}
+}
 const _GNEWS_KEY='04e902741e046e76b09896b84f17b83b';
 const _NEWSAPI_KEY='29dc935760054d8f8892dfc729f5a5da';
 const _MARKETAUX_KEY='6NR1RtHOSzR5Bx4DiyznD2uGc0EuhVoVGYSo7qFN';
@@ -1456,6 +1480,7 @@ function navTo(page, el){
 // ── Price Alerts ──
 function savePriceAlerts(){
   try{ localStorage.setItem('_sp_alerts', JSON.stringify(priceAlerts)); }catch{}
+  syncAlertsToWorker(); // sync ขึ้น Worker ทุกครั้งที่บันทึก
 }
 
 function buildTickerSelect(){
@@ -1556,7 +1581,7 @@ function checkPriceAlerts(ticker, price){
     if(!hit) return;
     const fireKey=ticker+'_'+a.dir+'_'+a.price;
     if(_alertFired.has(fireKey)) return;
-    _alertFired.add(fireKey);
+    _alertFired.add(fireKey, 86400000); // cooldown 24 ชั่วโมง
     a.triggered=true;
     savePriceAlerts();
     // เสียงแจ้งเตือน
@@ -2007,6 +2032,7 @@ function _loadLogoNow(ticker, elId, size){
   const domain = getLogoUrl(ticker);
 
   const sources = [
+    `https://financialmodelingprep.com/image-stock/${ticker}.png`,
     `https://logo.clearbit.com/${domain}`,
     `https://img.logo.dev/${domain}?token=pk_X-1ZkqaaQyiAbZeQVt-HMQ&size=128&format=png`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
@@ -2462,6 +2488,10 @@ function openDrawer(ticker){
   // render tech tab ครั้งเดียวตอนเปิด
   _currentChartDays=30; // reset เป็น 1M ทุกครั้งที่เปิด drawer ใหม่
   drawerTab('tech', document.querySelector('.drawer-tab[onclick*="tech"]'));
+  // ดึง analyst data ในพื้นหลัง
+  fetchAnalystData(ticker).then(()=>{
+    if(currentDrawerTab==='fund') drawerTab('fund', document.querySelector('.drawer-tab[onclick*="fund"]'));
+  });
   document.getElementById('drawer').classList.add('open');
   // FIX: lock body scroll ตอนเปิด Drawer
   document.body.style.overflow='hidden';
@@ -2617,6 +2647,50 @@ function _drawEarnChart(ticker, mode, containerId){
     ctx.fillStyle='rgba(139,153,181,0.8)'; ctx.font='9px Syne,sans-serif'; ctx.textAlign='center';
     ctx.fillText(d.q, x+barW+2, H-PAD_B+12);
   });
+}
+
+
+// ── Fetch Analyst Consensus + Short Interest จาก Finnhub ──
+async function fetchAnalystData(ticker){
+  try{
+    const WORKER = window.WORKER_URL || '';
+    // ดึง recommendation trends
+    const recRes = await safeFetch(`https://finnhub.io/api/v1/stock/recommendation?symbol=${ticker}&token=d83vsjpr01qkm5c9o0p0d83vsjpr01qkm5c9o0pg`,{},1);
+    const recData = await recRes.json();
+    // เอาแค่ล่าสุด
+    if(recData && recData.length > 0){
+      const latest = recData[0];
+      const total = (latest.strongBuy||0)+(latest.buy||0)+(latest.hold||0)+(latest.sell||0)+(latest.strongSell||0);
+      if(total > 0){
+        const buyPct = Math.round(((latest.strongBuy||0)+(latest.buy||0))/total*100);
+        const holdPct = Math.round((latest.hold||0)/total*100);
+        const sellPct = Math.round(((latest.sell||0)+(latest.strongSell||0))/total*100);
+        const consensus = buyPct>=50?'Buy':sellPct>=40?'Sell':'Hold';
+        const s = stocks.find(x=>x.t===ticker);
+        if(s){
+          s.analystBuy = buyPct;
+          s.analystHold = holdPct;
+          s.analystSell = sellPct;
+          s.analystTotal = total;
+          s.analystConsensus = consensus;
+        }
+      }
+    }
+    // ดึง basic financials (มี beta, 52w high/low, short interest)
+    const metricRes = await safeFetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=d83vsjpr01qkm5c9o0p0d83vsjpr01qkm5c9o0pg`,{},1);
+    const metricData = await metricRes.json();
+    const m = metricData?.metric||{};
+    const s = stocks.find(x=>x.t===ticker);
+    if(s){
+      if(m.beta!=null) s.beta = +m.beta.toFixed(2);
+      if(m['52WeekHigh']!=null) s.high52 = m['52WeekHigh'];
+      if(m['52WeekLow']!=null) s.low52 = m['52WeekLow'];
+      if(m['shortInterest']!=null){
+        const siPct = (m['shortInterest']/m['sharesOutstanding']*100);
+        if(!isNaN(siPct)) s.short = siPct.toFixed(1)+'%';
+      }
+    }
+  }catch(e){ console.warn('fetchAnalystData error',e); }
 }
 
 // ── renderInsider ──
@@ -2938,6 +3012,21 @@ function drawerTab(tab, btn){
       '<div style="font-family:\'Syne\',sans-serif;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin:14px 0 6px">⚠️ ความเสี่ยง</div>' +
       (s.div?'<div class="ind-row"><span class="ind-name">💰 Dividend Yield</span><span class="ind-val bull">'+s.div+'</span></div>':'<div class="ind-row"><span class="ind-name">💰 Dividend Yield</span><span class="ind-val" style="color:var(--text3)">ไม่มีปันผล</span></div>') +
       (s.beta!=null?'<div class="ind-row"><span class="ind-name">📉 Beta (ความผันผวน)</span><span class="ind-val '+(s.beta>1.5?'bear':s.beta<0.8?'bull':'neut')+'">'+s.beta+' '+(s.beta>1.5?'(ผันผวนสูง)':s.beta<0.8?'(เสถียร)':'(ปานกลาง)')+'</span></div>':'') +
+      (s.analystConsensus?
+        '<div style="background:rgba(100,200,100,0.06);border:1px solid rgba(100,200,100,0.2);border-radius:12px;padding:12px;margin-bottom:10px">' +
+          '<div style="font-family:\'Syne\',sans-serif;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px">📊 Analyst Consensus ('+s.analystTotal+' analysts)</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+            '<div style="flex:'+s.analystBuy+';height:8px;background:var(--green);border-radius:4px 0 0 4px"></div>' +
+            '<div style="flex:'+s.analystHold+';height:8px;background:var(--gold)"></div>' +
+            '<div style="flex:'+s.analystSell+';height:8px;background:var(--red);border-radius:0 4px 4px 0"></div>' +
+          '</div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:10px">' +
+            '<span style="color:var(--green)">Buy '+s.analystBuy+'%</span>' +
+            '<span style="color:var(--gold)">Hold '+s.analystHold+'%</span>' +
+            '<span style="color:var(--red)">Sell '+s.analystSell+'%</span>' +
+          '</div>' +
+        '</div>'
+      : '') +
       (s.short?'<div class="ind-row"><span class="ind-name">🩳 Short Float</span><span class="ind-val '+(parseFloat(s.short)>15?'bear':parseFloat(s.short)>8?'neut':'bull')+'">'+s.short+' '+(parseFloat(s.short)>15?'(Squeeze Risk สูง ⚠️)':parseFloat(s.short)>8?'(Short ปานกลาง)':'(Short ต่ำ)')+'</span></div>':'') +
       (()=>{
         const fe=fundExtra[s.t]||{};
@@ -3646,7 +3735,7 @@ Buy Score: ${score}/100
 }
 
 // ── Exit Signal — แจ้งเตือนเมื่อควรขาย พร้อมบอกจำนวนหุ้นที่ควรขาย ──
-const _exitAlerted = new Set();
+const _exitAlerted = _cooldown; // shared persistent cooldown
 const _trailingHigh = {}; // เก็บ high สูงสุดหลังซื้อสำหรับ Trailing Stop
 
 async function checkExitSignal(ticker, price){
@@ -3706,8 +3795,7 @@ async function checkExitSignal(ticker, price){
     exitReason = `🎯 ถึงเป้า R2 $${r2.toFixed(2)} (+${pnlPct.toFixed(1)}%)`;
     sellAction = `ขายทั้งหมด ${pos.shares} หุ้น`;
     sellShares = pos.shares;
-    _exitAlerted.add(exitKey_r2);
-    setTimeout(()=>_exitAlerted.delete(exitKey_r2), 7200000);
+    _exitAlerted.add(exitKey_r2, 7200000);
 
   } else if(hitR1 && !_exitAlerted.has(exitKey_r1)){
     // ถึง R1 → ขายครึ่ง lock กำไร รอ R2
@@ -3715,24 +3803,21 @@ async function checkExitSignal(ticker, price){
     exitReason = `🎯 ถึงเป้า R1 $${r1.toFixed(2)} (+${pnlPct.toFixed(1)}%)`;
     sellAction = `ขายครึ่ง ${half} หุ้น (lock กำไร รอ R2 $${r2.toFixed(2)})`;
     sellShares = half;
-    _exitAlerted.add(exitKey_r1);
-    setTimeout(()=>_exitAlerted.delete(exitKey_r1), 7200000);
+    _exitAlerted.add(exitKey_r1, 7200000);
 
   } else if(bigLoss && !_exitAlerted.has(exitKey_loss)){
     // Cut Loss → ขายทั้งหมด
     exitReason = `🛑 Cut Loss! ขาดทุน ${pnlPct.toFixed(1)}%`;
     sellAction = `ขายทั้งหมด ${pos.shares} หุ้น ทันที`;
     sellShares = pos.shares;
-    _exitAlerted.add(exitKey_loss);
-    setTimeout(()=>_exitAlerted.delete(exitKey_loss), 3600000);
+    _exitAlerted.add(exitKey_loss, 3600000);
 
   } else if(overbought && stBearish && !_exitAlerted.has(exitKey_momentum)){
     // Momentum หมด → ขายทั้งหมด
     exitReason = `📉 RSI Overbought + Supertrend กลับตัว`;
     sellAction = `ขายทั้งหมด ${pos.shares} หุ้น`;
     sellShares = pos.shares;
-    _exitAlerted.add(exitKey_momentum);
-    setTimeout(()=>_exitAlerted.delete(exitKey_momentum), 3600000);
+    _exitAlerted.add(exitKey_momentum, 3600000);
 
   } else if(trailingHit && !_exitAlerted.has(exitKey_trail)){
     // Trailing Stop → ขายครึ่ง ป้องกันกำไรหาย
@@ -3740,8 +3825,7 @@ async function checkExitSignal(ticker, price){
     exitReason = `📉 Trailing Stop! ร่วงจาก High ${trailingDrop.toFixed(1)}%`;
     sellAction = `ขายครึ่ง ${half} หุ้น (ปกป้องกำไร)`;
     sellShares = half;
-    _exitAlerted.add(exitKey_trail);
-    setTimeout(()=>_exitAlerted.delete(exitKey_trail), 3600000);
+    _exitAlerted.add(exitKey_trail, 3600000);
 
   } else if(overweight && pnlPct > 10 && !_exitAlerted.has(exitKey_weight)){
     // พอร์ตหนักเกินไป → ขาย 25% ลดสัดส่วน
@@ -3749,8 +3833,7 @@ async function checkExitSignal(ticker, price){
     exitReason = `⚖️ หุ้นนี้หนัก ${portPct.toFixed(0)}% ของพอร์ต`;
     sellAction = `ขาย ${trimShares} หุ้น (ลดสัดส่วนให้สมดุล)`;
     sellShares = trimShares;
-    _exitAlerted.add(exitKey_weight);
-    setTimeout(()=>_exitAlerted.delete(exitKey_weight), 86400000); // cooldown 1 วัน
+    _exitAlerted.add(exitKey_weight, 86400000); // cooldown 1 วัน
 
   } else return;
 
@@ -7186,6 +7269,8 @@ async function triggerAISummary(){
 }
 
 
+
+
 // ── PORTFOLIO TRACKER ──
 let portfolio = (()=>{ try{ return JSON.parse(localStorage.getItem('_sp_portfolio') || '[]'); }catch{ return []; } })();
 
@@ -7381,6 +7466,7 @@ function updateCardLive(s){
     chgEl.textContent=(chgNum>=0?'+':'')+chgNum.toFixed(2)+'%';
     chgEl.className='card-chg '+(chgNum>=0?'up':'dn');
   }
+
   // Portfolio live update — throttle 1 วินาที ป้องกัน DOM churn ทุก WS tick
   const portActive=document.getElementById('page-port')?.classList.contains('active');
   if(portActive && !_portUpdateTimer){
@@ -7406,8 +7492,7 @@ function updateCardLive(s){
     if(stk&&stk.short&&parseFloat(stk.short)>15&&stk.c>3){
       const sqKey='sq_'+stk.t;
       if(!_alertFired.has(sqKey)){
-        _alertFired.add(sqKey);
-        setTimeout(()=>_alertFired.delete(sqKey),3600000); // cooldown 1 ชั่วโมง
+        _alertFired.add(sqKey, 3600000); // cooldown 1 ชั่วโมง
         toast(`🩳 Short Squeeze Alert! ${stk.t} — Short Float ${stk.short} ราคาขึ้น +${(+stk.c).toFixed(1)}%`,4000);
         sendTG(`🩳 Short Squeeze Risk!\n${stk.t} | Short Float ${stk.short}\nราคาขึ้น +${(+stk.c).toFixed(1)}% | ราคา ${fmt(stk.p)}`);
       }
@@ -7684,6 +7769,8 @@ setTimeout(()=>{try{checkEarningsAlert();}catch{}}, 8000); // เช็คตอ
   content.addEventListener('touchstart', e => {
     // ถ้า drawer เปิดอยู่ ไม่ swipe
     if(document.getElementById('drawer')?.classList.contains('open')) return;
+    // ถ้า touch เริ่มจาก scroll row (filter/sort bar) ไม่ swipe
+    if(e.target.closest('.stocks-controls,.sector-row,.search-bar,.ctrl-btn,.wl-filter-btn')) return;
     _pgSwipeX = e.touches[0].clientX;
     _pgSwipeY = e.touches[0].clientY;
     _pgSwipeTime = Date.now();
@@ -7696,7 +7783,7 @@ setTimeout(()=>{try{checkEarningsAlert();}catch{}}, 8000); // เช็คตอ
     const dt = Date.now() - _pgSwipeTime;
     if(dt > 400) return;
     if(Math.abs(dx) < 70) return;
-    if(Math.abs(dy) > Math.abs(dx) * 0.8) return;
+    if(Math.abs(dy) > Math.abs(dx) * 0.5) return;
     _goPage(dx < 0 ? 1 : -1);
   }, {passive:true});
 })();
@@ -7715,8 +7802,20 @@ setTimeout(()=>{try{checkEarningsAlert();}catch{}}, 8000); // เช็คตอ
     const next = idx + dir;
     if(next < 0 || next >= TABS.length) return;
     const tab = TABS[next];
-    drawerTab(tab, _getTabEl(tab));
-    // scroll tab ให้เห็น
+    const body = document.getElementById('drawerBody');
+    if(body){
+      body.style.opacity='0';
+      body.style.transform=dir>0?'translateX(20px)':'translateX(-20px)';
+      setTimeout(()=>{
+        drawerTab(tab, _getTabEl(tab));
+        body.style.transition='opacity 0.2s ease,transform 0.2s ease';
+        body.style.opacity='1';
+        body.style.transform='translateX(0)';
+        setTimeout(()=>{ body.style.transition=''; body.style.transform=''; },220);
+      },80);
+    } else {
+      drawerTab(tab, _getTabEl(tab));
+    }
     _getTabEl(tab)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
   }
 
@@ -7734,10 +7833,9 @@ setTimeout(()=>{try{checkEarningsAlert();}catch{}}, 8000); // เช็คตอ
     const dx = e.changedTouches[0].clientX - _swipeStartX;
     const dy = e.changedTouches[0].clientY - _swipeStartY;
     const dt = Date.now() - _swipeStartTime;
-    // swipe ต้องเร็ว (<350ms) แนวนอน (dx>dy) และระยะ >60px
-    if(dt > 350) return;
+    // swipe ต้องปัดแรง >60px และแนวนอนชัดเจน
     if(Math.abs(dx) < 60) return;
-    if(Math.abs(dy) > Math.abs(dx)) return;
+    if(Math.abs(dy) > Math.abs(dx) * 0.5) return;
     _goTab(dx < 0 ? 1 : -1);
   }, {passive:true});
 })();
