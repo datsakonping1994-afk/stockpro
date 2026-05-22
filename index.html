@@ -2530,6 +2530,7 @@ function updateDashboard(){
 function openDrawer(ticker){
   // ปิด modal ทั้งหมดก่อนเปิด drawer
   ['heatmapModal','earningsModal','aiSummaryModal'].forEach(id=>closeModal(id));
+  _currentChartDays=30; // reset กลับ 1M ทุกครั้ง
   currentDrawerTicker=ticker;
   const s=stocks.find(x=>x.t===ticker);
   if(!s)return;
@@ -3010,7 +3011,7 @@ function drawerTab(tab, btn){
         <button class="tf-btn" onclick="_switchTF(this,180)">6M</button>
         <button class="tf-btn" onclick="_switchTF(this,365)">1Y</button>
       </div>
-      <div id="tvWidgetContainer" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:8px"></div>
+      <div id="lwChartContainer" style="height:280px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#070d18;touch-action:none;"></div>
       <div class="ind-table">
         <div class="ind-row"><span class="ind-name">🎯 Buy Score</span>${scoreTxt}</div>
         <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${rsi>=70?'bear':rsi<=30?'bull':'neut'}">${rsi} ${rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral'}</span></div>
@@ -3051,33 +3052,76 @@ function drawerTab(tab, btn){
         </div>
       </div>`;
     // Draw Lightweight Chart
-    const _initTVWidget=()=>{
-      const container=document.getElementById('tvWidgetContainer');
+    const _initChart=()=>{
+      const container=document.getElementById('lwChartContainer');
       if(!container) return;
-      const etfs=['SPY','QQQ','SMH','VIX','IWM'];
-      const nyse=['BRK.B','V','MA','JPM','XOM','WMT','COST','UNH','LLY','NVO','ISRG','ASML','TSM'];
-      let sym;
-      if(etfs.includes(s.t)) sym='AMEX:'+s.t;
-      else if(nyse.includes(s.t)) sym='NYSE:'+s.t;
-      else sym='NASDAQ:'+s.t;
-      const innerId='tv_inner_'+s.t.replace(/[^a-zA-Z0-9]/g,'_');
-      container.innerHTML='<div id="'+innerId+'" style="height:300px"></div>';
-      const cfg={autosize:true,symbol:sym,interval:'D',timezone:'Asia/Bangkok',
-        theme:'dark',style:'1',locale:'th_TH',hide_top_toolbar:false,
-        hide_legend:false,save_image:false,container_id:innerId,
-        studies:['RSI@tv-basicstudies','MACD@tv-basicstudies']};
-      if(typeof TradingView!=='undefined'){
-        new TradingView.widget(cfg);
+      const days=_currentChartDays||30;
+      const raw=candleCache[s.t]?.data;
+      const hasReal=raw&&raw.c&&raw.t&&raw.o&&raw.h&&raw.l&&!raw._mock&&raw.c.length>=5;
+      const s1=getS1(s.t,s.p),s2=getS2(s.t,s.p),r1=getR1(s.t,s.p),r2=getR2(s.t,s.p);
+      const calcEMA=(closes,period)=>{const k=2/(period+1);let e=closes[0];return closes.map(c=>{e=c*k+e*(1-k);return +e.toFixed(2);});};
+
+      const _draw=()=>{
+        if(typeof ApexCharts==='undefined') return;
+        container.innerHTML='';
+        let ohlc=[],closes=[],times=[];
+        if(hasReal){
+          const from=Math.max(0,raw.c.length-days);
+          for(let i=from;i<raw.c.length;i++){
+            if(raw.t[i]&&raw.c[i]>0){
+              ohlc.push({x:new Date(raw.t[i]*1000),y:[+raw.o[i],+raw.h[i],+raw.l[i],+raw.c[i]]});
+              closes.push(+raw.c[i]); times.push(new Date(raw.t[i]*1000));
+            }
+          }
+        } else {
+          let p=s.p*0.85;
+          for(let i=days;i>=0;i--){
+            p+=p*(Math.random()-0.47)*0.02;
+            const t=new Date(Date.now()-i*86400000);
+            const o=+p.toFixed(2),h=+(p*1.01).toFixed(2),l=+(p*0.99).toFixed(2),c=+(p+p*(Math.random()-0.5)*0.005).toFixed(2);
+            ohlc.push({x:t,y:[o,h,l,c]}); closes.push(c); times.push(t);
+          }
+        }
+        const ema20=closes.length>=20?calcEMA(closes,20).map((v,i)=>({x:times[i],y:v})):[];
+        const ema50=closes.length>=50?calcEMA(closes,50).map((v,i)=>({x:times[i],y:v})):[];
+        const annotations=[];
+        [[s1,'S1','#ff6b6b'],[s2,'S2','#cc4444'],[r1,'R1','#00e676'],[r2,'R2','#00a854']].forEach(([price,label,clr])=>{
+          if(price>0) annotations.push({y:price,borderColor:clr,borderWidth:1,strokeDashArray:4,label:{text:label,style:{color:'#fff',background:clr,fontSize:'9px',padding:{left:4,right:4,top:1,bottom:1}}}});
+        });
+        const chart=new ApexCharts(container,{
+          chart:{type:'candlestick',height:280,background:'#070d18',toolbar:{show:false},zoom:{enabled:true,type:'x'},animations:{enabled:false},fontFamily:'Inter,sans-serif'},
+          theme:{mode:'dark'},
+          series:[{name:'Price',type:'candlestick',data:ohlc},{name:'EMA20',type:'line',data:ema20},{name:'EMA50',type:'line',data:ema50}],
+          colors:['transparent','rgba(100,200,255,0.9)','rgba(255,180,0,0.9)'],
+          plotOptions:{candlestick:{colors:{upward:'#00e676',downward:'#ff4d6a'},wick:{useFillColor:true}}},
+          stroke:{width:[1,1.5,1.5],curve:'smooth'},
+          xaxis:{type:'datetime',labels:{style:{colors:'#8b99b5',fontSize:'9px'}},axisBorder:{show:false},axisTicks:{show:false}},
+          yaxis:{labels:{style:{colors:'#8b99b5',fontSize:'9px'},formatter:v=>v>=1000?v.toFixed(0):v>=100?v.toFixed(1):v.toFixed(2)},opposite:true},
+          grid:{borderColor:'rgba(255,255,255,0.04)'},
+          tooltip:{theme:'dark',x:{format:'dd MMM yy'}},
+          legend:{show:ema20.length>0,labels:{colors:'#8b99b5'},fontSize:'10px',markers:{width:8,height:8}},
+          annotations:{yaxis:annotations},
+        });
+        chart.render();
+      };
+
+      if(typeof ApexCharts!=='undefined'){
+        _draw();
       } else {
+        container.innerHTML='<div style="color:var(--text3);text-align:center;padding:60px 0;font-size:12px">⏳ กำลังโหลดกราฟ...</div>';
         const sc=document.createElement('script');
-        sc.src='https://s3.tradingview.com/tv.js';
-        sc.onload=()=>new TradingView.widget(cfg);
-        document.head.appendChild(sc);
+        sc.src='https://cdn.jsdelivr.net/npm/apexcharts';
+        sc.onload=_draw; document.head.appendChild(sc);
+      }
+      if(!hasReal&&hasApiKey()){
+        fetchCandles(s.t,days).then(()=>{
+          if(currentDrawerTicker===s.t&&currentDrawerTab==='tech') _initChart();
+        }).catch(()=>{});
       }
     };
     requestAnimationFrame(()=>{
       if(currentDrawerTicker===s.t && currentDrawerTab==='tech'){
-        _initTVWidget();
+        _initChart();
         const dayMap={30:0,90:1,180:2,365:3};
         const idx=dayMap[_currentChartDays]??0;
         document.querySelectorAll('.tf-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
