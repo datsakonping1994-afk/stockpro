@@ -3011,7 +3011,7 @@ function drawerTab(tab, btn){
         <button class="tf-btn" onclick="_switchTF(this,180)">6M</button>
         <button class="tf-btn" onclick="_switchTF(this,365)">1Y</button>
       </div>
-      <div id="lwChartContainer" style="height:280px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#0a101a"></div>
+      <div id="lwChartContainer" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#0a101a;width:100%"></div>
       <div class="ind-table">
         <div class="ind-row"><span class="ind-name">🎯 Buy Score</span>${scoreTxt}</div>
         <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${rsi>=70?'bear':rsi<=30?'bull':'neut'}">${rsi} ${rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral'}</span></div>
@@ -3103,7 +3103,7 @@ function drawerTab(tab, btn){
 
         const w=container.getBoundingClientRect().width||container.parentElement?.getBoundingClientRect().width||360;
         const chart=LightweightCharts.createChart(container,{
-          width:w, height:200,
+          width:w, height:300,
           layout:{background:{color:'#070d18'},textColor:'rgba(139,153,181,0.9)'},
           grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
           rightPriceScale:{borderColor:'rgba(255,255,255,0.08)',scaleMargins:{top:0.1,bottom:0.1}},
@@ -3146,7 +3146,7 @@ function drawerTab(tab, btn){
         // resize
         try{
           if(container._ro) container._ro.disconnect();
-          const ro=new ResizeObserver(()=>{const nw=container.getBoundingClientRect().width;if(nw>10)chart.resize(nw,200);});
+          const ro=new ResizeObserver(()=>{const nw=container.getBoundingClientRect().width;if(nw>10)chart.resize(nw,300);});
           ro.observe(container); container._ro=ro;
         }catch(e){}
       };
