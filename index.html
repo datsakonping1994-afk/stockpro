@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 
@@ -3011,7 +3010,7 @@ function drawerTab(tab, btn){
         <button class="tf-btn" onclick="_switchTF(this,180)">6M</button>
         <button class="tf-btn" onclick="_switchTF(this,365)">1Y</button>
       </div>
-      <div id="lwChartContainer" style="height:280px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#0a101a;touch-action:pan-x pinch-zoom;"></div>
+      <div id="tvWidgetContainer" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:8px"></div>
       <div class="ind-table">
         <div class="ind-row"><span class="ind-name">🎯 Buy Score</span>${scoreTxt}</div>
         <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${rsi>=70?'bear':rsi<=30?'bull':'neut'}">${rsi} ${rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral'}</span></div>
@@ -3052,127 +3051,33 @@ function drawerTab(tab, btn){
         </div>
       </div>`;
     // Draw Lightweight Chart
-    const _initLWChart=()=>{
-      const container=document.getElementById('lwChartContainer');
+    const _initTVWidget=()=>{
+      const container=document.getElementById('tvWidgetContainer');
       if(!container) return;
-      const days=_currentChartDays||30;
-      const raw=candleCache[s.t]?.data;
-      const hasReal=raw&&raw.c&&raw.t&&raw.o&&raw.h&&raw.l&&!raw._mock&&raw.c.length>=5;
-
-      const s1=getS1(s.t,s.p), s2=getS2(s.t,s.p);
-      const r1=getR1(s.t,s.p), r2=getR2(s.t,s.p);
-
-      const _drawLW=()=>{
-        if(typeof LightweightCharts==='undefined') return;
-        container.innerHTML='';
-
-        // ── สร้าง candleData ──
-        let candleData=[];
-        if(hasReal){
-          const n=Math.min(raw.c.length,days);
-          for(let i=raw.c.length-n;i<raw.c.length;i++){
-            const t=raw.t[i],o=+raw.o[i],h=+raw.h[i],l=+raw.l[i],c=+raw.c[i];
-            if(t&&!isNaN(o)&&!isNaN(h)&&!isNaN(l)&&!isNaN(c)&&h>=l)
-              candleData.push({time:t,open:o,high:h,low:l,close:c});
-          }
-        } else {
-          // mock OHLC
-          const now=Math.floor(Date.now()/1000);
-          let p=s.p*0.85;
-          for(let i=days;i>=0;i--){
-            p=Math.max(p*(1+(Math.random()-0.47)*0.025),s.p*0.4);
-            const o=+p.toFixed(2);
-            const chg=p*(Math.random()-0.5)*0.01;
-            const c=+(p+chg).toFixed(2);
-            const h=+(Math.max(o,c)*(1+Math.random()*0.008)).toFixed(2);
-            const l=+(Math.min(o,c)*(1-Math.random()*0.008)).toFixed(2);
-            candleData.push({time:now-i*86400,open:o,high:h,low:l,close:c});
-          }
-          candleData[candleData.length-1].close=s.p;
-        }
-
-        // dedup + sort
-        const seen=new Set();
-        candleData=candleData.filter(d=>{if(seen.has(d.time))return false;seen.add(d.time);return true;}).sort((a,b)=>a.time-b.time);
-
-        // DEBUG — ลบออกหลัง fix
-        console.log('[CHART DEBUG]',s.t,'hasReal=',hasReal,'candleData.length=',candleData.length,'w=',container.getBoundingClientRect().width,'offsetW=',container.offsetWidth,'LW=',typeof LightweightCharts);
-        if(candleData.length>0) console.log('[CHART DEBUG] first=',JSON.stringify(candleData[0]),'last=',JSON.stringify(candleData[candleData.length-1]));
-
-        if(!candleData.length) return;
-
-        const w=container.getBoundingClientRect().width||container.parentElement?.getBoundingClientRect().width||360;
-        const chart=LightweightCharts.createChart(container,{
-          width:w, height:200,
-          layout:{background:{color:'#070d18'},textColor:'rgba(139,153,181,0.9)'},
-          grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
-          rightPriceScale:{borderColor:'rgba(255,255,255,0.08)',scaleMargins:{top:0.1,bottom:0.1}},
-          timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:true,secondsVisible:false},
-          crosshair:{mode:1,vertLine:{color:'rgba(201,168,76,0.4)',width:1,style:2},horzLine:{color:'rgba(201,168,76,0.4)',width:1,style:2}},
-          handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
-          handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true},
-        });
-        // ป้องกัน touch event ขึ้นไปถึง drawer
-        container.addEventListener('touchstart',e=>e.stopPropagation(),{passive:false});
-        container.addEventListener('touchmove',e=>e.stopPropagation(),{passive:false});
-
-        const cs=chart.addCandlestickSeries({
-          upColor:'#00e676',downColor:'#ff4d6a',
-          borderUpColor:'#00e676',borderDownColor:'#ff4d6a',
-          wickUpColor:'rgba(0,230,118,0.6)',wickDownColor:'rgba(255,77,106,0.6)',
-          priceLineVisible:false,lastValueVisible:false,
-        });
-        cs.setData(candleData);
-
-        // volume
-        if(hasReal&&raw.v&&raw.v.length){
-          try{
-            const volS=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',scaleMargins:{top:0.85,bottom:0},lastValueVisible:false,priceLineVisible:false});
-            const n=Math.min(raw.c.length,days);
-            const vs=raw.v.slice(-n);
-            volS.setData(candleData.map((d,i)=>({time:d.time,value:vs[i]||0,color:d.close>=d.open?'rgba(0,230,118,0.15)':'rgba(255,77,106,0.15)'})));
-          }catch(e){}
-        }
-
-        // S/R lines
-        [[r2,'R2','#00c853'],[r1,'R1','#00e676'],[s1,'S1','#ff4d6a'],[s2,'S2','#cc3344']].forEach(([price,label,clr])=>{
-          if(price>0) cs.createPriceLine({price,color:clr,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:label});
-        });
-        cs.createPriceLine({price:s.p,color:'rgba(201,168,76,0.9)',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:'●'});
-
-        chart.timeScale().fitContent();
-
-        // ให้ touch บนกราฟไม่ bubble ไป page swipe
-        ['touchstart','touchmove','touchend'].forEach(ev=>
-          container.addEventListener(ev,e=>e.stopPropagation(),{passive:true})
-        );
-        // resize
-        try{
-          if(container._ro) container._ro.disconnect();
-          const ro=new ResizeObserver(()=>{const nw=container.getBoundingClientRect().width;if(nw>10)chart.resize(nw,200);});
-          ro.observe(container); container._ro=ro;
-        }catch(e){}
-      };
-
-      if(typeof LightweightCharts!=='undefined'){
-        _drawLW();
+      const etfs=['SPY','QQQ','SMH','VIX','IWM'];
+      const nyse=['BRK.B','V','MA','JPM','XOM','WMT','COST','UNH','LLY','NVO','ISRG','ASML','TSM'];
+      let sym;
+      if(etfs.includes(s.t)) sym='AMEX:'+s.t;
+      else if(nyse.includes(s.t)) sym='NYSE:'+s.t;
+      else sym='NASDAQ:'+s.t;
+      const innerId='tv_inner_'+s.t.replace(/[^a-zA-Z0-9]/g,'_');
+      container.innerHTML='<div id="'+innerId+'" style="height:300px"></div>';
+      const cfg={autosize:true,symbol:sym,interval:'D',timezone:'Asia/Bangkok',
+        theme:'dark',style:'1',locale:'th_TH',hide_top_toolbar:false,
+        hide_legend:false,save_image:false,container_id:innerId,
+        studies:['RSI@tv-basicstudies','MACD@tv-basicstudies']};
+      if(typeof TradingView!=='undefined'){
+        new TradingView.widget(cfg);
       } else {
-        container.innerHTML='<div style="color:var(--text3);text-align:center;padding:60px 0;font-size:12px">⏳ กำลังโหลดกราฟ...</div>';
         const sc=document.createElement('script');
-        sc.src='https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js';
-        sc.onload=_drawLW; document.head.appendChild(sc);
-      }
-
-      // fetch candles จริงแล้ว redraw
-      if(!hasReal&&hasApiKey()){
-        fetchCandles(s.t,days).then(()=>{
-          if(currentDrawerTicker===s.t&&currentDrawerTab==='tech') _initLWChart();
-        }).catch(()=>{});
+        sc.src='https://s3.tradingview.com/tv.js';
+        sc.onload=()=>new TradingView.widget(cfg);
+        document.head.appendChild(sc);
       }
     };
     requestAnimationFrame(()=>{
       if(currentDrawerTicker===s.t && currentDrawerTab==='tech'){
-        _initLWChart();
+        _initTVWidget();
         const dayMap={30:0,90:1,180:2,365:3};
         const idx=dayMap[_currentChartDays]??0;
         document.querySelectorAll('.tf-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
