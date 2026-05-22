@@ -313,7 +313,7 @@ canvas.spark{width:100%;height:52px;display:block}
 .drawer-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 16px;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;white-space:nowrap;flex-shrink:0}
 .drawer-tab{padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;font-family:'Syne',sans-serif;transition:all 0.15s;flex-shrink:0}
 .drawer-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
-.drawer-body{flex:1;overflow-y:auto;padding:16px;transition:opacity 0.18s ease;-webkit-overflow-scrolling:touch;will-change:scroll-position;transform:translateZ(0)}
+.drawer-body{flex:1;overflow-y:auto;padding:16px;transition:opacity 0.18s ease;-webkit-overflow-scrolling:touch;will-change:scroll-position;transform:translateZ(0);touch-action:pan-y}
 
 /* Chart area */
 .big-chart{height:220px;background:var(--bg2);border-radius:16px;overflow:hidden;position:relative;margin-bottom:16px;border:1px solid var(--border)}
@@ -3011,7 +3011,7 @@ function drawerTab(tab, btn){
         <button class="tf-btn" onclick="_switchTF(this,180)">6M</button>
         <button class="tf-btn" onclick="_switchTF(this,365)">1Y</button>
       </div>
-      <div id="lwChartContainer" style="height:280px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#0a101a"></div>
+      <div id="lwChartContainer" style="height:280px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#0a101a;touch-action:pan-x pinch-zoom;"></div>
       <div class="ind-table">
         <div class="ind-row"><span class="ind-name">🎯 Buy Score</span>${scoreTxt}</div>
         <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${rsi>=70?'bear':rsi<=30?'bull':'neut'}">${rsi} ${rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral'}</span></div>
@@ -3113,8 +3113,8 @@ function drawerTab(tab, btn){
           handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true},
         });
         // ป้องกัน touch event ขึ้นไปถึง drawer
-        container.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
-        container.addEventListener('touchmove',e=>e.stopPropagation(),{passive:true});
+        container.addEventListener('touchstart',e=>e.stopPropagation(),{passive:false});
+        container.addEventListener('touchmove',e=>e.stopPropagation(),{passive:false});
 
         const cs=chart.addCandlestickSeries({
           upColor:'#00e676',downColor:'#ff4d6a',
