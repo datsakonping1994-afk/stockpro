@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 
@@ -2531,7 +2530,6 @@ function updateDashboard(){
 function openDrawer(ticker){
   // ปิด modal ทั้งหมดก่อนเปิด drawer
   ['heatmapModal','earningsModal','aiSummaryModal'].forEach(id=>closeModal(id));
-  _currentChartDays=30; // reset กลับ 1M ทุกครั้ง
   currentDrawerTicker=ticker;
   const s=stocks.find(x=>x.t===ticker);
   if(!s)return;
@@ -3012,7 +3010,7 @@ function drawerTab(tab, btn){
         <button class="tf-btn" onclick="_switchTF(this,180)">6M</button>
         <button class="tf-btn" onclick="_switchTF(this,365)">1Y</button>
       </div>
-      <div id="lwChartContainer" style="height:280px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#070d18;touch-action:none;"></div>
+      <div id="tvWidgetContainer" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:8px"></div>
       <div class="ind-table">
         <div class="ind-row"><span class="ind-name">🎯 Buy Score</span>${scoreTxt}</div>
         <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${rsi>=70?'bear':rsi<=30?'bull':'neut'}">${rsi} ${rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral'}</span></div>
@@ -3053,106 +3051,33 @@ function drawerTab(tab, btn){
         </div>
       </div>`;
     // Draw Lightweight Chart
-    const _initLWChart=()=>{
-      const container=document.getElementById('lwChartContainer');
+    const _initTVWidget=()=>{
+      const container=document.getElementById('tvWidgetContainer');
       if(!container) return;
-      const days=_currentChartDays||30;
-      const raw=candleCache[s.t]?.data;
-      const hasReal=raw&&raw.c&&raw.t&&raw.o&&raw.h&&raw.l&&!raw._mock&&raw.c.length>=5;
-
-      const s1=getS1(s.t,s.p), s2=getS2(s.t,s.p);
-      const r1=getR1(s.t,s.p), r2=getR2(s.t,s.p);
-
-      const _drawLW=()=>{
-        if(typeof LightweightCharts==='undefined') return;
-        container.innerHTML='';
-
-        const chart=LightweightCharts.createChart(container,{
-          width:container.offsetWidth||360,
-          height:280,
-          layout:{background:{color:'#070d18'},textColor:'rgba(139,153,181,0.9)'},
-          grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
-          rightPriceScale:{borderColor:'rgba(255,255,255,0.08)',scaleMargins:{top:0.1,bottom:0.15}},
-          timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:true},
-          crosshair:{mode:1,vertLine:{color:'rgba(201,168,76,0.5)',width:1,style:2},horzLine:{color:'rgba(201,168,76,0.5)',width:1,style:2}},
-          handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
-          handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:{time:true,price:false}},
-        });
-
-        // ── Candle data ──
-        let candleData=[];
-        if(hasReal){
-          const n=Math.min(raw.c.length,days);
-          for(let i=raw.c.length-n;i<raw.c.length;i++){
-            const t=raw.t[i],o=+raw.o[i],h=+raw.h[i],l=+raw.l[i],c=+raw.c[i];
-            if(t&&!isNaN(o)&&h>=l) candleData.push({time:t,open:o,high:h,low:l,close:c});
-          }
-        } else {
-          const now=Math.floor(Date.now()/1000);
-          let p=s.p*0.85;
-          for(let i=days;i>=0;i--){
-            p+=p*(Math.random()-0.47)*0.02;
-            const o=+p.toFixed(2),h=+(p*1.01).toFixed(2),l=+(p*0.99).toFixed(2),c=+(p*(1+(Math.random()-0.5)*0.005)).toFixed(2);
-            candleData.push({time:now-i*86400,open:o,high:Math.max(o,c,h),low:Math.min(o,c,l),close:c});
-          }
-          candleData[candleData.length-1]={...candleData[candleData.length-1],close:s.p};
-        }
-
-        const cs=chart.addCandlestickSeries({
-          upColor:'#00e676',downColor:'#ff4d6a',
-          borderUpColor:'#00e676',borderDownColor:'#ff4d6a',
-          wickUpColor:'rgba(0,230,118,0.6)',wickDownColor:'rgba(255,77,106,0.6)',
-          priceLineVisible:false,lastValueVisible:true,
-        });
-        cs.setData(candleData);
-
-        // ── EMA lines ──
-        const calcEMA=(data,period)=>{
-          const k=2/(period+1);
-          let ema=data[0]?.close||0;
-          return data.map(d=>{ema=d.close*k+ema*(1-k);return{time:d.time,value:+ema.toFixed(2)};});
-        };
-        if(candleData.length>=20){
-          const ema20=chart.addLineSeries({color:'rgba(100,200,255,0.8)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-          ema20.setData(calcEMA(candleData,20));
-        }
-        if(candleData.length>=50){
-          const ema50=chart.addLineSeries({color:'rgba(255,180,0,0.8)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-          ema50.setData(calcEMA(candleData,50));
-        }
-
-        // ── S1/S2/R1/R2 ──
-        [[s1,'S1','#ff6b6b'],[s2,'S2','#cc4444'],[r1,'R1','#00e676'],[r2,'R2','#00a854']].forEach(([price,label,clr])=>{
-          if(price>0) cs.createPriceLine({price,color:clr,lineWidth:1,lineStyle:1,axisLabelVisible:true,title:label});
-        });
-
-        chart.timeScale().fitContent();
-
-        // ── Fix iOS touch ──
-        const chartEl=container.querySelector('canvas');
-        if(chartEl){
-          chartEl.style.touchAction='none';
-        }
-      };
-
-      if(typeof LightweightCharts!=='undefined'){
-        _drawLW();
+      const etfs=['SPY','QQQ','SMH','VIX','IWM'];
+      const nyse=['BRK.B','V','MA','JPM','XOM','WMT','COST','UNH','LLY','NVO','ISRG','ASML','TSM'];
+      let sym;
+      if(etfs.includes(s.t)) sym='AMEX:'+s.t;
+      else if(nyse.includes(s.t)) sym='NYSE:'+s.t;
+      else sym='NASDAQ:'+s.t;
+      const innerId='tv_inner_'+s.t.replace(/[^a-zA-Z0-9]/g,'_');
+      container.innerHTML='<div id="'+innerId+'" style="height:300px"></div>';
+      const cfg={autosize:true,symbol:sym,interval:'D',timezone:'Asia/Bangkok',
+        theme:'dark',style:'1',locale:'th_TH',hide_top_toolbar:false,
+        hide_legend:false,save_image:false,container_id:innerId,
+        studies:['RSI@tv-basicstudies','MACD@tv-basicstudies']};
+      if(typeof TradingView!=='undefined'){
+        new TradingView.widget(cfg);
       } else {
-        container.innerHTML='<div style="color:var(--text3);text-align:center;padding:60px 0;font-size:12px">⏳ กำลังโหลดกราฟ...</div>';
         const sc=document.createElement('script');
-        sc.src='https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js';
-        sc.onload=_drawLW; document.head.appendChild(sc);
-      }
-
-      if(!hasReal&&hasApiKey()){
-        fetchCandles(s.t,days).then(()=>{
-          if(currentDrawerTicker===s.t&&currentDrawerTab==='tech') _initLWChart();
-        }).catch(()=>{});
+        sc.src='https://s3.tradingview.com/tv.js';
+        sc.onload=()=>new TradingView.widget(cfg);
+        document.head.appendChild(sc);
       }
     };
     requestAnimationFrame(()=>{
       if(currentDrawerTicker===s.t && currentDrawerTab==='tech'){
-        _initLWChart();
+        _initTVWidget();
         const dayMap={30:0,90:1,180:2,365:3};
         const idx=dayMap[_currentChartDays]??0;
         document.querySelectorAll('.tf-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
