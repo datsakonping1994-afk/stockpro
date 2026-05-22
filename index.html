@@ -3132,7 +3132,9 @@ function drawerTab(tab, btn){
         }
 
         // S/R lines
-        [[r2,'R2','#00c853',false],[r1,'R1','#00e676',true],[s1,'S1','#ff4d6a',true],[s2,'S2','#cc3344',false]].forEach(([price,label,clr,showLabel])=>{
+        const showS2=s.p<s1; // ราคาหลุด S1
+        const showR2=s.p>r1; // ราคาทะลุ R1
+        [[r2,'R2','#00c853',showR2],[r1,'R1','#00e676',true],[s1,'S1','#ff4d6a',true],[s2,'S2','#cc3344',showS2]].forEach(([price,label,clr,showLabel])=>{
           if(price>0) cs.createPriceLine({price,color:clr,lineWidth:1,lineStyle:2,axisLabelVisible:showLabel,title:label});
         });
         cs.createPriceLine({price:s.p,color:'rgba(201,168,76,0.9)',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:'●'});
