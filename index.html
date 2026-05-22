@@ -3110,8 +3110,11 @@ function drawerTab(tab, btn){
           timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:true,secondsVisible:false},
           crosshair:{mode:1,vertLine:{color:'rgba(201,168,76,0.4)',width:1,style:2},horzLine:{color:'rgba(201,168,76,0.4)',width:1,style:2}},
           handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
-          handleScale:{mouseWheel:true,pinch:true},
+          handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true},
         });
+        // ป้องกัน touch event ขึ้นไปถึง drawer
+        container.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+        container.addEventListener('touchmove',e=>e.stopPropagation(),{passive:true});
 
         const cs=chart.addCandlestickSeries({
           upColor:'#00e676',downColor:'#ff4d6a',
