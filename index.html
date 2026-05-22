@@ -835,9 +835,22 @@ canvas.bigchart{width:100%;height:100%}
           <div class="settings-label">Export Trade Log</div>
           <button class="settings-btn" onclick="exportCSV()">📥 CSV</button>
         </div>
-        <div class="settings-row" style="border-bottom:none">
+        <div class="settings-row">
           <div class="settings-label">ล้าง Trade Log</div>
           <button class="settings-btn danger" onclick="if(confirm('ล้าง Trade Log ทั้งหมด?')){localStorage.removeItem('_tl_v2');loadAlerts();toast('ล้าง Trade Log แล้ว');}">🗑️ ล้างทั้งหมด</button>
+        </div>
+        <div class="settings-row" style="border-bottom:none">
+          <div>
+            <div class="settings-label">ล้าง Signal Cooldown</div>
+            <div class="settings-sublabel">บังคับเช็ค Buy Signal ใหม่ทันที</div>
+          </div>
+          <button class="settings-btn" onclick="
+            const keys=Object.keys(localStorage).filter(k=>k.startsWith('buy_alerted_'));
+            keys.forEach(k=>localStorage.removeItem(k));
+            _buyAlerted.clear();
+            toast('🔄 ล้าง Cooldown '+keys.length+' ตัวแล้ว — กำลังเช็ค Signal ใหม่...');
+            setTimeout(()=>{try{checkAllBuySignals();}catch{}},500);
+          ">🔄 รีเซ็ต</button>
         </div>
       </div>
 
@@ -1333,7 +1346,7 @@ const WS_SUBSCRIBE_LIMIT   = 80;   // จำนวนหุ้นสูงสุ
 const POLL_STAGGER_MS      = 120;  // หน่วง ms ระหว่าง HTTP request ป้องกัน rate limit
 const PRELOAD_PARALLEL     = 3;    // โหลด candle พร้อมกันสูงสุด N ตัว
 const PRELOAD_STAGGER_MS   = 150;  // หน่วง ms ระหว่าง batch ของ preload
-const BUY_SIGNAL_COOLDOWN  = 14400000; // 4 ชั่วโมง cooldown ต่อ ticker
+const BUY_SIGNAL_COOLDOWN  = 900000; // 15 นาที cooldown ต่อ ticker
 let ws=null, wsPing=null, isLive=false, _wsReconnectTimer=null, _wsReconnectCount=0;
 let pollTimer=null, signalTimer=null;
 let _pollInFlight=false; // FIX: ย้ายมาประกาศ global ป้องกัน undefined ใน _manualRefresh
@@ -4193,6 +4206,7 @@ function showSignalPopup(ticker,price,s1,score,hasCandleData=false,level='strong
   const s2=getS2(ticker,price);
   const r2=getR2(ticker,price);
   const overlay=document.getElementById('signalOverlay');
+  if(!overlay) return;
   overlay.className='signal-overlay';
   overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)closeSignal();};
@@ -5092,7 +5106,7 @@ function checkAllBuySignals(){
   (async()=>{
     try{
       for(const s of stocks){
-        if(s.p>0){
+        if(s.p>0 && !_isBuyAlerted(s.t)){
           await checkBuySignalFull(s.t,s.p);
         }
         await new Promise(r=>setTimeout(r,150));
@@ -6594,7 +6608,7 @@ function _calcBuyScore(ticker, price, s1, r1){
   let g5=0;
   if(closes.length>=4&&highs.length>=4&&lows.length>=4){
     const i=closes.length-1;
-    const c=closes[i],o=closes[i-1]||c,h=highs[i],l=lows[i];
+    const c=closes[i],o=(data?.o?.[i])||closes[i-1]||c,h=highs[i],l=lows[i];
     const body=Math.abs(c-o),range=h-l;
     const lw=Math.min(c,o)-l, uw=h-Math.max(c,o);
     if(range>0&&lw>=body*2&&uw<body*0.5) hammerPattern=true;
@@ -6810,6 +6824,12 @@ function _calcBuyScore(ticker, price, s1, r1){
   // รวมคะแนน + Trend multiplier
   // ════════════════════════════════════════════════
   let total = score1 + score2 + score3 + score4 + score5 + score6 + score7; // max = 125 → clamp 100
+
+  // ── หักคะแนนถ้าไม่มี momentum เลย (G3 < 5) ป้องกัน signal ตอนหุ้นร่วง ──
+  if(score3 < 5){
+    total = Math.round(total * 0.80);
+    scoreBreakdown.push('⚠️ ไม่มี momentum ×0.80');
+  }
 
   if(inUptrend===true){
     total = Math.round(total*1.05);
@@ -8394,10 +8414,11 @@ async function checkBuySignalFull(ticker,price){
   const r1=getR1(ticker,price);
   const pctFromS1=(price-s1)/s1*100;
 
-  // Pre-filter: ชิด S1 ≤ 3% และ RSI < 55
-  if(pctFromS1>2) return;
+  console.log(`[BUY] ${ticker} price=${price} s1=${s1.toFixed(2)} pct=${pctFromS1.toFixed(2)}%`);
+
+  if(pctFromS1>1.5){ console.log(`[BUY] ${ticker} SKIP: ห่าง S1 ${pctFromS1.toFixed(2)}% > 1.5%`); return; }
   const rsi=rsiData[ticker]||50;
-  if(rsi>=55) return;
+  if(rsi>=60){ console.log(`[BUY] ${ticker} SKIP: RSI ${rsi} >= 60`); return; }
 
   // โหลด candle
   if(!candleCache[ticker]?.data||candleCache[ticker]?.data?._mock){
@@ -8416,16 +8437,18 @@ async function checkBuySignalFull(ticker,price){
   }
 
   // Pre-filter score ≥ 35
-  if(score<35) return;
+  console.log(`[BUY] ${ticker} score=${score}`);
+  if(score<BUY_SIGNAL_THRESHOLD){ console.log(`[BUY] ${ticker} SKIP: score ${score} < ${BUY_SIGNAL_THRESHOLD}`); return; }
 
   // ── AI ตัดสินใจ ──
   let aiDecision='BUY';
   if(hasCandleData){
     try{ aiDecision=await _aiPreScreenSignal(ticker,price,s1,r1,score); }catch{}
   }
+  console.log(`[BUY] ${ticker} AI=${aiDecision}`);
 
   if(aiDecision==='BUY'||aiDecision===true){
-    // กำหนด level ตาม score
+    _setBuyAlerted(ticker); // cooldown 5 นาที
     const level=score>=50?'strong':score>=40?'good':'watch';
     const emoji=level==='strong'?'🟢':level==='good'?'🟡':'🔵';
     const label=level==='strong'?'ควรซื้อ':level==='good'?'น่าซื้อ':'น่าสนใจ';
@@ -8474,7 +8497,6 @@ function updateCardLive(s){
   // ตรวจ Exit Signal (เฉพาะหุ้นในพอร์ต)
   if(s.p>0) checkExitSignal(s.t, s.p);
   if(!_isBuyAlerted(s.t)&&s.p>0){
-    _setBuyAlerted(s.t);
     checkBuySignalFull(s.t,s.p);
   }
   // Short Squeeze Alert เมื่อ Short Float >15% และราคาขึ้นแรง >3%
