@@ -3011,7 +3011,7 @@ function drawerTab(tab, btn){
         <button class="tf-btn" onclick="_switchTF(this,180)">6M</button>
         <button class="tf-btn" onclick="_switchTF(this,365)">1Y</button>
       </div>
-      <div id="lwChartContainer" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:8px;background:#0a101a;width:100%"></div>
+      <div id="lwChartContainer" style="height:300px;overflow:hidden;margin:0 -16px 8px -16px;background:#0a101a;width:calc(100% + 32px)"></div>
       <div class="ind-table">
         <div class="ind-row"><span class="ind-name">🎯 Buy Score</span>${scoreTxt}</div>
         <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${rsi>=70?'bear':rsi<=30?'bull':'neut'}">${rsi} ${rsi>=70?'Overbought':rsi<=30?'Oversold':'Neutral'}</span></div>
