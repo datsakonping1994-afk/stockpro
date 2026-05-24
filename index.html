@@ -866,6 +866,17 @@ canvas.bigchart{width:100%;height:100%}
           </div>
           <button class="settings-btn" onclick="dedupeTradeLog()">🧹 ล้างซ้ำ</button>
         </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">ล้าง Chart Cache</div>
+            <div class="settings-sublabel">บังคับดึงข้อมูลกราฟใหม่ทั้งหมด</div>
+          </div>
+          <button class="settings-btn" onclick="
+            Object.keys(candleCache).forEach(k=>delete candleCache[k]);
+            fetch(ALERT_WORKER+'/candles/clear',{method:'POST'}).catch(()=>{});
+            toast('🔄 ล้าง Chart Cache แล้ว — เปิดหุ้นแล้วกด tab กราฟใหม่ครับ');
+          ">🔄 ล้าง Cache</button>
+        </div>
         <div class="settings-row" style="border-bottom:none">
           <div>
             <div class="settings-label">ล้าง Signal Cooldown</div>
@@ -6088,16 +6099,18 @@ async function _switchTF(btn, days){
     const ticker=currentDrawerTicker;
     if(!ticker) return;
     _currentChartDays=days;
-    if(candleCache[ticker]) candleCache[ticker].days=0;
+    // ไม่ล้าง cache เดิม แค่ขอข้อมูลใหม่ตาม days
     await fetchCandles(ticker,days);
     await updateRSIFromCandles(ticker);
-    // วาด LW chart ใหม่
+    // วาด LW chart ใหม่ — ใช้ข้อมูลตาม cacheKey ที่แยกตาม days
+    const cacheKey=`${ticker}_${days}`;
+    const chartData = candleCache[cacheKey]?.data || candleCache[ticker]?.data;
     const containerId='lwChartContainer';
     const container=document.getElementById(containerId);
-    if(container&&candleCache[ticker]?.data?.c&&typeof LightweightCharts!=='undefined'){
+    if(container&&chartData?.c&&typeof LightweightCharts!=='undefined'){
       const s=stocks.find(x=>x.t===ticker);
-      const allPrices=candleCache[ticker].data.c;
-      const allTs=candleCache[ticker].data.t||null;
+      const allPrices=chartData.c;
+      const allTs=chartData.t||null;
       const prices=allPrices.slice(-days);
       const timestamps=allTs?allTs.slice(-days):null;
       const p=s?.p||prices[prices.length-1]||0;
@@ -6354,10 +6367,13 @@ async function fetchCandlesPolygon(ticker, days=60){
 // ── fetchCandles — rate limit guard ──
 const _candleFetching=new Set(); // ป้องกัน concurrent fetch ตัวเดียวกัน
 async function fetchCandles(ticker, days=60){
+  const cacheKey = `${ticker}_${days}`;
+  // เช็ค cache แยกตาม days
+  if(candleCache[cacheKey]&&candleCache[cacheKey].ts>Date.now()-1800000) return candleCache[cacheKey].data;
   if(candleCache[ticker]&&candleCache[ticker].ts>Date.now()-1800000&&(candleCache[ticker].days||0)>=days) return candleCache[ticker].data;
   if(candleCache[ticker]?.data?._mock && !hasApiKey()) return candleCache[ticker].data;
-  if(_candleFetching.has(ticker)) return candleCache[ticker]?.data||null; // ถ้ากำลัง fetch อยู่ คืน cache เดิม
-  _candleFetching.add(ticker);
+  if(_candleFetching.has(cacheKey)) return candleCache[cacheKey]?.data||candleCache[ticker]?.data||null;
+  _candleFetching.add(cacheKey);
   try{
     // ── 0. ลอง Worker KV cache ก่อน (เร็วที่สุด ไม่เสีย quota) ──
     try{
@@ -6374,16 +6390,18 @@ async function fetchCandles(ticker, days=60){
       }
     }catch{}
 
-    // ── 1. ลอง Polygon.io ก่อน (ข้อมูลแม่นยำ ไม่ต้อง proxy) ──
-    let candleData=await fetchCandlesPolygon(ticker, days);
-    if(candleData){
-      candleCache[ticker]={data:candleData,ts:Date.now(),days,src:'polygon'};
-      return candleData;
-    }
-    // ── 2. Fallback → Twelve Data ──
-    candleData=await fetchCandlesTwelve(ticker, days);
+    // ── 1. ลอง Twelve Data ก่อน (ข้อมูลย้อนหลังมากกว่า) ──
+    let candleData=await fetchCandlesTwelve(ticker, days);
     if(candleData){
       candleCache[ticker]={data:candleData,ts:Date.now(),days,src:'twelve'};
+      candleCache[cacheKey]={data:candleData,ts:Date.now(),src:'twelve'};
+      return candleData;
+    }
+    // ── 2. Fallback → Polygon.io ──
+    candleData=await fetchCandlesPolygon(ticker, days);
+    if(candleData){
+      candleCache[ticker]={data:candleData,ts:Date.now(),days,src:'polygon'};
+      candleCache[cacheKey]={data:candleData,ts:Date.now(),src:'polygon'};
       return candleData;
     }
     // ── 3. Fallback → Yahoo Finance (proxy chain เดิม) ──
@@ -6407,16 +6425,18 @@ async function fetchCandles(ticker, days=60){
     }catch{}
     if(candleData){
       candleCache[ticker]={data:candleData,ts:Date.now(),days,src:'yahoo'};
+      candleCache[cacheKey]={data:candleData,ts:Date.now(),src:'yahoo'};
       return candleData;
     }
   }catch(e){}
-  finally{ _candleFetching.delete(ticker); }
+  finally{ _candleFetching.delete(cacheKey); }
   // Fallback: mock data
   const s=stocks.find(x=>x.t===ticker);
   if(s&&s.p>0){
     const data=_genMockCandles(ticker,s.p,days);
     if(data){
       candleCache[ticker]={data,ts:Date.now()-240000,days};
+      candleCache[cacheKey]={data,ts:Date.now()-240000};
       return data;
     }
   }
@@ -8392,10 +8412,9 @@ ${holdings}
 
 สรุปใน 4 บรรทัด: 1)ความเสี่ยงรวม 2)หุ้นที่น่าจับตา 3)ควรถือ cash เท่าไหร่ 4)คำแนะนำสั้นๆ`;
 
-    // Claude เป็นหลัก fallback Gemini → Groq
+    // เรียกผ่าน Worker — Gemini → Groq อัตโนมัติ
     let reply = await _callClaude(sys,prompt,200);
-    if(!reply) reply = await _callGemini15Pro(sys,prompt,200);
-    if(!reply) reply = await _callGroq(sys,prompt,200);
+    if(!reply){ resultEl.innerHTML='❌ ไม่สามารถวิเคราะห์ได้'; return; }
     reply = (reply||'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/#+\s/g,'').replace(/[\u{1F000}-\u{1FFFF}]/gu,'').replace(/[\u{2600}-\u{26FF}]/gu,'').replace(/[\u{2700}-\u{27BF}]/gu,'').replace(/\d+\)\s*/g,'').trim();
     // แต่ละประโยคขึ้นบรรทัดใหม่
     reply = reply.split('|').join('\n').replace(/\s{2,}/g,' ').trim();
@@ -8730,7 +8749,7 @@ function _setBuyAlerted(ticker){
   const key='buy_alerted_'+ticker;
   localStorage.setItem(key, Date.now().toString());
   _buyAlerted.add(ticker);
-  setTimeout(()=>{ _buyAlerted.delete(ticker); localStorage.removeItem(key); }, BUY_SIGNAL_COOLDOWN);
+  setTimeout(()=>{ _buyAlerted.delete(ticker); }, BUY_SIGNAL_COOLDOWN);
 }
 let _dashUpdateTimer=null, _portUpdateTimer=null;
 function updateCardLive(s){
