@@ -3534,10 +3534,9 @@ async function _callClaude(systemPrompt, userPrompt, maxTokens=800){
       signal:ctrl.signal
     });
     clearTimeout(tid);
-    if(r.ok){
-      const d=await r.json();
-      // รองรับทั้ง 2 format: {content:[{text}]} และ {text}
-      return d?.content?.[0]?.text || d?.text || null;
+    const d=await r.json(); // อ่าน body เสมอ ป้องกัน deadlock
+    if(d?.ok && (d?.content?.[0]?.text || d?.text)){
+      return d.content?.[0]?.text || d.text;
     }
   }catch(e){console.warn('Claude Worker error:',e.message);}
   return null;
@@ -3870,7 +3869,7 @@ async function sendAI(ticker){
 - ใช้ emoji แทน bullet ห้ามใช้ ## ** --- ห้ามใช้ศัพท์อังกฤษ
 - ถ้าหุ้นน่าซื้อ บอกตรงๆ ถ้าไม่น่าซื้อ บอกตรงๆ พร้อมเหตุผล`;
     const userPrompt=`${context}\n\nประวัติการสนทนา:\n${aiHistory[ticker].slice(-4).map(m=>`${m.role==='user'?'คำถาม':'ตอบ'}: ${m.content}`).join('\n')}\n\nคำถาม: ${msg}`;
-    const reply=await callAI_Chat(systemPrompt, userPrompt, 800);
+    const reply=await callAI_Analyze(systemPrompt, userPrompt, 800);
     const replyText=reply||'❌ ไม่ได้รับคำตอบ กรุณาลองใหม่';
     aiHistory[ticker].push({role:'assistant',content:replyText});
     _saveAiHistory();
@@ -8412,8 +8411,8 @@ ${holdings}
 
 สรุปใน 4 บรรทัด: 1)ความเสี่ยงรวม 2)หุ้นที่น่าจับตา 3)ควรถือ cash เท่าไหร่ 4)คำแนะนำสั้นๆ`;
 
-    // เรียกผ่าน Worker — Gemini → Groq อัตโนมัติ
-    let reply = await _callClaude(sys,prompt,200);
+    // เรียกผ่าน callAI_Analyze — Worker → Gemini → Groq → Pollinations
+    let reply = await callAI_Analyze(sys,prompt,200);
     if(!reply){ resultEl.innerHTML='❌ ไม่สามารถวิเคราะห์ได้'; return; }
     reply = (reply||'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/#+\s/g,'').replace(/[\u{1F000}-\u{1FFFF}]/gu,'').replace(/[\u{2600}-\u{26FF}]/gu,'').replace(/[\u{2700}-\u{27BF}]/gu,'').replace(/\d+\)\s*/g,'').trim();
     // แต่ละประโยคขึ้นบรรทัดใหม่
