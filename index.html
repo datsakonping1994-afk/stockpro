@@ -104,6 +104,7 @@
   .field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .draw-field{display:block; margin-top:10px;}
   .auto-badge{font-size:11px; color:var(--gold); display:flex; align-items:center; gap:4px; min-height:14px;}
+  .form-line{font-size:12px; color:var(--muted); font-family:'Roboto Mono',monospace; display:none;}
   label{display:block;}
   .field-label{font-size:11px; color:var(--muted);}
   input, textarea{
@@ -129,6 +130,21 @@
   .summary-text{font-size:13px; color:var(--muted); line-height:1.5; padding:2px 2px 0;}
   .summary-text.adjusted{color:var(--chalk);}
   .summary-text.adjusted::before{content:"🧠 "; }
+  .btn-ai{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
+    background:transparent; border:1px dashed var(--gold); color:var(--gold);
+    border-radius:10px; padding:9px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn-ai:active{transform:scale(.98);}
+  .btn-ai:disabled{opacity:.6;}
+  .ai-result{
+    font-size:13px; line-height:1.6; color:var(--chalk); background:var(--pitch);
+    border:1px solid var(--line); border-radius:12px; padding:0; margin-top:0;
+    overflow:hidden; max-height:0; transition:padding .2s, max-height .2s;
+  }
+  .ai-result.show{ padding:12px; max-height:600px; }
+  .ai-result .ai-error{ color:var(--rose); }
+  .ai-result .ai-tag{ font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); display:block; margin-bottom:6px; }
 
   .btn-row{display:flex; gap:8px;}
   .btn-save{
@@ -246,6 +262,7 @@ const QUICK_PICK_LEAGUES = [
   { id: "4347", match: "Swedish Allsvenskan", nameTh: "สวีเดน ออลสเวนส์คาน", flag: "🇸🇪" },
   { id: "4358", match: "Norwegian Eliteserien", nameTh: "นอร์เวย์ อีลิทเซเรียน", flag: "🇳🇴" },
   { id: "4643", match: "Irish Premier Division", nameTh: "ไอร์แลนด์ พรีเมียร์ดิวิชั่น", flag: "🇮🇪" },
+  { id: "5638", match: "Irish FAI Cup", nameTh: "ไอร์แลนด์ เอฟเอไอ คัพ", flag: "🇮🇪" },
   { id: "4691", match: "Romanian Liga I", nameTh: "โรมาเนีย ลีกา 1", flag: "🇷🇴" },
   { match: "American Major League Soccer", nameTh: "สหรัฐฯ เมเจอร์ลีก ซอคเกอร์ (MLS)", flag: "🇺🇸" },
   { match: "Brazilian Serie A", nameTh: "บราซิล เซเรีย อา", flag: "🇧🇷" },
@@ -274,6 +291,55 @@ const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
 let oddsApiSportsCache = null;      // [{key, title, ...}]
 const oddsApiEventsCache = {};      // sport_key -> [{home_team, away_team, commence_time, bookmakers}]
 const autoOddsByFixture = {};       // fixtureId -> {homeOdds, awayOdds, source}
+
+/* ------------------------------------------------------------------ */
+/*  DEEP ANALYSIS: Google Gemini free tier (genuinely free, no card,   */
+/*  no auto-billing even if the key leaks — worst case is quota used   */
+/*  up, same risk profile as the Odds API key above).                  */
+/* ------------------------------------------------------------------ */
+const GEMINI_API_KEY = "AIzaSyDOAfLq2I5m33MbWQGh8A5_Dc-aDiEGxxQ";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const geminiCache = {}; // fixtureId -> generated Thai analysis text
+
+function buildGeminiPrompt(fixture, a, homeForm, awayForm, note){
+  const lines = [];
+  lines.push(`คุณเป็นนักวิเคราะห์ฟุตบอลมืออาชีพ เขียนบทวิเคราะห์คู่นี้เป็นภาษาไทย สั้นกระชับ (ไม่เกิน 120 คำ) โทนเป็นกันเอง เหมือนอธิบายให้เพื่อนฟัง ห้ามใช้หัวข้อหรือ bullet point ให้เขียนเป็นย่อหน้าเดียวไหลลื่น`);
+  lines.push(`คู่แข่งขัน: ${fixture.home} (เจ้าบ้าน) พบ ${fixture.away} (ทีมเยือน), ลีก: ${fixture.leagueTh}`);
+  if(a){
+    lines.push(`ราคาบอกโอกาส: ${fixture.home} ${a.fairHomePct}%${a.fairDrawPct != null ? `, เสมอ ${a.fairDrawPct}%` : ""}, ${fixture.away} ${a.fairAwayPct}% (ตัวเต็งตามราคาคือ ${a.favourite === "home" ? fixture.home : a.favourite === "away" ? fixture.away : "เสมอ"})`);
+  }
+  if(homeForm && homeForm.played > 0) lines.push(`ฟอร์ม 5 นัดหลังของ ${fixture.home}: ${homeForm.record}`);
+  if(awayForm && awayForm.played > 0) lines.push(`ฟอร์ม 5 นัดหลังของ ${fixture.away}: ${awayForm.record}`);
+  if(note && note.trim()) lines.push(`ข้อมูลเพิ่มเติมจากผู้ใช้: ${note.trim()}`);
+  lines.push(`ให้วิเคราะห์ว่าทีมไหนมีภาษีเหนือกว่าและเพราะอะไร โดยอ้างอิงข้อมูลข้างต้นเท่านั้น อย่าสมมติข้อมูลที่ไม่ได้ให้มา`);
+  return lines.join("\n");
+}
+
+async function fetchGeminiAnalysis(fixture, a, homeForm, awayForm, note){
+  if(geminiCache[fixture.id]) return geminiCache[fixture.id];
+  const prompt = buildGeminiPrompt(fixture, a, homeForm, awayForm, note);
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY,
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    }),
+  });
+  if(!res.ok){
+    const body = await res.text().catch(() => "");
+    throw new Error(`Gemini error ${res.status}: ${body.slice(0,200)}`);
+  }
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || null;
+  if(!text) throw new Error("ไม่ได้รับข้อความวิเคราะห์กลับมา");
+  geminiCache[fixture.id] = text.trim();
+  return geminiCache[fixture.id];
+}
 
 async function fetchOddsApiSports(){
   if(oddsApiSportsCache) return oddsApiSportsCache;
@@ -460,10 +526,78 @@ function buildSummary(fixture, a, noteInfo){
   if(noteInfo && noteInfo.mentions.length){
     line += " · " + noteInfo.mentions.join(", ") + " จึงปรับน้ำหนักเพิ่มเติมแล้ว";
   }
+  if(a.formAdjusted){
+    line += " · ปรับน้ำหนักตามฟอร์ม 5 นัดหลังจริงด้วย";
+  }
   return line;
 }
 
-/* ---------------- odds math ---------------- */
+/* ---------------- team form (real recent results, not user-typed) ---------------- */
+const teamFormCache = {}; // teamId -> { record: "W-D-L", points, summary }
+
+async function fetchTeamForm(teamId){
+  if(!teamId) return null;
+  if(teamFormCache[teamId]) return teamFormCache[teamId];
+  try{
+    const res = await fetch(`${SPORTSDB_BASE}/eventslast.php?id=${teamId}`);
+    if(!res.ok) throw new Error("form fetch failed");
+    const json = await res.json();
+    const results = (json.results || []).slice(0, 5);
+    let w = 0, d = 0, l = 0;
+    const sequence = []; // most recent first, e.g. ["W","W","D","L","W"]
+    results.forEach(ev => {
+      const hs = parseInt(ev.intHomeScore, 10), as = parseInt(ev.intAwayScore, 10);
+      if(Number.isNaN(hs) || Number.isNaN(as)) return;
+      const isHome = String(ev.idHomeTeam) === String(teamId);
+      const scored = isHome ? hs : as;
+      const conceded = isHome ? as : hs;
+      let outcome = "D";
+      if(scored > conceded) outcome = "W";
+      else if(scored < conceded) outcome = "L";
+      if(outcome === "W") w++; else if(outcome === "D") d++; else l++;
+      sequence.push(outcome);
+    });
+    const played = w + d + l;
+    const points = w * 3 + d; // out of played*3
+    const form = {
+      played, w, d, l,
+      points,
+      maxPoints: played * 3,
+      sequence,
+      record: played > 0 ? `${w}ชนะ-${d}เสมอ-${l}แพ้` : null,
+    };
+    teamFormCache[teamId] = form;
+    return form;
+  }catch{
+    teamFormCache[teamId] = null;
+    return null;
+  }
+}
+
+// Converts each side's last-5 record into a small nudge on fair probability.
+// A team on a hot streak (e.g. 4W-1D out of 5) gets a modest boost; a team
+// in poor form gets a modest penalty. Capped so form can influence but never
+// override what the market price already says.
+function formToAdjust(form){
+  if(!form || form.played === 0) return 0;
+  const ppg = form.points / form.played; // 0..3
+  // 1.5 ppg (roughly break-even form) maps to 0 adjustment
+  const centered = (ppg - 1.5) / 1.5; // range about -1..+1
+  return Math.max(-0.06, Math.min(0.06, centered * 0.06));
+}
+
+function formSummaryLine(fixture, homeForm, awayForm){
+  const parts = [];
+  if(homeForm && homeForm.played > 0){
+    parts.push(`${fixture.home.split(" ")[0]} 5 นัดหลัง: ${homeForm.record}`);
+  }
+  if(awayForm && awayForm.played > 0){
+    parts.push(`${fixture.away.split(" ")[0]} 5 นัดหลัง: ${awayForm.record}`);
+  }
+  return parts.join(" · ");
+}
+
+
 function impliedProb(odds){
   const n = parseFloat(odds);
   if(!n || n <= 1) return null;
@@ -473,27 +607,32 @@ function impliedProb(odds){
 // Full 3-way (home/draw/away) calculation when draw odds are supplied;
 // falls back to the original 2-way calculation when they aren't, so
 // leagues/cups where a draw can't happen (or the user skips the field)
-// still work exactly as before.
-function analyzeOdds(homeOdds, awayOdds, note, drawOdds){
+// still work exactly as before. homeForm/awayForm (real last-5 results)
+// nudge the price-implied probabilities alongside the note-based nudge.
+function analyzeOdds(homeOdds, awayOdds, note, drawOdds, homeForm, awayForm){
   const pH = impliedProb(homeOdds), pA = impliedProb(awayOdds);
   if(pH == null || pA == null) return null;
   const pD = impliedProb(drawOdds);
   const noteInfo = analyzeNote(note);
+  const homeFormAdjust = formToAdjust(homeForm);
+  const awayFormAdjust = formToAdjust(awayForm);
+  const totalHomeAdjust = noteInfo.homeAdjust + homeFormAdjust;
+  const totalAwayAdjust = noteInfo.awayAdjust + awayFormAdjust;
 
   let fairH, fairA, fairD = null;
 
   if(pD != null){
     const overround = pH + pA + pD;
     fairH = pH/overround; fairA = pA/overround; fairD = pD/overround;
-    fairH = Math.min(0.9, Math.max(0.03, fairH + noteInfo.homeAdjust));
-    fairA = Math.min(0.9, Math.max(0.03, fairA + noteInfo.awayAdjust));
+    fairH = Math.min(0.9, Math.max(0.03, fairH + totalHomeAdjust));
+    fairA = Math.min(0.9, Math.max(0.03, fairA + totalAwayAdjust));
     const sum = fairH + fairA + fairD;
     fairH /= sum; fairA /= sum; fairD /= sum;
   } else {
     const overround = pH + pA;
     fairH = pH/overround; fairA = pA/overround;
-    fairH = Math.min(0.95, Math.max(0.05, fairH + noteInfo.homeAdjust));
-    fairA = Math.min(0.95, Math.max(0.05, fairA + noteInfo.awayAdjust));
+    fairH = Math.min(0.95, Math.max(0.05, fairH + totalHomeAdjust));
+    fairA = Math.min(0.95, Math.max(0.05, fairA + totalAwayAdjust));
     const sum = fairH + fairA;
     fairH /= sum; fairA /= sum;
   }
@@ -517,6 +656,7 @@ function analyzeOdds(homeOdds, awayOdds, note, drawOdds){
     tier,
     favourite,
     noteAdjusted: noteInfo.homeAdjust !== 0 || noteInfo.awayAdjust !== 0,
+    formAdjusted: homeFormAdjust !== 0 || awayFormAdjust !== 0,
     noteInfo,
   };
 }
@@ -580,6 +720,8 @@ async function fetchLeagueFixtures(league){
     flag: league.flag,
     home: e.strHomeTeam,
     away: e.strAwayTeam,
+    homeTeamId: e.idHomeTeam,
+    awayTeamId: e.idAwayTeam,
     date: e.dateEvent,
     time: e.strTime,
     venue: e.strVenue,
@@ -649,6 +791,7 @@ function ticketHTML(f){
       </button>
       <div class="perforation"><div class="hole left"></div><div class="hole right"></div><div class="dash"></div></div>
       <div class="ticket-bottom" id="body-${f.id}">
+        <div class="form-line" id="formline-${f.id}"></div>
         <div class="field-row">
           <label>
             <span class="field-label">ราคาเจ้าบ้าน (ทศนิยม)</span>
@@ -669,6 +812,11 @@ function ticketHTML(f){
           <textarea id="note-${f.id}" rows="2" placeholder="เช่น ทีมเยือนขาดตัวหลัก 2 คน"></textarea>
         </label>
         <div id="analysis-${f.id}"></div>
+        <button class="btn-ai" data-ai="${f.id}">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
+          วิเคราะห์เชิงลึกด้วย AI
+        </button>
+        <div class="ai-result" id="airesult-${f.id}"></div>
         <div class="btn-row">
           <button class="btn-save" data-save="${f.id}">
             <svg class="icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -690,6 +838,35 @@ function tierIconSVG(cls){
   return `<svg class="icon" style="stroke:var(--rose)" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
 }
 
+async function runAiAnalysis(f){
+  const btn = document.querySelector(`[data-ai="${f.id}"]`);
+  const resultEl = document.getElementById(`airesult-${f.id}`);
+
+  const home = document.getElementById(`home-${f.id}`).value;
+  const away = document.getElementById(`away-${f.id}`).value;
+  const draw = document.getElementById(`draw-${f.id}`).value;
+  const note = document.getElementById(`note-${f.id}`).value;
+  const homeForm = teamFormCache[f.homeTeamId];
+  const awayForm = teamFormCache[f.awayTeamId];
+  const a = analyzeOdds(home, away, note, draw, homeForm, awayForm);
+
+  btn.disabled = true;
+  const originalLabel = btn.innerHTML;
+  btn.innerHTML = "กำลังวิเคราะห์…";
+  resultEl.classList.add("show");
+  resultEl.innerHTML = `<span class="ai-tag">AI กำลังคิด</span>กำลังส่งข้อมูลให้ AI วิเคราะห์ รอสักครู่…`;
+
+  try{
+    const text = await fetchGeminiAnalysis(f, a, homeForm, awayForm, note);
+    resultEl.innerHTML = `<span class="ai-tag">วิเคราะห์โดย AI (Gemini)</span>${text.replace(/\n/g, "<br>")}`;
+  }catch(err){
+    resultEl.innerHTML = `<span class="ai-tag">เกิดข้อผิดพลาด</span><span class="ai-error">วิเคราะห์ไม่สำเร็จ: ${(err && err.message) || "ไม่ทราบสาเหตุ"} — ลองแตะปุ่มใหม่อีกครั้ง</span>`;
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
+}
+
 function renderAnalysis(f){
   const home = document.getElementById(`home-${f.id}`).value;
   const away = document.getElementById(`away-${f.id}`).value;
@@ -698,7 +875,16 @@ function renderAnalysis(f){
   const box = document.getElementById(`analysis-${f.id}`);
   const iconSlot = document.getElementById(`tiericon-${f.id}`);
   const ticketEl = document.getElementById(`ticket-${f.id}`);
-  const a = analyzeOdds(home, away, note, draw);
+  const homeForm = teamFormCache[f.homeTeamId];
+  const awayForm = teamFormCache[f.awayTeamId];
+  const a = analyzeOdds(home, away, note, draw, homeForm, awayForm);
+
+  const formLineEl = document.getElementById(`formline-${f.id}`);
+  if(formLineEl){
+    const line = formSummaryLine(f, homeForm, awayForm);
+    formLineEl.textContent = line;
+    formLineEl.style.display = line ? "block" : "none";
+  }
 
   ticketEl.classList.remove("tier-green","tier-yellow","tier-red");
   if(!a){
@@ -749,9 +935,10 @@ async function renderList(){
 
   // wire up events + preload saved/auto odds
   for(const f of visible){
-    document.querySelector(`[data-toggle="${f.id}"]`).onclick = () => toggleTicket(f.id);
+    document.querySelector(`[data-toggle="${f.id}"]`).onclick = () => toggleTicket(f);
     document.querySelector(`[data-save="${f.id}"]`).onclick = () => saveTicket(f);
     document.querySelector(`[data-clear="${f.id}"]`).onclick = () => clearTicket(f);
+    document.querySelector(`[data-ai="${f.id}"]`).onclick = () => runAiAnalysis(f);
     document.getElementById(`home-${f.id}`).addEventListener("input", () => renderAnalysis(f));
     document.getElementById(`away-${f.id}`).addEventListener("input", () => renderAnalysis(f));
     document.getElementById(`draw-${f.id}`).addEventListener("input", () => renderAnalysis(f));
@@ -784,14 +971,26 @@ function showAutoBadge(fixtureId, bookmaker){
 
 function footnoteHTML(){
   return `<p class="footnote">โปรแกรมแข่งดึงจาก TheSportsDB · ราคาต่อรองดึงอัตโนมัติจาก The Odds API เมื่อมีให้ ลีกที่ไม่มีราคากรอกเองได้
-    · ระบบวิเคราะห์อ่านโน้ตของคุณและปรับน้ำหนักให้ (กฎที่ตั้งไว้ล่วงหน้า ไม่ใช่ AI สนทนาจริง) · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
+    · ฟอร์ม 5 นัดหลังดึงจริงจาก TheSportsDB · กดปุ่ม "วิเคราะห์เชิงลึกด้วย AI" เพื่อให้ Gemini (ฟรี) เขียนบทวิเคราะห์จากข้อมูลที่มี · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
 }
 
-function toggleTicket(id){
-  const body = document.getElementById(`body-${id}`);
-  const chev = document.getElementById(`chev-${id}`);
+function toggleTicket(f){
+  const body = document.getElementById(`body-${f.id}`);
+  const chev = document.getElementById(`chev-${f.id}`);
   const isOpen = body.classList.toggle("open");
   chev.style.transform = isOpen ? "rotate(180deg)" : "rotate(0deg)";
+
+  if(isOpen){
+    const formLineEl = document.getElementById(`formline-${f.id}`);
+    const needHome = f.homeTeamId && !teamFormCache[f.homeTeamId];
+    const needAway = f.awayTeamId && !teamFormCache[f.awayTeamId];
+    if(needHome || needAway){
+      if(formLineEl){ formLineEl.textContent = "กำลังโหลดฟอร์ม 5 นัดหลัง…"; formLineEl.style.display = "block"; }
+      Promise.all([fetchTeamForm(f.homeTeamId), fetchTeamForm(f.awayTeamId)])
+        .then(() => renderAnalysis(f))
+        .catch(() => { if(formLineEl) formLineEl.style.display = "none"; });
+    }
+  }
 }
 
 async function saveTicket(f){
