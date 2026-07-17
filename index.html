@@ -102,6 +102,8 @@
   .ticket-bottom{padding:16px; display:none; flex-direction:column; gap:12px;}
   .ticket-bottom.open{display:flex;}
   .field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .draw-field{display:block; margin-top:10px;}
+  .auto-badge{font-size:11px; color:var(--gold); display:flex; align-items:center; gap:4px; min-height:14px;}
   label{display:block;}
   .field-label{font-size:11px; color:var(--muted);}
   input, textarea{
@@ -124,6 +126,9 @@
   .analysis-sub{font-size:11px; color:var(--muted); font-family:'Roboto Mono',monospace;}
   .gap-label{font-size:10px; color:var(--muted); text-align:right;}
   .gap-num{font-size:20px; text-align:right;}
+  .summary-text{font-size:13px; color:var(--muted); line-height:1.5; padding:2px 2px 0;}
+  .summary-text.adjusted{color:var(--chalk);}
+  .summary-text.adjusted::before{content:"🧠 "; }
 
   .btn-row{display:flex; gap:8px;}
   .btn-save{
@@ -158,6 +163,7 @@
   .btn-follow{background:var(--gold); color:var(--pitch); border:none; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer;}
   .btn-unfollow{background:var(--line); color:var(--muted); border:none; border-radius:999px; padding:6px 12px; font-size:12px; cursor:pointer;}
   .picker-loading, .picker-empty{text-align:center; color:var(--muted); padding:40px 0; font-size:14px;}
+  .picker-section-label{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:600; padding:8px 2px 2px;}
 
   svg.icon{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle;}
 </style>
@@ -222,11 +228,161 @@ const TOP_LEAGUE_MATCH = [
   { match: "UEFA Champions League", nameTh: "ยูฟ่า แชมเปียนส์ลีก", flag: "⭐" },
 ];
 
+// Quick-pick choices shown as tappable buttons in the picker — no typing
+// required. Each has an exact English name to match against the live
+// directory, plus a Thai label the user actually recognizes.
+const QUICK_PICK_LEAGUES = [
+  { match: "English Premier League", nameTh: "อังกฤษ พรีเมียร์ลีก", flag: "🏴" },
+  { match: "English League Championship", nameTh: "อังกฤษ แชมเปี้ยนชิพ", flag: "🏴" },
+  { match: "Spanish La Liga", nameTh: "สเปน ลาลีกา", flag: "🇪🇸" },
+  { match: "Italian Serie A", nameTh: "อิตาลี เซเรีย อา", flag: "🇮🇹" },
+  { match: "German Bundesliga", nameTh: "เยอรมัน บุนเดสลีกา", flag: "🇩🇪" },
+  { match: "French Ligue 1", nameTh: "ฝรั่งเศส ลีกเอิง", flag: "🇫🇷" },
+  { match: "Dutch Eredivisie", nameTh: "เนเธอร์แลนด์ เอเรดิวิซี", flag: "🇳🇱" },
+  { match: "Portuguese Primeira Liga", nameTh: "โปรตุเกส พรีเมร่าลีกา", flag: "🇵🇹" },
+  { match: "Scottish Premier League", nameTh: "สกอตแลนด์ พรีเมียร์ลีก", flag: "🏴" },
+  { match: "Belgian Pro League", nameTh: "เบลเยียม โปรลีก", flag: "🇧🇪" },
+  { match: "Turkish Super Lig", nameTh: "ตุรกี ซุปเปอร์ลีก", flag: "🇹🇷" },
+  { match: "Swedish Allsvenskan", nameTh: "สวีเดน ออลสเวนส์คาน", flag: "🇸🇪" },
+  { match: "Norwegian Eliteserien", nameTh: "นอร์เวย์ อีลิทเซเรียน", flag: "🇳🇴" },
+  { match: "Irish Premier Division", nameTh: "ไอร์แลนด์ พรีเมียร์ดิวิชั่น", flag: "🇮🇪" },
+  { match: "Romanian Liga I", nameTh: "โรมาเนีย ลีกา 1", flag: "🇷🇴" },
+  { match: "American Major League Soccer", nameTh: "สหรัฐฯ เมเจอร์ลีก ซอคเกอร์ (MLS)", flag: "🇺🇸" },
+  { match: "Brazilian Serie A", nameTh: "บราซิล เซเรีย อา", flag: "🇧🇷" },
+  { match: "Argentinian Primera Division", nameTh: "อาร์เจนตินา พรีเมร่า ดิวิซิออน", flag: "🇦🇷" },
+  { match: "Japanese J-League", nameTh: "ญี่ปุ่น เจลีก", flag: "🇯🇵" },
+  { match: "Chinese Super League", nameTh: "จีน ซูเปอร์ลีก", flag: "🇨🇳" },
+  { match: "Saudi Arabian Pro League", nameTh: "ซาอุดีอาระเบีย โปรลีก", flag: "🇸🇦" },
+  { match: "Australian A-League", nameTh: "ออสเตรเลีย เอลีก", flag: "🇦🇺" },
+  { match: "UEFA Champions League", nameTh: "ยูฟ่า แชมเปียนส์ลีก", flag: "⭐" },
+  { match: "UEFA Europa League", nameTh: "ยูฟ่า ยูโรป้าลีก", flag: "⭐" },
+];
+
 const TIER_META = {
   green:  { label: "มั่นใจสูง", cls: "green" },
   yellow: { label: "ปานกลาง",   cls: "yellow" },
   red:    { label: "เสี่ยง สูสี", cls: "red" },
 };
+
+/* ------------------------------------------------------------------ */
+/*  ODDS DATA SOURCE: The Odds API (legal, licensed-bookmaker feed)   */
+/*  Free tier key — swap ODDS_API_KEY if it ever gets rate-limited.   */
+/* ------------------------------------------------------------------ */
+const ODDS_API_KEY = "c8a27b58d64be14502e723359fd5a565";
+const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
+
+let oddsApiSportsCache = null;      // [{key, title, ...}]
+const oddsApiEventsCache = {};      // sport_key -> [{home_team, away_team, commence_time, bookmakers}]
+const autoOddsByFixture = {};       // fixtureId -> {homeOdds, awayOdds, source}
+
+async function fetchOddsApiSports(){
+  if(oddsApiSportsCache) return oddsApiSportsCache;
+  try{
+    const res = await fetch(`${ODDS_API_BASE}/sports/?apiKey=${ODDS_API_KEY}`);
+    if(!res.ok) throw new Error("odds api sports failed");
+    oddsApiSportsCache = await res.json();
+  }catch{
+    oddsApiSportsCache = [];
+  }
+  return oddsApiSportsCache;
+}
+
+// normalize for fuzzy matching: lowercase, strip punctuation/diacritics/common filler words
+function normalizeText(s){
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(fc|cf|afc|the|club|de|do|des)\b/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+async function resolveOddsSportKey(leagueNameEn){
+  const sports = await fetchOddsApiSports();
+  if(!sports.length) return null;
+  const target = normalizeText(leagueNameEn);
+  let best = null, bestScore = 0;
+  for(const s of sports){
+    if(s.group !== "Soccer") continue;
+    const title = normalizeText(s.title);
+    if(title === target){ return s.key; } // exact match wins immediately
+    // substring overlap score
+    if(title.includes(target) || target.includes(title)){
+      const score = Math.min(title.length, target.length);
+      if(score > bestScore){ bestScore = score; best = s.key; }
+    }
+  }
+  return best;
+}
+
+async function fetchOddsApiEvents(sportKey){
+  if(oddsApiEventsCache[sportKey]) return oddsApiEventsCache[sportKey];
+  try{
+    const res = await fetch(
+      `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu,uk&markets=h2h&oddsFormat=decimal`
+    );
+    if(!res.ok) throw new Error("odds api odds failed");
+    const data = await res.json();
+    oddsApiEventsCache[sportKey] = data;
+    return data;
+  }catch{
+    oddsApiEventsCache[sportKey] = [];
+    return [];
+  }
+}
+
+function teamsMatch(a, b){
+  const na = normalizeText(a), nb = normalizeText(b);
+  if(!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+// Finds odds for one fixture from an already-fetched Odds API events array,
+// matching by team names (loose) and same calendar day.
+function findOddsForFixture(events, fixture){
+  const fixtureDay = fixture.date; // YYYY-MM-DD
+  for(const ev of events){
+    const evDay = (ev.commence_time || "").slice(0, 10);
+    if(evDay !== fixtureDay) continue;
+    if(!teamsMatch(ev.home_team, fixture.home) || !teamsMatch(ev.away_team, fixture.away)) continue;
+    const book = (ev.bookmakers || [])[0];
+    if(!book) continue;
+    const market = (book.markets || []).find(m => m.key === "h2h");
+    if(!market) continue;
+    const homeOutcome = market.outcomes.find(o => teamsMatch(o.name, fixture.home));
+    const awayOutcome = market.outcomes.find(o => teamsMatch(o.name, fixture.away));
+    const drawOutcome = market.outcomes.find(o => o.name.toLowerCase() === "draw");
+    if(homeOutcome && awayOutcome){
+      return {
+        homeOdds: homeOutcome.price,
+        awayOdds: awayOutcome.price,
+        drawOdds: drawOutcome ? drawOutcome.price : null,
+        bookmaker: book.title,
+      };
+    }
+  }
+  return null;
+}
+
+// Pre-fetches auto-odds for every league currently in view, then matches
+// each fixture. Populates autoOddsByFixture. Best-effort — leagues the API
+// doesn't cover simply get no auto odds (manual entry still works for them).
+async function preloadAutoOdds(fixtureList){
+  const leagueIds = [...new Set(fixtureList.map(f => f.leagueId))];
+  const leagueMeta = {};
+  fixtureList.forEach(f => { leagueMeta[f.leagueId] = f.leagueNameEn || f.leagueTh; });
+
+  await Promise.all(leagueIds.map(async (lid) => {
+    const sportKey = await resolveOddsSportKey(leagueMeta[lid]);
+    if(!sportKey) return;
+    const events = await fetchOddsApiEvents(sportKey);
+    fixtureList
+      .filter(f => f.leagueId === lid)
+      .forEach(f => {
+        const found = findOddsForFixture(events, f);
+        if(found) autoOddsByFixture[f.id] = found;
+      });
+  }));
+}
 
 let allLeaguesCache = null;
 let watchlist = [];
@@ -247,26 +403,113 @@ async function storageDelete(key){
   try{ await window.storage.delete(key, false); } catch{ /* ignore */ }
 }
 
+/* ---------------- "smart" rule-based analysis (no external AI needed) ---------------- */
+// Looks for injury/absence-type keywords in the user's own note and figures
+// out which side they're talking about, then nudges the odds-implied
+// probabilities accordingly. This is a fixed rule set, not a real LLM —
+// but it's free, has no key to leak, and never goes down.
+const NEGATIVE_KEYWORDS = ["เจ็บ","บาดเจ็บ","ขาด","แบน","พัก","ไม่พร้อม","สำรอง","ล้า","เหนื่อย","ปัญหา"];
+const POSITIVE_KEYWORDS = ["ฟอร์มดี","มั่นใจ","ครบทีม","แข็งแกร่ง","ฟิต","ชนะรวด"];
+const HOME_KEYWORDS = ["เจ้าบ้าน","บ้านตัวเอง"];
+const AWAY_KEYWORDS = ["ทีมเยือน","เยือน"];
+
+function analyzeNote(note){
+  if(!note || !note.trim()) return { homeAdjust: 0, awayAdjust: 0, mentions: [] };
+  const text = note;
+  let homeAdjust = 0, awayAdjust = 0;
+  const mentions = [];
+
+  const hasNeg = NEGATIVE_KEYWORDS.some(k => text.includes(k));
+  const hasPos = POSITIVE_KEYWORDS.some(k => text.includes(k));
+  const mentionsHome = HOME_KEYWORDS.some(k => text.includes(k));
+  const mentionsAway = AWAY_KEYWORDS.some(k => text.includes(k));
+
+  if(hasNeg && mentionsAway && !mentionsHome){ awayAdjust -= 0.06; mentions.push("โน้ตระบุปัญหาฝั่งทีมเยือน"); }
+  if(hasNeg && mentionsHome && !mentionsAway){ homeAdjust -= 0.06; mentions.push("โน้ตระบุปัญหาฝั่งเจ้าบ้าน"); }
+  if(hasPos && mentionsAway && !mentionsHome){ awayAdjust += 0.05; mentions.push("โน้ตระบุฟอร์มดีฝั่งทีมเยือน"); }
+  if(hasPos && mentionsHome && !mentionsAway){ homeAdjust += 0.05; mentions.push("โน้ตระบุฟอร์มดีฝั่งเจ้าบ้าน"); }
+
+  return { homeAdjust, awayAdjust, mentions };
+}
+
+function buildSummary(fixture, a, noteInfo){
+  const home = fixture.home, away = fixture.away;
+  let line;
+  const fav = a.favourite === "home" ? home : a.favourite === "away" ? away : null;
+
+  if(a.favourite === "draw"){
+    line = `โอกาสเสมอสูงสุดในบรรดาสามผลลัพธ์ (เสมอ ${a.fairDrawPct}%) ทั้งสองทีมสูสีกันมาก`;
+  } else if(a.tier === "green"){
+    line = `${fav} มีภาษีเหนือกว่าชัดเจน (ส่วนต่าง ${a.gapPct}%) ราคาเทมาทางนี้ค่อนข้างหนัก`;
+  } else if(a.tier === "yellow"){
+    line = `${fav} ได้เปรียบเล็กน้อย (ส่วนต่าง ${a.gapPct}%) แต่ยังไม่ขาดลอย มีโอกาสพลิกได้`;
+  } else {
+    line = `สองทีมสูสีมาก (ส่วนต่างแค่ ${a.gapPct}%) ราคาแทบจะเท่ากัน ผลลัพธ์เปิดกว้าง`;
+  }
+  if(a.fairDrawPct != null && a.favourite !== "draw"){
+    line += ` · โอกาสเสมอ ${a.fairDrawPct}%`;
+  }
+  if(noteInfo && noteInfo.mentions.length){
+    line += " · " + noteInfo.mentions.join(", ") + " จึงปรับน้ำหนักเพิ่มเติมแล้ว";
+  }
+  return line;
+}
+
 /* ---------------- odds math ---------------- */
 function impliedProb(odds){
   const n = parseFloat(odds);
   if(!n || n <= 1) return null;
   return 1/n;
 }
-function analyzeOdds(homeOdds, awayOdds){
+
+// Full 3-way (home/draw/away) calculation when draw odds are supplied;
+// falls back to the original 2-way calculation when they aren't, so
+// leagues/cups where a draw can't happen (or the user skips the field)
+// still work exactly as before.
+function analyzeOdds(homeOdds, awayOdds, note, drawOdds){
   const pH = impliedProb(homeOdds), pA = impliedProb(awayOdds);
   if(pH == null || pA == null) return null;
-  const overround = pH + pA;
-  const fairH = pH/overround, fairA = pA/overround;
-  const gap = Math.abs(fairH - fairA);
+  const pD = impliedProb(drawOdds);
+  const noteInfo = analyzeNote(note);
+
+  let fairH, fairA, fairD = null;
+
+  if(pD != null){
+    const overround = pH + pA + pD;
+    fairH = pH/overround; fairA = pA/overround; fairD = pD/overround;
+    fairH = Math.min(0.9, Math.max(0.03, fairH + noteInfo.homeAdjust));
+    fairA = Math.min(0.9, Math.max(0.03, fairA + noteInfo.awayAdjust));
+    const sum = fairH + fairA + fairD;
+    fairH /= sum; fairA /= sum; fairD /= sum;
+  } else {
+    const overround = pH + pA;
+    fairH = pH/overround; fairA = pA/overround;
+    fairH = Math.min(0.95, Math.max(0.05, fairH + noteInfo.homeAdjust));
+    fairA = Math.min(0.95, Math.max(0.05, fairA + noteInfo.awayAdjust));
+    const sum = fairH + fairA;
+    fairH /= sum; fairA /= sum;
+  }
+
+  // favourite = whichever of the (2 or 3) outcomes is most likely
+  const candidates = [["home", fairH], ["away", fairA]];
+  if(fairD != null) candidates.push(["draw", fairD]);
+  candidates.sort((x, y) => y[1] - x[1]);
+  const favourite = candidates[0][0];
+  const gap = candidates[0][1] - candidates[1][1]; // separation from the runner-up
+
   let tier = "red";
   if(gap >= 0.30) tier = "green";
   else if(gap >= 0.14) tier = "yellow";
+
   return {
     fairHomePct: Math.round(fairH*100),
     fairAwayPct: Math.round(fairA*100),
+    fairDrawPct: fairD != null ? Math.round(fairD*100) : null,
     gapPct: Math.round(gap*100),
-    tier
+    tier,
+    favourite,
+    noteAdjusted: noteInfo.homeAdjust !== 0 || noteInfo.awayAdjust !== 0,
+    noteInfo,
   };
 }
 
@@ -305,6 +548,7 @@ async function fetchLeagueFixtures(league){
     id: e.idEvent,
     leagueId: league.id,
     leagueTh: league.nameTh,
+    leagueNameEn: league.nameEn,
     flag: league.flag,
     home: e.strHomeTeam,
     away: e.strAwayTeam,
@@ -387,6 +631,11 @@ function ticketHTML(f){
             <input inputmode="decimal" id="away-${f.id}" placeholder="เช่น 2.10" />
           </label>
         </div>
+        <label class="draw-field">
+          <span class="field-label">ราคาเสมอ (ทศนิยม, ไม่บังคับ — ใส่ให้แม่นขึ้น)</span>
+          <input inputmode="decimal" id="draw-${f.id}" placeholder="เช่น 3.40" />
+        </label>
+        <div class="auto-badge" id="autobadge-${f.id}"></div>
         <label>
           <span class="field-label">โน้ตของคุณ (ฟอร์ม/ข่าวทีม ฯลฯ)</span>
           <textarea id="note-${f.id}" rows="2" placeholder="เช่น ทีมเยือนขาดตัวหลัก 2 คน"></textarea>
@@ -416,10 +665,12 @@ function tierIconSVG(cls){
 function renderAnalysis(f){
   const home = document.getElementById(`home-${f.id}`).value;
   const away = document.getElementById(`away-${f.id}`).value;
+  const draw = document.getElementById(`draw-${f.id}`).value;
+  const note = document.getElementById(`note-${f.id}`).value;
   const box = document.getElementById(`analysis-${f.id}`);
   const iconSlot = document.getElementById(`tiericon-${f.id}`);
   const ticketEl = document.getElementById(`ticket-${f.id}`);
-  const a = analyzeOdds(home, away);
+  const a = analyzeOdds(home, away, note, draw);
 
   ticketEl.classList.remove("tier-green","tier-yellow","tier-red");
   if(!a){
@@ -431,13 +682,16 @@ function renderAnalysis(f){
   const meta = TIER_META[a.tier];
   ticketEl.classList.add("tier-" + a.tier);
   iconSlot.innerHTML = tierIconSVG(a.tier);
+  const subLine = a.fairDrawPct != null
+    ? `${f.home.split(" ")[0]} ${a.fairHomePct}% · เสมอ ${a.fairDrawPct}% · ${f.away.split(" ")[0]} ${a.fairAwayPct}%`
+    : `${f.home.split(" ")[0]} ${a.fairHomePct}% · ${f.away.split(" ")[0]} ${a.fairAwayPct}%`;
   box.innerHTML = `
     <div class="analysis-box tier-${a.tier}">
       <div class="analysis-left">
         ${tierIconSVG(a.tier)}
         <div>
           <div class="tier-label ${a.tier}">${meta.label}</div>
-          <div class="analysis-sub">${f.home.split(" ")[0]} ${a.fairHomePct}% · ${f.away.split(" ")[0]} ${a.fairAwayPct}%</div>
+          <div class="analysis-sub">${subLine}</div>
         </div>
       </div>
       <div>
@@ -445,6 +699,7 @@ function renderAnalysis(f){
         <div class="gap-num oswald">${a.gapPct}%</div>
       </div>
     </div>
+    <div class="summary-text${a.noteAdjusted ? " adjusted" : ""}">${buildSummary(f, a, a.noteInfo)}</div>
   `;
   oddsMap[f.id] = a.tier;
   renderScoreboard();
@@ -464,28 +719,44 @@ async function renderList(){
 
   listEl.innerHTML = visible.map(ticketHTML).join("") + footnoteHTML();
 
-  // wire up events + preload saved odds
+  // wire up events + preload saved/auto odds
   for(const f of visible){
     document.querySelector(`[data-toggle="${f.id}"]`).onclick = () => toggleTicket(f.id);
     document.querySelector(`[data-save="${f.id}"]`).onclick = () => saveTicket(f);
     document.querySelector(`[data-clear="${f.id}"]`).onclick = () => clearTicket(f);
     document.getElementById(`home-${f.id}`).addEventListener("input", () => renderAnalysis(f));
     document.getElementById(`away-${f.id}`).addEventListener("input", () => renderAnalysis(f));
+    document.getElementById(`draw-${f.id}`).addEventListener("input", () => renderAnalysis(f));
+    document.getElementById(`note-${f.id}`).addEventListener("input", () => renderAnalysis(f));
 
     const saved = await storageGet(STORAGE_PREFIX + f.id);
+    const auto = autoOddsByFixture[f.id];
+
     if(saved){
+      // user's own saved value always wins (explicit choice)
       document.getElementById(`home-${f.id}`).value = saved.homeOdds || "";
       document.getElementById(`away-${f.id}`).value = saved.awayOdds || "";
+      document.getElementById(`draw-${f.id}`).value = saved.drawOdds || "";
       document.getElementById(`note-${f.id}`).value = saved.note || "";
       document.getElementById(`savednote-${f.id}`).style.display = "block";
+    } else if(auto){
+      document.getElementById(`home-${f.id}`).value = auto.homeOdds;
+      document.getElementById(`away-${f.id}`).value = auto.awayOdds;
+      if(auto.drawOdds != null) document.getElementById(`draw-${f.id}`).value = auto.drawOdds;
+      showAutoBadge(f.id, auto.bookmaker);
     }
     renderAnalysis(f);
   }
 }
 
+function showAutoBadge(fixtureId, bookmaker){
+  const el = document.getElementById(`autobadge-${fixtureId}`);
+  if(el) el.innerHTML = `<svg class="icon" style="width:12px;height:12px;stroke:var(--gold)" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg> ราคาอัตโนมัติจาก ${bookmaker}`;
+}
+
 function footnoteHTML(){
-  return `<p class="footnote">โปรแกรมแข่งดึงจาก TheSportsDB (ฟรี ถูกกฎหมาย) · ราคาต่อรองเป็นข้อมูลที่คุณกรอกเอง
-    เก็บไว้ในเครื่องนี้เท่านั้น ไม่มีการเชื่อมต่อเว็บพนัน · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
+  return `<p class="footnote">โปรแกรมแข่งดึงจาก TheSportsDB · ราคาต่อรองดึงอัตโนมัติจาก The Odds API เมื่อมีให้ ลีกที่ไม่มีราคากรอกเองได้
+    · ระบบวิเคราะห์อ่านโน้ตของคุณและปรับน้ำหนักให้ (กฎที่ตั้งไว้ล่วงหน้า ไม่ใช่ AI สนทนาจริง) · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
 }
 
 function toggleTicket(id){
@@ -498,14 +769,16 @@ function toggleTicket(id){
 async function saveTicket(f){
   const homeOdds = document.getElementById(`home-${f.id}`).value;
   const awayOdds = document.getElementById(`away-${f.id}`).value;
+  const drawOdds = document.getElementById(`draw-${f.id}`).value;
   const note = document.getElementById(`note-${f.id}`).value;
-  const ok = await storageSet(STORAGE_PREFIX + f.id, { homeOdds, awayOdds, note });
+  const ok = await storageSet(STORAGE_PREFIX + f.id, { homeOdds, awayOdds, drawOdds, note });
   document.getElementById(`savednote-${f.id}`).style.display = ok ? "block" : "none";
 }
 async function clearTicket(f){
   await storageDelete(STORAGE_PREFIX + f.id);
   document.getElementById(`home-${f.id}`).value = "";
   document.getElementById(`away-${f.id}`).value = "";
+  document.getElementById(`draw-${f.id}`).value = "";
   document.getElementById(`note-${f.id}`).value = "";
   document.getElementById(`savednote-${f.id}`).style.display = "none";
   renderAnalysis(f);
@@ -530,6 +803,7 @@ async function loadFixtures(){
   all.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
   fixtures = all;
 
+  await preloadAutoOdds(all);
   await renderList();
   renderScoreboard();
   btn.disabled = false; icon.classList.remove("spin");
@@ -548,20 +822,48 @@ document.getElementById("pickerSearch").addEventListener("input", (e) => renderP
 
 async function renderPickerList(query){
   const el = document.getElementById("pickerList");
-  el.innerHTML = `<div class="picker-loading">กำลังโหลดรายชื่อลีกทั้งหมด…</div>`;
+  el.innerHTML = `<div class="picker-loading">กำลังโหลดรายชื่อลีก…</div>`;
   let dir;
   try{ dir = await fetchAllSoccerLeagues(); }
-  catch{ el.innerHTML = `<div class="picker-loading">โหลดรายชื่อลีกทั้งหมดไม่สำเร็จ ลองใหม่อีกครั้ง</div>`; return; }
+  catch{ el.innerHTML = `<div class="picker-loading">โหลดรายชื่อลีกไม่สำเร็จ ลองใหม่อีกครั้ง</div>`; return; }
 
-  const q = query.trim().toLowerCase();
-  const results = (q ? dir.filter(l => l.nameEn.toLowerCase().includes(q)) : dir).slice(0, 40);
   const watchedIds = new Set(watchlist.map(l => l.id));
+  const q = query.trim().toLowerCase();
 
-  if(results.length === 0){
-    el.innerHTML = `<div class="picker-empty">ไม่พบลีกที่ค้นหา</div>`;
+  // Default view (no search text): Thai quick-pick chips, no typing needed.
+  if(!q){
+    const resolved = QUICK_PICK_LEAGUES
+      .map(w => {
+        const hit = dir.find(l => l.nameEn && l.nameEn.toLowerCase() === w.match.toLowerCase());
+        return hit ? { id: hit.id, nameEn: hit.nameEn, nameTh: w.nameTh, flag: w.flag } : null;
+      })
+      .filter(Boolean);
+
+    if(resolved.length === 0){
+      el.innerHTML = `<div class="picker-empty">โหลดลีกแนะนำไม่สำเร็จ ลองพิมพ์ค้นหาด้านบนแทน</div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="picker-section-label">ลีกยอดนิยม แตะเพื่อติดตาม</div>` +
+      resolved.map(l => `
+        <div class="picker-row">
+          <span>${l.flag} ${l.nameTh}</span>
+          ${watchedIds.has(l.id)
+            ? `<button class="btn-unfollow" data-remove="${l.id}">เอาออก</button>`
+            : `<button class="btn-follow" data-add="${l.id}" data-name="${l.nameEn.replace(/"/g,'&quot;')}" data-nameth="${l.nameTh.replace(/"/g,'&quot;')}" data-flag="${l.flag}">+ ติดตาม</button>`
+          }
+        </div>
+      `).join("");
+    wirePickerButtons(query);
     return;
   }
 
+  // Search mode: user typed something — search the full English directory.
+  const results = dir.filter(l => l.nameEn.toLowerCase().includes(q)).slice(0, 40);
+  if(results.length === 0){
+    el.innerHTML = `<div class="picker-empty">ไม่พบลีกที่ค้นหา ลองคำอื่น หรือเลือกจากลีกยอดนิยมแทน</div>`;
+    return;
+  }
   el.innerHTML = results.map(l => `
     <div class="picker-row">
       <span>${l.nameEn}</span>
@@ -571,13 +873,19 @@ async function renderPickerList(query){
       }
     </div>
   `).join("");
+  wirePickerButtons(query);
+}
 
+function wirePickerButtons(query){
+  const el = document.getElementById("pickerList");
   el.querySelectorAll("[data-add]").forEach(btn => {
     btn.onclick = async () => {
       const id = btn.getAttribute("data-add");
       const name = btn.getAttribute("data-name");
+      const nameTh = btn.getAttribute("data-nameth") || name;
+      const flag = btn.getAttribute("data-flag") || "⚽";
       if(!watchlist.some(l => l.id === id)){
-        watchlist.push({ id, nameEn: name, nameTh: name, flag: "⚽" });
+        watchlist.push({ id, nameEn: name, nameTh, flag });
         saveWatchlist(watchlist);
         renderChips();
         await loadFixtures();
