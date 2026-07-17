@@ -202,7 +202,7 @@
   <div class="picker-search">
     <div class="search-wrap">
       <svg class="icon search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="pickerSearch" placeholder="ค้นชื่อลีก (ภาษาอังกฤษ) เช่น Eredivisie, MLS, J1 League" />
+      <input id="pickerSearch" type="search" placeholder="ค้นชื่อลีก (ภาษาอังกฤษ) เช่น Eredivisie, MLS, J1 League" />
     </div>
   </div>
   <div id="pickerList"></div>
@@ -522,11 +522,31 @@ async function fetchAllSoccerLeagues(){
   allLeaguesCache = (json.leagues || []).map(l => ({ id: l.idLeague, nameEn: l.strLeague }));
   return allLeaguesCache;
 }
+// Fuzzy-matches a wanted league name against the live directory using the
+// same normalize-and-compare approach as team-name matching, so small
+// wording differences (e.g. "Swedish Allsvenskan" vs "Allsvenskan") don't
+// cause a league to silently disappear from the quick-pick list.
+function findLeagueFuzzy(dir, wantedName){
+  const target = normalizeText(wantedName);
+  if(!target) return null;
+  let exact = null, best = null, bestScore = 0;
+  for(const l of dir){
+    if(!l.nameEn) continue;
+    const n = normalizeText(l.nameEn);
+    if(n === target){ exact = l; break; }
+    if(n.includes(target) || target.includes(n)){
+      const score = Math.min(n.length, target.length);
+      if(score > bestScore){ bestScore = score; best = l; }
+    }
+  }
+  return exact || best;
+}
+
 async function resolveTopLeagues(){
   const dir = await fetchAllSoccerLeagues();
   const out = [];
   TOP_LEAGUE_MATCH.forEach(w => {
-    const hit = dir.find(l => l.nameEn && l.nameEn.toLowerCase() === w.match.toLowerCase());
+    const hit = findLeagueFuzzy(dir, w.match);
     if(hit) out.push({ id: hit.id, nameEn: hit.nameEn, nameTh: w.nameTh, flag: w.flag });
   });
   return out;
@@ -834,7 +854,7 @@ async function renderPickerList(query){
   if(!q){
     const resolved = QUICK_PICK_LEAGUES
       .map(w => {
-        const hit = dir.find(l => l.nameEn && l.nameEn.toLowerCase() === w.match.toLowerCase());
+        const hit = findLeagueFuzzy(dir, w.match);
         return hit ? { id: hit.id, nameEn: hit.nameEn, nameTh: w.nameTh, flag: w.flag } : null;
       })
       .filter(Boolean);
