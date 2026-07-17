@@ -145,6 +145,7 @@
   .ai-result.show{ padding:12px; max-height:600px; }
   .ai-result .ai-error{ color:var(--rose); }
   .ai-result .ai-tag{ font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); display:block; margin-bottom:6px; }
+  .ai-result .ai-sources{ font-size:11px; color:var(--muted); margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
 
   .btn-row{display:flex; gap:8px;}
   .btn-save{
@@ -305,15 +306,15 @@ const geminiCache = {}; // fixtureId -> generated Thai analysis text
 
 function buildGeminiPrompt(fixture, a, homeForm, awayForm, note){
   const lines = [];
-  lines.push(`คุณเป็นนักวิเคราะห์ฟุตบอลมืออาชีพ เขียนบทวิเคราะห์คู่นี้เป็นภาษาไทย สั้นกระชับ (ไม่เกิน 120 คำ) โทนเป็นกันเอง เหมือนอธิบายให้เพื่อนฟัง ห้ามใช้หัวข้อหรือ bullet point ให้เขียนเป็นย่อหน้าเดียวไหลลื่น`);
-  lines.push(`คู่แข่งขัน: ${fixture.home} (เจ้าบ้าน) พบ ${fixture.away} (ทีมเยือน), ลีก: ${fixture.leagueTh}`);
+  lines.push(`คุณเป็นนักวิเคราะห์ฟุตบอลมืออาชีพ เขียนบทวิเคราะห์คู่นี้เป็นภาษาไทย สั้นกระชับ (ไม่เกิน 150 คำ) โทนเป็นกันเอง เหมือนอธิบายให้เพื่อนฟัง ห้ามใช้หัวข้อหรือ bullet point ให้เขียนเป็นย่อหน้าเดียวไหลลื่น`);
+  lines.push(`คู่แข่งขัน: ${fixture.home} (เจ้าบ้าน) พบ ${fixture.away} (ทีมเยือน), ลีก: ${fixture.leagueTh}, วันแข่ง: ${fixture.date}`);
   if(a){
     lines.push(`ราคาบอกโอกาส: ${fixture.home} ${a.fairHomePct}%${a.fairDrawPct != null ? `, เสมอ ${a.fairDrawPct}%` : ""}, ${fixture.away} ${a.fairAwayPct}% (ตัวเต็งตามราคาคือ ${a.favourite === "home" ? fixture.home : a.favourite === "away" ? fixture.away : "เสมอ"})`);
   }
   if(homeForm && homeForm.played > 0) lines.push(`ฟอร์มล่าสุดของ ${fixture.home} (${homeForm.played} นัด, ข้อมูลจำกัดจากแหล่งข้อมูลฟรี): ${homeForm.record}`);
   if(awayForm && awayForm.played > 0) lines.push(`ฟอร์มล่าสุดของ ${fixture.away} (${awayForm.played} นัด, ข้อมูลจำกัดจากแหล่งข้อมูลฟรี): ${awayForm.record}`);
   if(note && note.trim()) lines.push(`ข้อมูลเพิ่มเติมจากผู้ใช้: ${note.trim()}`);
-  lines.push(`ให้วิเคราะห์ว่าทีมไหนมีภาษีเหนือกว่าและเพราะอะไร โดยอ้างอิงข้อมูลข้างต้นเท่านั้น อย่าสมมติข้อมูลที่ไม่ได้ให้มา`);
+  lines.push(`ใช้เครื่องมือค้นเว็บที่มีเพื่อหาข่าวทีมล่าสุด (ผู้เล่นบาดเจ็บ/แบน, ฟอร์มจริง, สถิติเจอกัน) ประกอบการวิเคราะห์ด้วย นอกเหนือจากข้อมูลราคา/ฟอร์มที่ให้มาข้างต้น แล้ววิเคราะห์ว่าทีมไหนมีภาษีเหนือกว่าและเพราะอะไร ถ้าข้อมูลที่ค้นเจอขัดกับราคา ให้บอกด้วยว่าขัดกันตรงไหน`);
   return lines.join("\n");
 }
 
@@ -328,6 +329,7 @@ async function fetchGeminiAnalysis(fixture, a, homeForm, awayForm, note){
     },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
     }),
   });
   if(!res.ok){
@@ -337,7 +339,10 @@ async function fetchGeminiAnalysis(fixture, a, homeForm, awayForm, note){
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || null;
   if(!text) throw new Error("ไม่ได้รับข้อความวิเคราะห์กลับมา");
-  geminiCache[fixture.id] = text.trim();
+  const sources = (data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
+    .map(c => c?.web?.title)
+    .filter(Boolean);
+  geminiCache[fixture.id] = { text: text.trim(), sources };
   return geminiCache[fixture.id];
 }
 
@@ -857,8 +862,11 @@ async function runAiAnalysis(f){
   resultEl.innerHTML = `<span class="ai-tag">AI กำลังคิด</span>กำลังส่งข้อมูลให้ AI วิเคราะห์ รอสักครู่…`;
 
   try{
-    const text = await fetchGeminiAnalysis(f, a, homeForm, awayForm, note);
-    resultEl.innerHTML = `<span class="ai-tag">วิเคราะห์โดย AI (Gemini)</span>${text.replace(/\n/g, "<br>")}`;
+    const result = await fetchGeminiAnalysis(f, a, homeForm, awayForm, note);
+    const sourcesHtml = result.sources && result.sources.length
+      ? `<div class="ai-sources">อ้างอิง: ${result.sources.slice(0,3).join(", ")}</div>`
+      : "";
+    resultEl.innerHTML = `<span class="ai-tag">วิเคราะห์โดย AI (Gemini, ค้นเว็บประกอบ)</span>${result.text.replace(/\n/g, "<br>")}${sourcesHtml}`;
   }catch(err){
     resultEl.innerHTML = `<span class="ai-tag">เกิดข้อผิดพลาด</span><span class="ai-error">วิเคราะห์ไม่สำเร็จ: ${(err && err.message) || "ไม่ทราบสาเหตุ"} — ลองแตะปุ่มใหม่อีกครั้ง</span>`;
   }finally{
@@ -971,7 +979,7 @@ function showAutoBadge(fixtureId, bookmaker){
 
 function footnoteHTML(){
   return `<p class="footnote">โปรแกรมแข่งดึงจาก TheSportsDB · ราคาต่อรองดึงอัตโนมัติจาก The Odds API เมื่อมีให้ ลีกที่ไม่มีราคากรอกเองได้
-    · ฟอร์มทีมดึงจริงจาก TheSportsDB (คีย์ฟรีมักให้แค่ 1 นัดล่าสุด ไม่ใช่ 5 นัด — เป็นข้อจำกัดของแหล่งข้อมูลฟรี) · กดปุ่ม "วิเคราะห์เชิงลึกด้วย AI" เพื่อให้ Gemini (ฟรี) เขียนบทวิเคราะห์จากข้อมูลที่มี · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
+    · ฟอร์มทีมดึงจริงจาก TheSportsDB (คีย์ฟรีมักให้แค่ 1 นัดล่าสุด ไม่ใช่ 5 นัด — เป็นข้อจำกัดของแหล่งข้อมูลฟรี) · กดปุ่ม "วิเคราะห์เชิงลึกด้วย AI" ให้ Gemini (ฟรี) ค้นเว็บหาข่าวทีมจริงประกอบการวิเคราะห์ (โควต้าค้นเว็บมีจำกัดต่อเดือน) · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
 }
 
 function toggleTicket(f){
