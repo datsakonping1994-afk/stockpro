@@ -310,8 +310,8 @@ function buildGeminiPrompt(fixture, a, homeForm, awayForm, note){
   if(a){
     lines.push(`ราคาบอกโอกาส: ${fixture.home} ${a.fairHomePct}%${a.fairDrawPct != null ? `, เสมอ ${a.fairDrawPct}%` : ""}, ${fixture.away} ${a.fairAwayPct}% (ตัวเต็งตามราคาคือ ${a.favourite === "home" ? fixture.home : a.favourite === "away" ? fixture.away : "เสมอ"})`);
   }
-  if(homeForm && homeForm.played > 0) lines.push(`ฟอร์ม 5 นัดหลังของ ${fixture.home}: ${homeForm.record}`);
-  if(awayForm && awayForm.played > 0) lines.push(`ฟอร์ม 5 นัดหลังของ ${fixture.away}: ${awayForm.record}`);
+  if(homeForm && homeForm.played > 0) lines.push(`ฟอร์มล่าสุดของ ${fixture.home} (${homeForm.played} นัด, ข้อมูลจำกัดจากแหล่งข้อมูลฟรี): ${homeForm.record}`);
+  if(awayForm && awayForm.played > 0) lines.push(`ฟอร์มล่าสุดของ ${fixture.away} (${awayForm.played} นัด, ข้อมูลจำกัดจากแหล่งข้อมูลฟรี): ${awayForm.record}`);
   if(note && note.trim()) lines.push(`ข้อมูลเพิ่มเติมจากผู้ใช้: ${note.trim()}`);
   lines.push(`ให้วิเคราะห์ว่าทีมไหนมีภาษีเหนือกว่าและเพราะอะไร โดยอ้างอิงข้อมูลข้างต้นเท่านั้น อย่าสมมติข้อมูลที่ไม่ได้ให้มา`);
   return lines.join("\n");
@@ -527,7 +527,7 @@ function buildSummary(fixture, a, noteInfo){
     line += " · " + noteInfo.mentions.join(", ") + " จึงปรับน้ำหนักเพิ่มเติมแล้ว";
   }
   if(a.formAdjusted){
-    line += " · ปรับน้ำหนักตามฟอร์ม 5 นัดหลังจริงด้วย";
+    line += " · ปรับน้ำหนักตามฟอร์มล่าสุดจริงด้วย";
   }
   return line;
 }
@@ -581,18 +581,18 @@ async function fetchTeamForm(teamId){
 function formToAdjust(form){
   if(!form || form.played === 0) return 0;
   const ppg = form.points / form.played; // 0..3
-  // 1.5 ppg (roughly break-even form) maps to 0 adjustment
   const centered = (ppg - 1.5) / 1.5; // range about -1..+1
-  return Math.max(-0.06, Math.min(0.06, centered * 0.06));
+  const confidence = Math.min(1, form.played / 5); // fewer games = less trust
+  return Math.max(-0.06, Math.min(0.06, centered * 0.06 * confidence));
 }
 
 function formSummaryLine(fixture, homeForm, awayForm){
   const parts = [];
   if(homeForm && homeForm.played > 0){
-    parts.push(`${fixture.home.split(" ")[0]} 5 นัดหลัง: ${homeForm.record}`);
+    parts.push(`${fixture.home.split(" ")[0]} ฟอร์มล่าสุด (${homeForm.played} นัด): ${homeForm.record}`);
   }
   if(awayForm && awayForm.played > 0){
-    parts.push(`${fixture.away.split(" ")[0]} 5 นัดหลัง: ${awayForm.record}`);
+    parts.push(`${fixture.away.split(" ")[0]} ฟอร์มล่าสุด (${awayForm.played} นัด): ${awayForm.record}`);
   }
   return parts.join(" · ");
 }
@@ -971,7 +971,7 @@ function showAutoBadge(fixtureId, bookmaker){
 
 function footnoteHTML(){
   return `<p class="footnote">โปรแกรมแข่งดึงจาก TheSportsDB · ราคาต่อรองดึงอัตโนมัติจาก The Odds API เมื่อมีให้ ลีกที่ไม่มีราคากรอกเองได้
-    · ฟอร์ม 5 นัดหลังดึงจริงจาก TheSportsDB · กดปุ่ม "วิเคราะห์เชิงลึกด้วย AI" เพื่อให้ Gemini (ฟรี) เขียนบทวิเคราะห์จากข้อมูลที่มี · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
+    · ฟอร์มทีมดึงจริงจาก TheSportsDB (คีย์ฟรีมักให้แค่ 1 นัดล่าสุด ไม่ใช่ 5 นัด — เป็นข้อจำกัดของแหล่งข้อมูลฟรี) · กดปุ่ม "วิเคราะห์เชิงลึกด้วย AI" เพื่อให้ Gemini (ฟรี) เขียนบทวิเคราะห์จากข้อมูลที่มี · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
 }
 
 function toggleTicket(f){
@@ -985,7 +985,7 @@ function toggleTicket(f){
     const needHome = f.homeTeamId && !teamFormCache[f.homeTeamId];
     const needAway = f.awayTeamId && !teamFormCache[f.awayTeamId];
     if(needHome || needAway){
-      if(formLineEl){ formLineEl.textContent = "กำลังโหลดฟอร์ม 5 นัดหลัง…"; formLineEl.style.display = "block"; }
+      if(formLineEl){ formLineEl.textContent = "กำลังโหลดฟอร์มล่าสุด…"; formLineEl.style.display = "block"; }
       Promise.all([fetchTeamForm(f.homeTeamId), fetchTeamForm(f.awayTeamId)])
         .then(() => renderAnalysis(f))
         .catch(() => { if(formLineEl) formLineEl.style.display = "none"; });
