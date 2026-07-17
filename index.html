@@ -243,10 +243,10 @@ const QUICK_PICK_LEAGUES = [
   { match: "Scottish Premier League", nameTh: "สกอตแลนด์ พรีเมียร์ลีก", flag: "🏴" },
   { match: "Belgian Pro League", nameTh: "เบลเยียม โปรลีก", flag: "🇧🇪" },
   { match: "Turkish Super Lig", nameTh: "ตุรกี ซุปเปอร์ลีก", flag: "🇹🇷" },
-  { match: "Swedish Allsvenskan", nameTh: "สวีเดน ออลสเวนส์คาน", flag: "🇸🇪" },
-  { match: "Norwegian Eliteserien", nameTh: "นอร์เวย์ อีลิทเซเรียน", flag: "🇳🇴" },
-  { match: "Irish Premier Division", nameTh: "ไอร์แลนด์ พรีเมียร์ดิวิชั่น", flag: "🇮🇪" },
-  { match: "Romanian Liga I", nameTh: "โรมาเนีย ลีกา 1", flag: "🇷🇴" },
+  { id: "4347", match: "Swedish Allsvenskan", nameTh: "สวีเดน ออลสเวนส์คาน", flag: "🇸🇪" },
+  { id: "4358", match: "Norwegian Eliteserien", nameTh: "นอร์เวย์ อีลิทเซเรียน", flag: "🇳🇴" },
+  { id: "4643", match: "Irish Premier Division", nameTh: "ไอร์แลนด์ พรีเมียร์ดิวิชั่น", flag: "🇮🇪" },
+  { id: "4691", match: "Romanian Liga I", nameTh: "โรมาเนีย ลีกา 1", flag: "🇷🇴" },
   { match: "American Major League Soccer", nameTh: "สหรัฐฯ เมเจอร์ลีก ซอคเกอร์ (MLS)", flag: "🇺🇸" },
   { match: "Brazilian Serie A", nameTh: "บราซิล เซเรีย อา", flag: "🇧🇷" },
   { match: "Argentinian Primera Division", nameTh: "อาร์เจนตินา พรีเมร่า ดิวิซิออน", flag: "🇦🇷" },
@@ -390,17 +390,25 @@ let fixtures = [];
 let activeLeague = "all";
 let oddsMap = {}; // eventId -> tier
 
-/* ---------------- storage helpers (window.storage API) ---------------- */
+/* ---------------- storage helpers (browser localStorage) ---------------- */
+// Uses plain localStorage, not window.storage — window.storage only exists
+// inside Claude.ai's artifact preview and does not exist on a real deployed
+// site like GitHub Pages, which is why saves silently failed before.
+const LS_NAMESPACE = "footballAnalyzer:";
 async function storageGet(key){
-  try{ const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : null; }
-  catch{ return null; }
+  try{
+    const raw = localStorage.getItem(LS_NAMESPACE + key);
+    return raw != null ? JSON.parse(raw) : null;
+  }catch{ return null; }
 }
 async function storageSet(key, val){
-  try{ await window.storage.set(key, JSON.stringify(val), false); return true; }
-  catch{ return false; }
+  try{
+    localStorage.setItem(LS_NAMESPACE + key, JSON.stringify(val));
+    return true;
+  }catch{ return false; }
 }
 async function storageDelete(key){
-  try{ await window.storage.delete(key, false); } catch{ /* ignore */ }
+  try{ localStorage.removeItem(LS_NAMESPACE + key); } catch{ /* ignore */ }
 }
 
 /* ---------------- "smart" rule-based analysis (no external AI needed) ---------------- */
@@ -854,6 +862,10 @@ async function renderPickerList(query){
   if(!q){
     const resolved = QUICK_PICK_LEAGUES
       .map(w => {
+        if(w.id){
+          // verified ID — no lookup needed, always works
+          return { id: w.id, nameEn: w.match, nameTh: w.nameTh, flag: w.flag };
+        }
         const hit = findLeagueFuzzy(dir, w.match);
         return hit ? { id: hit.id, nameEn: hit.nameEn, nameTh: w.nameTh, flag: w.flag } : null;
       })
