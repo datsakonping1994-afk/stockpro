@@ -11,7 +11,8 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1f1a;--card:#17302a;--ink:#f1ead6;--mut:#9db0a8;--line:#2b4a41;--acc:#3fa583;--red:#ff7b6e;--win:#5fd09a;--on:#0f1f1a}}
 :root[data-theme="dark"]{--bg:#0f1f1a;--card:#17302a;--ink:#f1ead6;--mut:#9db0a8;--line:#2b4a41;--acc:#3fa583;--red:#ff7b6e;--win:#5fd09a;--on:#0f1f1a}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*{box-sizing:border-box}
+*{box-sizing:border-box;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button{-webkit-user-select:none;user-select:none}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Noto Sans Thai",system-ui,sans-serif}
 main{max-width:560px;margin:0 auto;padding:16px 14px 40px}
 h1{font-size:24px;font-weight:800;margin:4px 0 14px}
@@ -134,7 +135,7 @@ function render(){
   const by={};ents.forEach(e=>by[e.n]=(by[e.n]||0)+e.a);
   const names=Object.keys(by);
   $("pl").innerHTML=names.map(n=>`<option value="${esc(n)}">`).join("");
-  $("ents").innerHTML=ents.length?ents.map((e,i)=>`<div class="ent${i===editIdx?" editing":""}"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`).join("")+(t=>`<div class="ent tt"><span>รวมเพื่อน</span><span class="${t>0?"pos":t<0?"neg":""}">${sg(t)}</span></div>`)(ents.reduce((a,e)=>a+e.a,0)):'<p class="mut">ยังไม่มีรายการ</p>';
+  $("ents").innerHTML=ents.length?ents.map((e,i)=>`<div class="ent${i===editIdx?" editing":""}"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
   const sum=names.reduce((a,n)=>a+by[n],0),cap=parseFloat($("cap").value)||0;
   const web=cap+banked+sum;$("web").textContent=m(web)+" บาท";
   const r=$("real").value;
