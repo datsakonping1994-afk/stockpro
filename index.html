@@ -1,1162 +1,209 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>ตั๋วบอลของฉัน</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สมุดบัญชีวงไฮโล</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --pitch:#0B1F17;
-    --pitch-2:#122A20;
-    --line:#274538;
-    --chalk:#F2F5EC;
-    --muted:#8FA396;
-    --muted-2:#4A6558;
-    --gold:#D9A441;
-    --green:#34D399;
-    --amber:#FBBF24;
-    --rose:#FB7185;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0;
-    background:var(--pitch);
-    color:var(--chalk);
-    font-family:'Inter',sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-  .oswald{font-family:'Oswald',sans-serif;}
-  .mono{font-family:'Roboto Mono',monospace;}
-
-  /* ---------- header / scoreboard ---------- */
-  header{
-    position:sticky; top:0; z-index:10;
-    background:rgba(11,31,23,.95);
-    backdrop-filter:blur(6px);
-    border-bottom:1px solid var(--line);
-    padding:20px 16px 12px;
-  }
-  .header-row{display:flex; align-items:center; justify-content:space-between;}
-  .eyebrow{font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); font-weight:600;}
-  h1{font-size:24px; line-height:1; margin:2px 0 0; color:var(--chalk);}
-  #refreshBtn{
-    display:flex; align-items:center; gap:6px;
-    background:transparent; border:1px solid var(--line); color:var(--gold);
-    border-radius:999px; padding:6px 12px; font-size:12px; cursor:pointer;
-  }
-  #refreshBtn:disabled{opacity:.5; cursor:default;}
-  .spin{animation:spin 1s linear infinite;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-
-  .score-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px;}
-  .score-cell{background:var(--pitch-2); border:1px solid var(--line); border-radius:12px; padding:8px; text-align:center;}
-  .dot{width:8px; height:8px; border-radius:999px; margin:0 auto 4px;}
-  .dot.green{background:var(--green);} .dot.yellow{background:var(--amber);} .dot.red{background:var(--rose);}
-  .score-num{font-size:20px; line-height:1;}
-  .score-label{font-size:10px; color:var(--muted); margin-top:2px;}
-
-  /* ---------- league chips ---------- */
-  .chip-row{display:flex; gap:8px; overflow-x:auto; padding:12px 16px; scrollbar-width:none;}
-  .chip-row::-webkit-scrollbar{display:none;}
-  .chip{
-    flex-shrink:0; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;
-    border:1px solid var(--line); color:var(--muted); background:transparent; cursor:pointer; white-space:nowrap;
-  }
-  .chip.active{background:var(--gold); color:var(--pitch); border-color:var(--gold);}
-  .chip.add{border-style:dashed; border-color:var(--gold); color:var(--gold); display:flex; align-items:center; gap:4px;}
-
-  /* ---------- match list ---------- */
-  #list{padding:0 16px 40px; display:flex; flex-direction:column; gap:12px;}
-  .empty{
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:8px; padding:64px 24px; text-align:center; color:var(--muted); font-size:14px;
-  }
-
-  /* ---------- ticket card ---------- */
-  .ticket{
-    position:relative; border-radius:16px; overflow:hidden;
-    background:var(--pitch-2); border:1px solid var(--line);
-    box-shadow:0 1px 3px rgba(0,0,0,.3);
-  }
-  .ticket.tier-green{box-shadow:0 0 0 1px var(--green);}
-  .ticket.tier-yellow{box-shadow:0 0 0 1px var(--amber);}
-  .ticket.tier-red{box-shadow:0 0 0 1px var(--rose);}
-
-  .ticket-top{
-    width:100%; text-align:left; background:none; border:none; color:inherit; cursor:pointer;
-    padding:16px 16px 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-  }
-  .league-tag{display:flex; align-items:center; gap:6px; font-size:11px; text-transform:uppercase; letter-spacing:.02em; color:var(--muted); font-weight:600;}
-  .match-title{margin-top:4px; font-size:18px; line-height:1.25;}
-  .vs{color:var(--gold); margin:0 6px;}
-  .match-meta{margin-top:4px; font-size:12px; color:var(--muted);}
-  .ticket-top-right{flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:2px;}
-
-  .perforation{position:relative; height:0;}
-  .perforation .hole{position:absolute; top:-12px; width:24px; height:24px; border-radius:999px; background:var(--pitch);}
-  .perforation .hole.left{left:-12px;} .perforation .hole.right{right:-12px;}
-  .perforation .dash{border-top:2px dashed var(--line); margin:0 24px;}
-
-  .ticket-bottom{padding:16px; display:none; flex-direction:column; gap:12px;}
-  .ticket-bottom.open{display:flex;}
-  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  .draw-field{display:block; margin-top:10px;}
-  .auto-badge{font-size:11px; color:var(--gold); display:flex; align-items:center; gap:4px; min-height:14px;}
-  .form-line{font-size:12px; color:var(--muted); font-family:'Roboto Mono',monospace; display:none;}
-  label{display:block;}
-  .field-label{font-size:11px; color:var(--muted);}
-  input, textarea{
-    margin-top:4px; width:100%; border-radius:10px; background:var(--pitch); border:1px solid var(--line);
-    color:var(--chalk); padding:8px 10px; font-size:14px; font-family:'Roboto Mono',monospace;
-  }
-  textarea{font-family:'Inter',sans-serif;}
-  input:focus, textarea:focus{outline:none; box-shadow:0 0 0 2px var(--gold);}
-
-  .analysis-box{
-    border-radius:12px; padding:10px 12px; background:var(--pitch); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:space-between;
-  }
-  .analysis-box.tier-green{box-shadow:0 0 0 1px var(--green);}
-  .analysis-box.tier-yellow{box-shadow:0 0 0 1px var(--amber);}
-  .analysis-box.tier-red{box-shadow:0 0 0 1px var(--rose);}
-  .analysis-left{display:flex; align-items:center; gap:8px;}
-  .tier-label{font-size:14px; font-weight:600;}
-  .tier-label.green{color:var(--green);} .tier-label.yellow{color:var(--amber);} .tier-label.red{color:var(--rose);}
-  .analysis-sub{font-size:11px; color:var(--muted); font-family:'Roboto Mono',monospace;}
-  .gap-label{font-size:10px; color:var(--muted); text-align:right;}
-  .gap-num{font-size:20px; text-align:right;}
-  .summary-text{font-size:13px; color:var(--muted); line-height:1.5; padding:2px 2px 0;}
-  .summary-text.adjusted{color:var(--chalk);}
-  .summary-text.adjusted::before{content:"🧠 "; }
-  .btn-ai{
-    width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
-    background:transparent; border:1px dashed var(--gold); color:var(--gold);
-    border-radius:10px; padding:9px; font-size:13px; font-weight:600; cursor:pointer;
-  }
-  .btn-ai:active{transform:scale(.98);}
-  .btn-ai:disabled{opacity:.6;}
-  .ai-result{
-    font-size:13px; line-height:1.6; color:var(--chalk); background:var(--pitch);
-    border:1px solid var(--line); border-radius:12px; padding:0; margin-top:0;
-    overflow:hidden; max-height:0; transition:padding .2s, max-height .2s;
-  }
-  .ai-result.show{ padding:12px; max-height:600px; }
-  .ai-result .ai-error{ color:var(--rose); }
-  .ai-result .ai-tag{ font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); display:block; margin-bottom:6px; }
-  .ai-result .ai-sources{ font-size:11px; color:var(--muted); margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
-
-  .btn-row{display:flex; gap:8px;}
-  .btn-save{
-    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
-    background:var(--gold); color:var(--pitch); border:none; border-radius:10px; padding:10px; font-weight:600; font-size:14px; cursor:pointer;
-  }
-  .btn-save:active{transform:scale(.98);}
-  .btn-clear{
-    background:transparent; border:1px solid var(--line); color:var(--muted); border-radius:10px; padding:10px 14px; cursor:pointer;
-  }
-  .saved-note{font-size:11px; color:var(--muted); text-align:center;}
-
-  .footnote{text-align:center; font-size:10px; color:var(--muted-2); padding-top:16px; line-height:1.6;}
-
-  /* ---------- league picker overlay ---------- */
-  #picker{
-    position:fixed; inset:0; z-index:30; background:var(--pitch); display:none; flex-direction:column;
-  }
-  #picker.open{display:flex;}
-  .picker-head{padding:20px 16px 12px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px;}
-  .picker-close{background:none; border:none; color:var(--muted); cursor:pointer; padding:0;}
-  .picker-search{padding:12px 16px;}
-  .search-wrap{position:relative;}
-  .search-wrap input{padding-left:34px;}
-  .search-icon{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted);}
-  #pickerList{flex:1; overflow-y:auto; padding:0 16px 32px; display:flex; flex-direction:column; gap:8px;}
-  .picker-row{
-    display:flex; align-items:center; justify-content:space-between; border-radius:12px;
-    background:var(--pitch-2); border:1px solid var(--line); padding:10px 12px;
-  }
-  .picker-row span{font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:12px;}
-  .btn-follow{background:var(--gold); color:var(--pitch); border:none; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer;}
-  .btn-unfollow{background:var(--line); color:var(--muted); border:none; border-radius:999px; padding:6px 12px; font-size:12px; cursor:pointer;}
-  .picker-loading, .picker-empty{text-align:center; color:var(--muted); padding:40px 0; font-size:14px;}
-  .picker-section-label{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:600; padding:8px 2px 2px;}
-
-  svg.icon{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle;}
+:root{--bg:#f6f1e4;--card:#fffdf6;--ink:#17332c;--mut:#6b7a73;--line:#ddd5bf;--acc:#12503f;--red:#c8372d;--win:#12703f;--on:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1f1a;--card:#17302a;--ink:#f1ead6;--mut:#9db0a8;--line:#2b4a41;--acc:#3fa583;--red:#ff7b6e;--win:#5fd09a;--on:#0f1f1a}}
+:root[data-theme="dark"]{--bg:#0f1f1a;--card:#17302a;--ink:#f1ead6;--mut:#9db0a8;--line:#2b4a41;--acc:#3fa583;--red:#ff7b6e;--win:#5fd09a;--on:#0f1f1a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Noto Sans Thai",system-ui,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:24px;font-weight:800;margin:4px 0 14px}
+h2{font-size:16px;font-weight:800;margin:0 0 10px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;min-height:44px}
+button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 12px;min-height:44px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.pri{background:var(--acc);color:var(--on);border-color:var(--acc);font-weight:600}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.row>*{flex:1}.row>.fix{flex:none}
+.seg button.on.w{background:var(--win);color:var(--on);border-color:var(--win);font-weight:600}
+.seg button.on.l{background:var(--red);color:var(--on);border-color:var(--red);font-weight:600}
+.ent{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.x{min-height:36px;padding:2px 10px;color:var(--red)}
+.pos{color:var(--win);font-weight:800}.neg{color:var(--red);font-weight:800}
+.pp{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.pp small{display:block;color:var(--mut)}
+.big{font-size:26px;font-weight:800}
+.mut{color:var(--mut);font-size:14px}
+label{font-size:14px;color:var(--mut)}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.kp button{font-size:20px;min-height:48px;padding:4px}
+.kp .op{background:var(--card);font-weight:600}
+.kp .eq{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.disp{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:64px;text-align:right;overflow-x:auto}
+.disp .e{font-size:22px;font-weight:600;word-break:break-all}
+.disp .r{font-size:14px;color:var(--mut)}
 </style>
 </head>
 <body>
+<main>
+<h1>สมุดบัญชีวงไฮโล</h1>
 
-<header>
-  <div class="header-row">
-    <div>
-      <div class="eyebrow">เครื่องมือส่วนตัว</div>
-      <h1 class="oswald">ตั๋วบอลของฉัน</h1>
-    </div>
-    <button id="refreshBtn">
-      <svg class="icon" id="refreshIcon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      รีเฟรช
-    </button>
-  </div>
-  <div class="score-grid">
-    <div class="score-cell"><div class="dot green"></div><div class="score-num oswald" id="cntGreen">0</div><div class="score-label">มั่นใจสูง</div></div>
-    <div class="score-cell"><div class="dot yellow"></div><div class="score-num oswald" id="cntYellow">0</div><div class="score-label">ปานกลาง</div></div>
-    <div class="score-cell"><div class="dot red"></div><div class="score-num oswald" id="cntRed">0</div><div class="score-label">เสี่ยง สูสี</div></div>
-  </div>
-</header>
+<section>
+<h2>ทุนที่คุณเติมเข้าเว็บ</h2>
+<input id="cap" type="number" inputmode="decimal" value="10000" aria-label="ทุน">
+</section>
 
-<div class="chip-row" id="chipRow"></div>
+<section>
+<h2>บันทึกยอดแต่ละคน</h2>
+<div class="row"><input id="pn" list="pl" placeholder="ชื่อ (พิมพ์ใหม่หรือเลือก)" maxlength="20"><datalist id="pl"></datalist></div>
+<div class="row seg"><button id="bw" class="on w">ได้ (+)</button><button id="bl" class="l">เสีย (−)</button></div>
+<button id="cancel" hidden style="width:100%;margin-bottom:8px">ยกเลิกการแก้ไข</button>
+<div class="row"><input id="am" type="text" inputmode="decimal" autocomplete="off" placeholder="จำนวนเงิน เช่น 500+700-200"><button class="pri fix" id="add">บันทึก</button></div>
+<div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
+<div id="apv" class="mut" style="min-height:22px;margin-bottom:6px"></div>
+<div id="ents"></div>
+<button id="undo" style="width:100%;margin-top:8px">↶ ย้อนกลับรายการล่าสุด</button>
+</section>
 
-<div id="list"></div>
+<section>
+<h2>เคลียร์เงินกับเพื่อน</h2>
+<div id="people"></div>
+<p class="mut" id="tot"></p>
+</section>
 
-<div id="picker">
-  <div class="picker-head">
-    <button class="picker-close" id="pickerClose">
-      <svg class="icon" viewBox="0 0 24 24" style="width:22px;height:22px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-    <h2 class="oswald" style="font-size:20px;margin:0;">เพิ่มลีกที่ติดตาม</h2>
-  </div>
-  <div class="picker-search">
-    <div class="search-wrap">
-      <svg class="icon search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="pickerSearch" type="search" placeholder="ค้นชื่อลีก (ภาษาอังกฤษ) เช่น Eredivisie, MLS, J1 League" />
-    </div>
-  </div>
-  <div id="pickerList"></div>
-</div>
+<section>
+<h2>ประวัติการแก้ไข</h2>
+<p class="mut">ทุกการเพิ่ม แก้ไข ลบ ถูกบันทึกไว้ กด "ย้อนก่อนนี้" เพื่อกลับไปสถานะก่อนรายการนั้น การย้อนก็ถูกบันทึกและย้อนซ้ำได้</p>
+<div id="hist"></div>
+<button id="clearH" style="width:100%;margin-top:8px">ล้างประวัติอย่างเดียว (รายการยอดยังอยู่)</button>
+</section>
+
+<section>
+<h2>เงินในเว็บ</h2>
+<div class="mut">ควรเหลือ (ทุน + ผลรวมทุกคน)</div>
+<div class="big" id="web"></div>
+<div class="row" style="margin-top:10px"><label class="fix">ยอดจริงในเว็บ</label><input id="real" type="number" inputmode="decimal" placeholder="ใส่เพื่อเทียบ"></div>
+<div id="diff" class="mut"></div>
+<button id="clear" style="width:100%;margin-top:10px">ล้างทั้งหมด</button>
+</section>
+</main>
 
 <script>
-/* ------------------------------------------------------------------ */
-/*  DATA SOURCE: TheSportsDB free public test key ("3") — legal API   */
-/*  Docs: https://www.thesportsdb.com/documentation                   */
-/* ------------------------------------------------------------------ */
-const SPORTSDB_BASE = "https://www.thesportsdb.com/api/v1/json/3";
-const STORAGE_PREFIX = "odds:";
-const WATCHLIST_KEY = "watchlist:leagues";
+const $=id=>document.getElementById(id);
+let ents=[{n:"คนที่ 1",a:1000},{n:"คนที่ 2",a:-1000},{n:"เพื่อนคนที่ 3",a:-2000}],sign=1,editIdx=-1,hist=[];
+const m=n=>Math.abs(n).toLocaleString("th-TH",{maximumFractionDigits:2});
+const sg=n=>(n>0?"+":n<0?"−":"")+m(n);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-const TOP_LEAGUE_MATCH = [
-  { match: "English Premier League", nameTh: "อังกฤษ พรีเมียร์ลีก", flag: "🏴" },
-  { match: "Spanish La Liga", nameTh: "สเปน ลาลีกา", flag: "🇪🇸" },
-  { match: "Italian Serie A", nameTh: "อิตาลี เซเรีย อา", flag: "🇮🇹" },
-  { match: "German Bundesliga", nameTh: "เยอรมัน บุนเดสลีกา", flag: "🇩🇪" },
-  { match: "French Ligue 1", nameTh: "ฝรั่งเศส ลีกเอิง", flag: "🇫🇷" },
-  { match: "Dutch Eredivisie", nameTh: "เนเธอร์แลนด์ เอเรดิวิซี", flag: "🇳🇱" },
-  { match: "Portuguese Primeira Liga", nameTh: "โปรตุเกส พรีเมร่าลีกา", flag: "🇵🇹" },
-  { match: "UEFA Champions League", nameTh: "ยูฟ่า แชมเปียนส์ลีก", flag: "⭐" },
-];
-
-// Quick-pick choices shown as tappable buttons in the picker — no typing
-// required. Each has an exact English name to match against the live
-// directory, plus a Thai label the user actually recognizes.
-const QUICK_PICK_LEAGUES = [
-  { match: "English Premier League", nameTh: "อังกฤษ พรีเมียร์ลีก", flag: "🏴" },
-  { match: "English League Championship", nameTh: "อังกฤษ แชมเปี้ยนชิพ", flag: "🏴" },
-  { match: "Spanish La Liga", nameTh: "สเปน ลาลีกา", flag: "🇪🇸" },
-  { match: "Italian Serie A", nameTh: "อิตาลี เซเรีย อา", flag: "🇮🇹" },
-  { match: "German Bundesliga", nameTh: "เยอรมัน บุนเดสลีกา", flag: "🇩🇪" },
-  { match: "French Ligue 1", nameTh: "ฝรั่งเศส ลีกเอิง", flag: "🇫🇷" },
-  { match: "Dutch Eredivisie", nameTh: "เนเธอร์แลนด์ เอเรดิวิซี", flag: "🇳🇱" },
-  { match: "Portuguese Primeira Liga", nameTh: "โปรตุเกส พรีเมร่าลีกา", flag: "🇵🇹" },
-  { match: "Scottish Premier League", nameTh: "สกอตแลนด์ พรีเมียร์ลีก", flag: "🏴" },
-  { match: "Belgian Pro League", nameTh: "เบลเยียม โปรลีก", flag: "🇧🇪" },
-  { match: "Turkish Super Lig", nameTh: "ตุรกี ซุปเปอร์ลีก", flag: "🇹🇷" },
-  { id: "4347", match: "Swedish Allsvenskan", nameTh: "สวีเดน ออลสเวนส์คาน", flag: "🇸🇪" },
-  { id: "4358", match: "Norwegian Eliteserien", nameTh: "นอร์เวย์ อีลิทเซเรียน", flag: "🇳🇴" },
-  { id: "4643", match: "Irish Premier Division", nameTh: "ไอร์แลนด์ พรีเมียร์ดิวิชั่น", flag: "🇮🇪" },
-  { id: "5638", match: "Irish FAI Cup", nameTh: "ไอร์แลนด์ เอฟเอไอ คัพ", flag: "🇮🇪" },
-  { id: "4691", match: "Romanian Liga I", nameTh: "โรมาเนีย ลีกา 1", flag: "🇷🇴" },
-  { match: "American Major League Soccer", nameTh: "สหรัฐฯ เมเจอร์ลีก ซอคเกอร์ (MLS)", flag: "🇺🇸" },
-  { match: "Brazilian Serie A", nameTh: "บราซิล เซเรีย อา", flag: "🇧🇷" },
-  { match: "Argentinian Primera Division", nameTh: "อาร์เจนตินา พรีเมร่า ดิวิซิออน", flag: "🇦🇷" },
-  { match: "Japanese J-League", nameTh: "ญี่ปุ่น เจลีก", flag: "🇯🇵" },
-  { match: "Chinese Super League", nameTh: "จีน ซูเปอร์ลีก", flag: "🇨🇳" },
-  { match: "Saudi Arabian Pro League", nameTh: "ซาอุดีอาระเบีย โปรลีก", flag: "🇸🇦" },
-  { match: "Australian A-League", nameTh: "ออสเตรเลีย เอลีก", flag: "🇦🇺" },
-  { match: "UEFA Champions League", nameTh: "ยูฟ่า แชมเปียนส์ลีก", flag: "⭐" },
-  { match: "UEFA Europa League", nameTh: "ยูฟ่า ยูโรป้าลีก", flag: "⭐" },
-];
-
-const TIER_META = {
-  green:  { label: "มั่นใจสูง", cls: "green" },
-  yellow: { label: "ปานกลาง",   cls: "yellow" },
-  red:    { label: "เสี่ยง สูสี", cls: "red" },
+function render(){
+  $("add").textContent=editIdx>=0?"บันทึกแก้ไข":"บันทึก";$("cancel").hidden=editIdx<0;apreview();renderHist();save();
+  $("bw").classList.toggle("on",sign>0);$("bl").classList.toggle("on",sign<0);
+  const by={};ents.forEach(e=>by[e.n]=(by[e.n]||0)+e.a);
+  const names=Object.keys(by);
+  $("pl").innerHTML=names.map(n=>`<option value="${esc(n)}">`).join("");
+  $("ents").innerHTML=ents.length?ents.map((e,i)=>`<div class="ent"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  let pay=0,get=0;
+  $("people").innerHTML=names.map(n=>{
+    const v=by[n];if(v>0)pay+=v;else get-=v;
+    const t=v>0?`คุณต้องจ่ายให้ ${m(v)}`:v<0?`เก็บจากเขา ${m(v)}`:"เสมอ";
+    return `<div class="pp"><div>${esc(n)}<small>${t}</small></div><div class="${v>0?"pos":v<0?"neg":""}">${sg(v)}</div></div>`;
+  }).join("")||'<p class="mut">ยังไม่มีข้อมูล</p>';
+  const sum=names.reduce((a,n)=>a+by[n],0),cap=parseFloat($("cap").value)||0;
+  $("tot").innerHTML=`ต้องเก็บจากเพื่อน <b>${m(get)}</b> · ต้องจ่ายเพื่อน <b>${m(pay)}</b><br>ผลรวมทุกคน <b class="${sum>0?"pos":sum<0?"neg":""}">${sg(sum)}</b> (${sum>=0?"คนเล่นได้สุทธิ เว็บจ่ายออก":"คนเล่นเสียสุทธิ เว็บได้ไป"})`;
+  const web=cap+sum;$("web").textContent=m(web)+" บาท";
+  const r=$("real").value;
+  if(r===""){$("diff").textContent="";}
+  else{const d=parseFloat(r)-web;$("diff").innerHTML=Math.abs(d)<0.005?'<b class="pos">ตรงกัน</b>':`ต่างกัน <b class="${d>0?"pos":"neg"}">${sg(d)}</b> บาท (เช็กว่ามีรายการตกหล่นไหม)`;}
+}
+$("bw").onclick=()=>{sign=1;render();};
+$("bl").onclick=()=>{sign=-1;render();};
+$("add").onclick=()=>{
+  const n=$("pn").value.trim(),v=amtVal();
+  if(!n){$("pn").focus();return;}
+  if(v===null||v===0){$("am").focus();return;}
+  const a=v<0?v:sign*v;
+  if(editIdx>=0&&ents[editIdx]){const o=ents[editIdx];logH(`แก้ไข ${o.n} ${sg(o.a)} → ${n} ${sg(a)}`);ents[editIdx]={n,a};}
+  else{logH(`เพิ่ม ${n} ${sg(a)}`);ents.push({n,a});}
+  editIdx=-1;$("pn").value="";$("am").value="";render();
 };
-
-/* ------------------------------------------------------------------ */
-/*  ODDS DATA SOURCE: The Odds API (legal, licensed-bookmaker feed)   */
-/*  Free tier key — swap ODDS_API_KEY if it ever gets rate-limited.   */
-/* ------------------------------------------------------------------ */
-const ODDS_API_KEY = "c8a27b58d64be14502e723359fd5a565";
-const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
-
-let oddsApiSportsCache = null;      // [{key, title, ...}]
-const oddsApiEventsCache = {};      // sport_key -> [{home_team, away_team, commence_time, bookmakers}]
-const autoOddsByFixture = {};       // fixtureId -> {homeOdds, awayOdds, source}
-
-/* ------------------------------------------------------------------ */
-/*  DEEP ANALYSIS: Google Gemini free tier (genuinely free, no card,   */
-/*  no auto-billing even if the key leaks — worst case is quota used   */
-/*  up, same risk profile as the Odds API key above).                  */
-/* ------------------------------------------------------------------ */
-const GEMINI_API_KEY = "AIzaSyDOAfLq2I5m33MbWQGh8A5_Dc-aDiEGxxQ";
-const GEMINI_MODEL = "gemini-flash-latest";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
-const geminiCache = {}; // fixtureId -> generated Thai analysis text
-
-function buildGeminiPrompt(fixture, a, homeForm, awayForm, note){
-  const lines = [];
-  lines.push(`คุณเป็นนักวิเคราะห์ฟุตบอลมืออาชีพ เขียนบทวิเคราะห์คู่นี้เป็นภาษาไทย สั้นกระชับ (ไม่เกิน 150 คำ) โทนเป็นกันเอง เหมือนอธิบายให้เพื่อนฟัง ห้ามใช้หัวข้อหรือ bullet point ให้เขียนเป็นย่อหน้าเดียวไหลลื่น`);
-  lines.push(`คู่แข่งขัน: ${fixture.home} (เจ้าบ้าน) พบ ${fixture.away} (ทีมเยือน), ลีก: ${fixture.leagueTh}, วันแข่ง: ${fixture.date}`);
-  if(a){
-    lines.push(`ราคาบอกโอกาส: ${fixture.home} ${a.fairHomePct}%${a.fairDrawPct != null ? `, เสมอ ${a.fairDrawPct}%` : ""}, ${fixture.away} ${a.fairAwayPct}% (ตัวเต็งตามราคาคือ ${a.favourite === "home" ? fixture.home : a.favourite === "away" ? fixture.away : "เสมอ"})`);
+$("am").onkeydown=e=>{if(e.key==="Enter")$("add").click();};
+$("cap").oninput=$("real").oninput=render;
+$("ents").onclick=e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.e!==undefined){const i=+b.dataset.e,x=ents[i];editIdx=i;sign=x.a<0?-1:1;$("pn").value=x.n;$("am").value=Math.abs(x.a);render();$("am").focus();}
+  else{const x=ents[+b.dataset.i];if(x)logH(`ลบ ${x.n} ${sg(x.a)}`);ents.splice(+b.dataset.i,1);editIdx=-1;render();}
+};
+$("cancel").onclick=()=>{editIdx=-1;$("pn").value="";$("am").value="";render();};
+let clearArm=false,clearTimer;
+const resetClear=()=>{clearArm=false;clearTimeout(clearTimer);$("clear").textContent="ล้างทั้งหมด";};
+$("clear").onclick=()=>{
+  if(!clearArm){
+    clearArm=true;$("clear").textContent="กดอีกครั้งเพื่อยืนยัน (ลบรายการและประวัติทั้งหมด)";
+    clearTimer=setTimeout(resetClear,4000);return;
   }
-  if(homeForm && homeForm.played > 0) lines.push(`ฟอร์มล่าสุดของ ${fixture.home} (${homeForm.played} นัด, ข้อมูลจำกัดจากแหล่งข้อมูลฟรี): ${homeForm.record}`);
-  if(awayForm && awayForm.played > 0) lines.push(`ฟอร์มล่าสุดของ ${fixture.away} (${awayForm.played} นัด, ข้อมูลจำกัดจากแหล่งข้อมูลฟรี): ${awayForm.record}`);
-  if(note && note.trim()) lines.push(`ข้อมูลเพิ่มเติมจากผู้ใช้: ${note.trim()}`);
-  lines.push(`ใช้เครื่องมือค้นเว็บที่มีเพื่อหาข่าวทีมล่าสุด (ผู้เล่นบาดเจ็บ/แบน, ฟอร์มจริง, สถิติเจอกัน) ประกอบการวิเคราะห์ด้วย นอกเหนือจากข้อมูลราคา/ฟอร์มที่ให้มาข้างต้น แล้ววิเคราะห์ว่าทีมไหนมีภาษีเหนือกว่าและเพราะอะไร ถ้าข้อมูลที่ค้นเจอขัดกับราคา ให้บอกด้วยว่าขัดกันตรงไหน`);
-  return lines.join("\n");
-}
+  resetClear();
+  ents=[];hist=[];editIdx=-1;$("pn").value="";$("am").value="";render();
+};
+$("clearH").onclick=()=>{hist=[];render();};
 
-async function fetchGeminiAnalysis(fixture, a, homeForm, awayForm, note){
-  if(geminiCache[fixture.id]) return geminiCache[fixture.id];
-  const prompt = buildGeminiPrompt(fixture, a, homeForm, awayForm, note);
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY,
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
-    }),
-  });
-  if(!res.ok){
-    const body = await res.text().catch(() => "");
-    throw new Error(`Gemini error ${res.status}: ${body.slice(0,200)}`);
+/* ประวัติ */
+function logH(label){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents)});if(hist.length>100)hist.pop();}
+function tm(t){return new Date(t).toLocaleString("th-TH",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});}
+function renderHist(){
+  $("hist").innerHTML=hist.length?hist.map((h,i)=>`<div class="ent"><span><small class="mut">${tm(h.t)}</small><br>${esc(h.label)}</span><button data-h="${i}">ย้อนก่อนนี้</button></div>`).join(""):'<p class="mut">ยังไม่มีประวัติ</p>';
+  $("undo").disabled=!hist.length;
+}
+function restore(i){
+  const h=hist[i];if(!h)return;
+  logH(`ย้อนกลับ: ${h.label}`);
+  ents=JSON.parse(h.before);editIdx=-1;$("pn").value="";$("am").value="";render();
+}
+$("hist").onclick=e=>{const b=e.target.closest("button");if(b)restore(+b.dataset.h);};
+$("undo").onclick=()=>restore(0);
+function save(){try{localStorage.setItem("hilo-ledger",JSON.stringify({ents,hist,cap:$("cap").value}));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem("hilo-ledger")||"null");if(d){ents=d.ents||[];hist=d.hist||[];if(d.cap!==undefined)$("cap").value=d.cap;}}catch(e){}}
+
+/* ช่องจำนวนเงินคิดเลขได้ */
+function amtVal(){
+  const s=$("am").value.replace(/[,\s]/g,"").replace(/−/g,"-").replace(/×/g,"*").replace(/÷/g,"/");
+  return s?ev(s):null;
+}
+function apreview(){
+  const v=amtVal();
+  $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0||sign<0?"เสีย":"ได้"})`;
+}
+$("am").oninput=apreview;
+["pointerdown","mousedown"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault()));
+$("ops").onclick=e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const o=b.dataset.op,am=$("am");let s=am.value;
+  if(o==="b")s=s.slice(0,-1);
+  else{
+    if(!s&&o!=="-")return;
+    if(/[+\-*/×÷−]$/.test(s))s=s.slice(0,-1);
+    s+=o;
   }
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || null;
-  if(!text) throw new Error("ไม่ได้รับข้อความวิเคราะห์กลับมา");
-  const sources = (data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
-    .map(c => c?.web?.title)
-    .filter(Boolean);
-  geminiCache[fixture.id] = { text: text.trim(), sources };
-  return geminiCache[fixture.id];
-}
-
-async function fetchOddsApiSports(){
-  if(oddsApiSportsCache) return oddsApiSportsCache;
-  try{
-    const res = await fetch(`${ODDS_API_BASE}/sports/?apiKey=${ODDS_API_KEY}`);
-    if(!res.ok) throw new Error("odds api sports failed");
-    oddsApiSportsCache = await res.json();
-  }catch{
-    oddsApiSportsCache = [];
+  am.value=s;apreview();am.focus();
+};
+function ev(s){
+  const t=s.match(/\d+\.?\d*|\.\d+|[+\-*/]/g);if(!t)return null;
+  if(t[0]==="-"&&t.length>1&&/^[\d.]/.test(t[1])){t[1]="-"+t[1];t.shift();}
+  const nums=[],ops=[];
+  for(let k=0;k<t.length;k++){
+    if(k%2===0){if(!/^-?[\d.]/.test(t[k]))return null;nums.push(parseFloat(t[k]));}
+    else{if(!/^[+\-*/]$/.test(t[k]))return null;ops.push(t[k]);}
   }
-  return oddsApiSportsCache;
-}
-
-// normalize for fuzzy matching: lowercase, strip punctuation/diacritics/common filler words
-function normalizeText(s){
-  return (s || "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(fc|cf|afc|the|club|de|do|des)\b/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
-
-async function resolveOddsSportKey(leagueNameEn){
-  const sports = await fetchOddsApiSports();
-  if(!sports.length) return null;
-  const target = normalizeText(leagueNameEn);
-  let best = null, bestScore = 0;
-  for(const s of sports){
-    if(s.group !== "Soccer") continue;
-    const title = normalizeText(s.title);
-    if(title === target){ return s.key; } // exact match wins immediately
-    // substring overlap score
-    if(title.includes(target) || target.includes(title)){
-      const score = Math.min(title.length, target.length);
-      if(score > bestScore){ bestScore = score; best = s.key; }
-    }
+  if(nums.length!==ops.length+1)return null;
+  const n2=[nums[0]],o2=[];
+  for(let k=0;k<ops.length;k++){
+    if(ops[k]==="*")n2[n2.length-1]*=nums[k+1];
+    else if(ops[k]==="/"){if(nums[k+1]===0)return null;n2[n2.length-1]/=nums[k+1];}
+    else{o2.push(ops[k]);n2.push(nums[k+1]);}
   }
-  return best;
+  let r=n2[0];o2.forEach((o,k)=>{r=o==="+"?r+n2[k+1]:r-n2[k+1];});
+  return Math.round(r*100)/100;
 }
 
-async function fetchOddsApiEvents(sportKey){
-  if(oddsApiEventsCache[sportKey]) return oddsApiEventsCache[sportKey];
-  try{
-    const res = await fetch(
-      `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu,uk&markets=h2h&oddsFormat=decimal`
-    );
-    if(!res.ok) throw new Error("odds api odds failed");
-    const data = await res.json();
-    oddsApiEventsCache[sportKey] = data;
-    return data;
-  }catch{
-    oddsApiEventsCache[sportKey] = [];
-    return [];
-  }
-}
-
-function teamsMatch(a, b){
-  const na = normalizeText(a), nb = normalizeText(b);
-  if(!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
-}
-
-// Finds odds for one fixture from an already-fetched Odds API events array,
-// matching by team names (loose) and same calendar day.
-function findOddsForFixture(events, fixture){
-  const fixtureDay = fixture.date; // YYYY-MM-DD
-  for(const ev of events){
-    const evDay = (ev.commence_time || "").slice(0, 10);
-    if(evDay !== fixtureDay) continue;
-    if(!teamsMatch(ev.home_team, fixture.home) || !teamsMatch(ev.away_team, fixture.away)) continue;
-    const book = (ev.bookmakers || [])[0];
-    if(!book) continue;
-    const market = (book.markets || []).find(m => m.key === "h2h");
-    if(!market) continue;
-    const homeOutcome = market.outcomes.find(o => teamsMatch(o.name, fixture.home));
-    const awayOutcome = market.outcomes.find(o => teamsMatch(o.name, fixture.away));
-    const drawOutcome = market.outcomes.find(o => o.name.toLowerCase() === "draw");
-    if(homeOutcome && awayOutcome){
-      return {
-        homeOdds: homeOutcome.price,
-        awayOdds: awayOutcome.price,
-        drawOdds: drawOutcome ? drawOutcome.price : null,
-        bookmaker: book.title,
-      };
-    }
-  }
-  return null;
-}
-
-// Pre-fetches auto-odds for every league currently in view, then matches
-// each fixture. Populates autoOddsByFixture. Best-effort — leagues the API
-// doesn't cover simply get no auto odds (manual entry still works for them).
-async function preloadAutoOdds(fixtureList){
-  const leagueIds = [...new Set(fixtureList.map(f => f.leagueId))];
-  const leagueMeta = {};
-  fixtureList.forEach(f => { leagueMeta[f.leagueId] = f.leagueNameEn || f.leagueTh; });
-
-  await Promise.all(leagueIds.map(async (lid) => {
-    const sportKey = await resolveOddsSportKey(leagueMeta[lid]);
-    if(!sportKey) return;
-    const events = await fetchOddsApiEvents(sportKey);
-    fixtureList
-      .filter(f => f.leagueId === lid)
-      .forEach(f => {
-        const found = findOddsForFixture(events, f);
-        if(found) autoOddsByFixture[f.id] = found;
-      });
-  }));
-}
-
-let allLeaguesCache = null;
-let watchlist = [];
-let fixtures = [];
-let activeLeague = "all";
-let oddsMap = {}; // eventId -> tier
-
-/* ---------------- storage helpers (browser localStorage) ---------------- */
-// Uses plain localStorage, not window.storage — window.storage only exists
-// inside Claude.ai's artifact preview and does not exist on a real deployed
-// site like GitHub Pages, which is why saves silently failed before.
-const LS_NAMESPACE = "footballAnalyzer:";
-async function storageGet(key){
-  try{
-    const raw = localStorage.getItem(LS_NAMESPACE + key);
-    return raw != null ? JSON.parse(raw) : null;
-  }catch{ return null; }
-}
-async function storageSet(key, val){
-  try{
-    localStorage.setItem(LS_NAMESPACE + key, JSON.stringify(val));
-    return true;
-  }catch{ return false; }
-}
-async function storageDelete(key){
-  try{ localStorage.removeItem(LS_NAMESPACE + key); } catch{ /* ignore */ }
-}
-
-/* ---------------- "smart" rule-based analysis (no external AI needed) ---------------- */
-// Looks for injury/absence-type keywords in the user's own note and figures
-// out which side they're talking about, then nudges the odds-implied
-// probabilities accordingly. This is a fixed rule set, not a real LLM —
-// but it's free, has no key to leak, and never goes down.
-const NEGATIVE_KEYWORDS = ["เจ็บ","บาดเจ็บ","ขาด","แบน","พัก","ไม่พร้อม","สำรอง","ล้า","เหนื่อย","ปัญหา"];
-const POSITIVE_KEYWORDS = ["ฟอร์มดี","มั่นใจ","ครบทีม","แข็งแกร่ง","ฟิต","ชนะรวด"];
-const HOME_KEYWORDS = ["เจ้าบ้าน","บ้านตัวเอง"];
-const AWAY_KEYWORDS = ["ทีมเยือน","เยือน"];
-
-function analyzeNote(note){
-  if(!note || !note.trim()) return { homeAdjust: 0, awayAdjust: 0, mentions: [] };
-  const text = note;
-  let homeAdjust = 0, awayAdjust = 0;
-  const mentions = [];
-
-  const hasNeg = NEGATIVE_KEYWORDS.some(k => text.includes(k));
-  const hasPos = POSITIVE_KEYWORDS.some(k => text.includes(k));
-  const mentionsHome = HOME_KEYWORDS.some(k => text.includes(k));
-  const mentionsAway = AWAY_KEYWORDS.some(k => text.includes(k));
-
-  if(hasNeg && mentionsAway && !mentionsHome){ awayAdjust -= 0.06; mentions.push("โน้ตระบุปัญหาฝั่งทีมเยือน"); }
-  if(hasNeg && mentionsHome && !mentionsAway){ homeAdjust -= 0.06; mentions.push("โน้ตระบุปัญหาฝั่งเจ้าบ้าน"); }
-  if(hasPos && mentionsAway && !mentionsHome){ awayAdjust += 0.05; mentions.push("โน้ตระบุฟอร์มดีฝั่งทีมเยือน"); }
-  if(hasPos && mentionsHome && !mentionsAway){ homeAdjust += 0.05; mentions.push("โน้ตระบุฟอร์มดีฝั่งเจ้าบ้าน"); }
-
-  return { homeAdjust, awayAdjust, mentions };
-}
-
-function buildSummary(fixture, a, noteInfo){
-  const home = fixture.home, away = fixture.away;
-  let line;
-  const fav = a.favourite === "home" ? home : a.favourite === "away" ? away : null;
-
-  if(a.favourite === "draw"){
-    line = `โอกาสเสมอสูงสุดในบรรดาสามผลลัพธ์ (เสมอ ${a.fairDrawPct}%) ทั้งสองทีมสูสีกันมาก`;
-  } else if(a.tier === "green"){
-    line = `${fav} มีภาษีเหนือกว่าชัดเจน (ส่วนต่าง ${a.gapPct}%) ราคาเทมาทางนี้ค่อนข้างหนัก`;
-  } else if(a.tier === "yellow"){
-    line = `${fav} ได้เปรียบเล็กน้อย (ส่วนต่าง ${a.gapPct}%) แต่ยังไม่ขาดลอย มีโอกาสพลิกได้`;
-  } else {
-    line = `สองทีมสูสีมาก (ส่วนต่างแค่ ${a.gapPct}%) ราคาแทบจะเท่ากัน ผลลัพธ์เปิดกว้าง`;
-  }
-  if(a.fairDrawPct != null && a.favourite !== "draw"){
-    line += ` · โอกาสเสมอ ${a.fairDrawPct}%`;
-  }
-  if(noteInfo && noteInfo.mentions.length){
-    line += " · " + noteInfo.mentions.join(", ") + " จึงปรับน้ำหนักเพิ่มเติมแล้ว";
-  }
-  if(a.formAdjusted){
-    line += " · ปรับน้ำหนักตามฟอร์มล่าสุดจริงด้วย";
-  }
-  return line;
-}
-
-/* ---------------- team form (real recent results, not user-typed) ---------------- */
-const teamFormCache = {}; // teamId -> { record: "W-D-L", points, summary }
-
-async function fetchTeamForm(teamId){
-  if(!teamId) return null;
-  if(teamFormCache[teamId]) return teamFormCache[teamId];
-  try{
-    const res = await fetch(`${SPORTSDB_BASE}/eventslast.php?id=${teamId}`);
-    if(!res.ok) throw new Error("form fetch failed");
-    const json = await res.json();
-    const results = (json.results || []).slice(0, 5);
-    let w = 0, d = 0, l = 0;
-    const sequence = []; // most recent first, e.g. ["W","W","D","L","W"]
-    results.forEach(ev => {
-      const hs = parseInt(ev.intHomeScore, 10), as = parseInt(ev.intAwayScore, 10);
-      if(Number.isNaN(hs) || Number.isNaN(as)) return;
-      const isHome = String(ev.idHomeTeam) === String(teamId);
-      const scored = isHome ? hs : as;
-      const conceded = isHome ? as : hs;
-      let outcome = "D";
-      if(scored > conceded) outcome = "W";
-      else if(scored < conceded) outcome = "L";
-      if(outcome === "W") w++; else if(outcome === "D") d++; else l++;
-      sequence.push(outcome);
-    });
-    const played = w + d + l;
-    const points = w * 3 + d; // out of played*3
-    const form = {
-      played, w, d, l,
-      points,
-      maxPoints: played * 3,
-      sequence,
-      record: played > 0 ? `${w}ชนะ-${d}เสมอ-${l}แพ้` : null,
-    };
-    teamFormCache[teamId] = form;
-    return form;
-  }catch{
-    teamFormCache[teamId] = null;
-    return null;
-  }
-}
-
-// Converts each side's last-5 record into a small nudge on fair probability.
-// A team on a hot streak (e.g. 4W-1D out of 5) gets a modest boost; a team
-// in poor form gets a modest penalty. Capped so form can influence but never
-// override what the market price already says.
-function formToAdjust(form){
-  if(!form || form.played === 0) return 0;
-  const ppg = form.points / form.played; // 0..3
-  const centered = (ppg - 1.5) / 1.5; // range about -1..+1
-  const confidence = Math.min(1, form.played / 5); // fewer games = less trust
-  return Math.max(-0.06, Math.min(0.06, centered * 0.06 * confidence));
-}
-
-function formSummaryLine(fixture, homeForm, awayForm){
-  const parts = [];
-  if(homeForm && homeForm.played > 0){
-    parts.push(`${fixture.home.split(" ")[0]} ฟอร์มล่าสุด (${homeForm.played} นัด): ${homeForm.record}`);
-  }
-  if(awayForm && awayForm.played > 0){
-    parts.push(`${fixture.away.split(" ")[0]} ฟอร์มล่าสุด (${awayForm.played} นัด): ${awayForm.record}`);
-  }
-  return parts.join(" · ");
-}
-
-
-function impliedProb(odds){
-  const n = parseFloat(odds);
-  if(!n || n <= 1) return null;
-  return 1/n;
-}
-
-// Full 3-way (home/draw/away) calculation when draw odds are supplied;
-// falls back to the original 2-way calculation when they aren't, so
-// leagues/cups where a draw can't happen (or the user skips the field)
-// still work exactly as before. homeForm/awayForm (real last-5 results)
-// nudge the price-implied probabilities alongside the note-based nudge.
-function analyzeOdds(homeOdds, awayOdds, note, drawOdds, homeForm, awayForm){
-  const pH = impliedProb(homeOdds), pA = impliedProb(awayOdds);
-  if(pH == null || pA == null) return null;
-  const pD = impliedProb(drawOdds);
-  const noteInfo = analyzeNote(note);
-  const homeFormAdjust = formToAdjust(homeForm);
-  const awayFormAdjust = formToAdjust(awayForm);
-  const totalHomeAdjust = noteInfo.homeAdjust + homeFormAdjust;
-  const totalAwayAdjust = noteInfo.awayAdjust + awayFormAdjust;
-
-  let fairH, fairA, fairD = null;
-
-  if(pD != null){
-    const overround = pH + pA + pD;
-    fairH = pH/overround; fairA = pA/overround; fairD = pD/overround;
-    fairH = Math.min(0.9, Math.max(0.03, fairH + totalHomeAdjust));
-    fairA = Math.min(0.9, Math.max(0.03, fairA + totalAwayAdjust));
-    const sum = fairH + fairA + fairD;
-    fairH /= sum; fairA /= sum; fairD /= sum;
-  } else {
-    const overround = pH + pA;
-    fairH = pH/overround; fairA = pA/overround;
-    fairH = Math.min(0.95, Math.max(0.05, fairH + totalHomeAdjust));
-    fairA = Math.min(0.95, Math.max(0.05, fairA + totalAwayAdjust));
-    const sum = fairH + fairA;
-    fairH /= sum; fairA /= sum;
-  }
-
-  // favourite = whichever of the (2 or 3) outcomes is most likely
-  const candidates = [["home", fairH], ["away", fairA]];
-  if(fairD != null) candidates.push(["draw", fairD]);
-  candidates.sort((x, y) => y[1] - x[1]);
-  const favourite = candidates[0][0];
-  const gap = candidates[0][1] - candidates[1][1]; // separation from the runner-up
-
-  let tier = "red";
-  if(gap >= 0.30) tier = "green";
-  else if(gap >= 0.14) tier = "yellow";
-
-  return {
-    fairHomePct: Math.round(fairH*100),
-    fairAwayPct: Math.round(fairA*100),
-    fairDrawPct: fairD != null ? Math.round(fairD*100) : null,
-    gapPct: Math.round(gap*100),
-    tier,
-    favourite,
-    noteAdjusted: noteInfo.homeAdjust !== 0 || noteInfo.awayAdjust !== 0,
-    formAdjusted: homeFormAdjust !== 0 || awayFormAdjust !== 0,
-    noteInfo,
-  };
-}
-
-/* ---------------- league directory / watchlist ---------------- */
-async function fetchAllSoccerLeagues(){
-  if(allLeaguesCache) return allLeaguesCache;
-  const res = await fetch(`${SPORTSDB_BASE}/all_leagues.php?s=Soccer`);
-  if(!res.ok) throw new Error("โหลดรายชื่อลีกไม่สำเร็จ");
-  const json = await res.json();
-  allLeaguesCache = (json.leagues || []).map(l => ({ id: l.idLeague, nameEn: l.strLeague }));
-  return allLeaguesCache;
-}
-// Fuzzy-matches a wanted league name against the live directory using the
-// same normalize-and-compare approach as team-name matching, so small
-// wording differences (e.g. "Swedish Allsvenskan" vs "Allsvenskan") don't
-// cause a league to silently disappear from the quick-pick list.
-function findLeagueFuzzy(dir, wantedName){
-  const target = normalizeText(wantedName);
-  if(!target) return null;
-  let exact = null, best = null, bestScore = 0;
-  for(const l of dir){
-    if(!l.nameEn) continue;
-    const n = normalizeText(l.nameEn);
-    if(n === target){ exact = l; break; }
-    if(n.includes(target) || target.includes(n)){
-      const score = Math.min(n.length, target.length);
-      if(score > bestScore){ bestScore = score; best = l; }
-    }
-  }
-  return exact || best;
-}
-
-async function resolveTopLeagues(){
-  const dir = await fetchAllSoccerLeagues();
-  const out = [];
-  TOP_LEAGUE_MATCH.forEach(w => {
-    const hit = findLeagueFuzzy(dir, w.match);
-    if(hit) out.push({ id: hit.id, nameEn: hit.nameEn, nameTh: w.nameTh, flag: w.flag });
-  });
-  return out;
-}
-async function loadWatchlist(){
-  const saved = await storageGet(WATCHLIST_KEY);
-  if(Array.isArray(saved) && saved.length > 0) return saved;
-  try{ return await resolveTopLeagues(); } catch{ return []; }
-}
-function saveWatchlist(list){ storageSet(WATCHLIST_KEY, list); }
-
-/* ---------------- fixtures ---------------- */
-async function fetchLeagueFixtures(league){
-  const res = await fetch(`${SPORTSDB_BASE}/eventsnextleague.php?id=${league.id}`);
-  if(!res.ok) throw new Error("โหลด " + league.nameTh + " ไม่สำเร็จ");
-  const json = await res.json();
-  const events = json.events || [];
-  return events.map(e => ({
-    id: e.idEvent,
-    leagueId: league.id,
-    leagueTh: league.nameTh,
-    leagueNameEn: league.nameEn,
-    flag: league.flag,
-    home: e.strHomeTeam,
-    away: e.strAwayTeam,
-    homeTeamId: e.idHomeTeam,
-    awayTeamId: e.idAwayTeam,
-    date: e.dateEvent,
-    time: e.strTime,
-    venue: e.strVenue,
-  }));
-}
-function formatThaiDateTime(dateStr, timeStr){
-  if(!dateStr) return "ยังไม่กำหนด";
-  try{
-    const iso = timeStr ? `${dateStr}T${timeStr}Z` : `${dateStr}T00:00:00Z`;
-    const d = new Date(iso);
-    const t = new Intl.DateTimeFormat("th-TH", {
-      timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
-    }).format(d);
-    return t + " น. (ไทย)";
-  }catch{ return dateStr; }
-}
-
-/* ---------------- render: scoreboard ---------------- */
-function renderScoreboard(){
-  const c = { green:0, yellow:0, red:0 };
-  Object.values(oddsMap).forEach(t => { if(c[t] !== undefined) c[t]++; });
-  document.getElementById("cntGreen").textContent = c.green;
-  document.getElementById("cntYellow").textContent = c.yellow;
-  document.getElementById("cntRed").textContent = c.red;
-}
-
-/* ---------------- render: league chips ---------------- */
-function renderChips(){
-  const row = document.getElementById("chipRow");
-  row.innerHTML = "";
-
-  const allChip = document.createElement("button");
-  allChip.className = "chip" + (activeLeague === "all" ? " active" : "");
-  allChip.textContent = "ทั้งหมด";
-  allChip.onclick = () => { activeLeague = "all"; renderChips(); renderList(); };
-  row.appendChild(allChip);
-
-  watchlist.forEach(l => {
-    const chip = document.createElement("button");
-    chip.className = "chip" + (activeLeague === l.id ? " active" : "");
-    chip.textContent = `${l.flag} ${l.nameTh}`;
-    chip.onclick = () => { activeLeague = l.id; renderChips(); renderList(); };
-    row.appendChild(chip);
-  });
-
-  const addChip = document.createElement("button");
-  addChip.className = "chip add";
-  addChip.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path d="M11 5h2v14h-2z"/><path d="M5 11h14v2H5z"/></svg> เพิ่มลีก`;
-  addChip.onclick = openPicker;
-  row.appendChild(addChip);
-}
-
-/* ---------------- render: ticket cards ---------------- */
-function ticketHTML(f){
-  return `
-    <div class="ticket" id="ticket-${f.id}">
-      <button class="ticket-top" data-toggle="${f.id}">
-        <div style="min-width:0">
-          <div class="league-tag"><span>${f.flag}</span><span>${f.leagueTh}</span></div>
-          <div class="match-title oswald">${f.home}<span class="vs">vs</span>${f.away}</div>
-          <div class="match-meta mono">${formatThaiDateTime(f.date, f.time)}${f.venue ? " · " + f.venue : ""}</div>
-        </div>
-        <div class="ticket-top-right">
-          <span id="tiericon-${f.id}"></span>
-          <svg class="icon chevron" id="chev-${f.id}" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-      </button>
-      <div class="perforation"><div class="hole left"></div><div class="hole right"></div><div class="dash"></div></div>
-      <div class="ticket-bottom" id="body-${f.id}">
-        <div class="form-line" id="formline-${f.id}"></div>
-        <div class="field-row">
-          <label>
-            <span class="field-label">ราคาเจ้าบ้าน (ทศนิยม)</span>
-            <input inputmode="decimal" id="home-${f.id}" placeholder="เช่น 1.85" />
-          </label>
-          <label>
-            <span class="field-label">ราคาทีมเยือน (ทศนิยม)</span>
-            <input inputmode="decimal" id="away-${f.id}" placeholder="เช่น 2.10" />
-          </label>
-        </div>
-        <label class="draw-field">
-          <span class="field-label">ราคาเสมอ (ทศนิยม, ไม่บังคับ — ใส่ให้แม่นขึ้น)</span>
-          <input inputmode="decimal" id="draw-${f.id}" placeholder="เช่น 3.40" />
-        </label>
-        <div class="auto-badge" id="autobadge-${f.id}"></div>
-        <label>
-          <span class="field-label">โน้ตของคุณ (ฟอร์ม/ข่าวทีม ฯลฯ)</span>
-          <textarea id="note-${f.id}" rows="2" placeholder="เช่น ทีมเยือนขาดตัวหลัก 2 คน"></textarea>
-        </label>
-        <div id="analysis-${f.id}"></div>
-        <button class="btn-ai" data-ai="${f.id}">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
-          วิเคราะห์เชิงลึกด้วย AI
-        </button>
-        <div class="ai-result" id="airesult-${f.id}"></div>
-        <div class="btn-row">
-          <button class="btn-save" data-save="${f.id}">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            บันทึกราคา
-          </button>
-          <button class="btn-clear" data-clear="${f.id}">
-            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-          </button>
-        </div>
-        <div class="saved-note" id="savednote-${f.id}" style="display:none">บันทึกไว้ในเครื่องนี้แล้ว</div>
-      </div>
-    </div>
-  `;
-}
-
-function tierIconSVG(cls){
-  if(cls === "green") return `<svg class="icon" style="stroke:var(--green)" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
-  if(cls === "yellow") return `<svg class="icon" style="stroke:var(--amber)" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`;
-  return `<svg class="icon" style="stroke:var(--rose)" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
-}
-
-async function runAiAnalysis(f){
-  const btn = document.querySelector(`[data-ai="${f.id}"]`);
-  const resultEl = document.getElementById(`airesult-${f.id}`);
-
-  const home = document.getElementById(`home-${f.id}`).value;
-  const away = document.getElementById(`away-${f.id}`).value;
-  const draw = document.getElementById(`draw-${f.id}`).value;
-  const note = document.getElementById(`note-${f.id}`).value;
-  const homeForm = teamFormCache[f.homeTeamId];
-  const awayForm = teamFormCache[f.awayTeamId];
-  const a = analyzeOdds(home, away, note, draw, homeForm, awayForm);
-
-  btn.disabled = true;
-  const originalLabel = btn.innerHTML;
-  btn.innerHTML = "กำลังวิเคราะห์…";
-  resultEl.classList.add("show");
-  resultEl.innerHTML = `<span class="ai-tag">AI กำลังคิด</span>กำลังส่งข้อมูลให้ AI วิเคราะห์ รอสักครู่…`;
-
-  try{
-    const result = await fetchGeminiAnalysis(f, a, homeForm, awayForm, note);
-    const sourcesHtml = result.sources && result.sources.length
-      ? `<div class="ai-sources">อ้างอิง: ${result.sources.slice(0,3).join(", ")}</div>`
-      : "";
-    resultEl.innerHTML = `<span class="ai-tag">วิเคราะห์โดย AI (Gemini, ค้นเว็บประกอบ)</span>${result.text.replace(/\n/g, "<br>")}${sourcesHtml}`;
-  }catch(err){
-    resultEl.innerHTML = `<span class="ai-tag">เกิดข้อผิดพลาด</span><span class="ai-error">วิเคราะห์ไม่สำเร็จ: ${(err && err.message) || "ไม่ทราบสาเหตุ"} — ลองแตะปุ่มใหม่อีกครั้ง</span>`;
-  }finally{
-    btn.disabled = false;
-    btn.innerHTML = originalLabel;
-  }
-}
-
-function renderAnalysis(f){
-  const home = document.getElementById(`home-${f.id}`).value;
-  const away = document.getElementById(`away-${f.id}`).value;
-  const draw = document.getElementById(`draw-${f.id}`).value;
-  const note = document.getElementById(`note-${f.id}`).value;
-  const box = document.getElementById(`analysis-${f.id}`);
-  const iconSlot = document.getElementById(`tiericon-${f.id}`);
-  const ticketEl = document.getElementById(`ticket-${f.id}`);
-  const homeForm = teamFormCache[f.homeTeamId];
-  const awayForm = teamFormCache[f.awayTeamId];
-  const a = analyzeOdds(home, away, note, draw, homeForm, awayForm);
-
-  const formLineEl = document.getElementById(`formline-${f.id}`);
-  if(formLineEl){
-    const line = formSummaryLine(f, homeForm, awayForm);
-    formLineEl.textContent = line;
-    formLineEl.style.display = line ? "block" : "none";
-  }
-
-  ticketEl.classList.remove("tier-green","tier-yellow","tier-red");
-  if(!a){
-    box.innerHTML = "";
-    iconSlot.innerHTML = "";
-    delete oddsMap[f.id];
-    return;
-  }
-  const meta = TIER_META[a.tier];
-  ticketEl.classList.add("tier-" + a.tier);
-  iconSlot.innerHTML = tierIconSVG(a.tier);
-  const subLine = a.fairDrawPct != null
-    ? `${f.home.split(" ")[0]} ${a.fairHomePct}% · เสมอ ${a.fairDrawPct}% · ${f.away.split(" ")[0]} ${a.fairAwayPct}%`
-    : `${f.home.split(" ")[0]} ${a.fairHomePct}% · ${f.away.split(" ")[0]} ${a.fairAwayPct}%`;
-  box.innerHTML = `
-    <div class="analysis-box tier-${a.tier}">
-      <div class="analysis-left">
-        ${tierIconSVG(a.tier)}
-        <div>
-          <div class="tier-label ${a.tier}">${meta.label}</div>
-          <div class="analysis-sub">${subLine}</div>
-        </div>
-      </div>
-      <div>
-        <div class="gap-label">ส่วนต่าง</div>
-        <div class="gap-num oswald">${a.gapPct}%</div>
-      </div>
-    </div>
-    <div class="summary-text${a.noteAdjusted ? " adjusted" : ""}">${buildSummary(f, a, a.noteInfo)}</div>
-  `;
-  oddsMap[f.id] = a.tier;
-  renderScoreboard();
-}
-
-async function renderList(){
-  const listEl = document.getElementById("list");
-  const visible = activeLeague === "all" ? fixtures : fixtures.filter(f => f.leagueId === activeLeague);
-
-  if(visible.length === 0){
-    listEl.innerHTML = `<div class="empty">
-      <svg class="icon" viewBox="0 0 24 24" style="width:28px;height:28px"><path d="M20 6H4a2 2 0 0 0-2 2v3a2 2 0 0 1 0 4v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3a2 2 0 0 1 0-4V8a2 2 0 0 0-2-2z"/></svg>
-      <span>ยังไม่มีโปรแกรมแข่งที่ประกาศล่วงหน้าในลีกนี้</span>
-    </div>`;
-    return;
-  }
-
-  listEl.innerHTML = visible.map(ticketHTML).join("") + footnoteHTML();
-
-  // wire up events + preload saved/auto odds
-  for(const f of visible){
-    document.querySelector(`[data-toggle="${f.id}"]`).onclick = () => toggleTicket(f);
-    document.querySelector(`[data-save="${f.id}"]`).onclick = () => saveTicket(f);
-    document.querySelector(`[data-clear="${f.id}"]`).onclick = () => clearTicket(f);
-    document.querySelector(`[data-ai="${f.id}"]`).onclick = () => runAiAnalysis(f);
-    document.getElementById(`home-${f.id}`).addEventListener("input", () => renderAnalysis(f));
-    document.getElementById(`away-${f.id}`).addEventListener("input", () => renderAnalysis(f));
-    document.getElementById(`draw-${f.id}`).addEventListener("input", () => renderAnalysis(f));
-    document.getElementById(`note-${f.id}`).addEventListener("input", () => renderAnalysis(f));
-
-    const saved = await storageGet(STORAGE_PREFIX + f.id);
-    const auto = autoOddsByFixture[f.id];
-
-    if(saved){
-      // user's own saved value always wins (explicit choice)
-      document.getElementById(`home-${f.id}`).value = saved.homeOdds || "";
-      document.getElementById(`away-${f.id}`).value = saved.awayOdds || "";
-      document.getElementById(`draw-${f.id}`).value = saved.drawOdds || "";
-      document.getElementById(`note-${f.id}`).value = saved.note || "";
-      document.getElementById(`savednote-${f.id}`).style.display = "block";
-    } else if(auto){
-      document.getElementById(`home-${f.id}`).value = auto.homeOdds;
-      document.getElementById(`away-${f.id}`).value = auto.awayOdds;
-      if(auto.drawOdds != null) document.getElementById(`draw-${f.id}`).value = auto.drawOdds;
-      showAutoBadge(f.id, auto.bookmaker);
-    }
-    renderAnalysis(f);
-  }
-}
-
-function showAutoBadge(fixtureId, bookmaker){
-  const el = document.getElementById(`autobadge-${fixtureId}`);
-  if(el) el.innerHTML = `<svg class="icon" style="width:12px;height:12px;stroke:var(--gold)" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg> ราคาอัตโนมัติจาก ${bookmaker}`;
-}
-
-function footnoteHTML(){
-  return `<p class="footnote">โปรแกรมแข่งดึงจาก TheSportsDB · ราคาต่อรองดึงอัตโนมัติจาก The Odds API เมื่อมีให้ ลีกที่ไม่มีราคากรอกเองได้
-    · ฟอร์มทีมดึงจริงจาก TheSportsDB (คีย์ฟรีมักให้แค่ 1 นัดล่าสุด ไม่ใช่ 5 นัด — เป็นข้อจำกัดของแหล่งข้อมูลฟรี) · กดปุ่ม "วิเคราะห์เชิงลึกด้วย AI" ให้ Gemini (ฟรี) ค้นเว็บหาข่าวทีมจริงประกอบการวิเคราะห์ (โควต้าค้นเว็บมีจำกัดต่อเดือน) · เก็บไว้ในเครื่องนี้เท่านั้น · เพื่อการวิเคราะห์ส่วนตัวเท่านั้น ไม่ใช่คำแนะนำการเดิมพัน</p>`;
-}
-
-function toggleTicket(f){
-  const body = document.getElementById(`body-${f.id}`);
-  const chev = document.getElementById(`chev-${f.id}`);
-  const isOpen = body.classList.toggle("open");
-  chev.style.transform = isOpen ? "rotate(180deg)" : "rotate(0deg)";
-
-  if(isOpen){
-    const formLineEl = document.getElementById(`formline-${f.id}`);
-    const needHome = f.homeTeamId && !teamFormCache[f.homeTeamId];
-    const needAway = f.awayTeamId && !teamFormCache[f.awayTeamId];
-    if(needHome || needAway){
-      if(formLineEl){ formLineEl.textContent = "กำลังโหลดฟอร์มล่าสุด…"; formLineEl.style.display = "block"; }
-      Promise.all([fetchTeamForm(f.homeTeamId), fetchTeamForm(f.awayTeamId)])
-        .then(() => renderAnalysis(f))
-        .catch(() => { if(formLineEl) formLineEl.style.display = "none"; });
-    }
-  }
-}
-
-async function saveTicket(f){
-  const homeOdds = document.getElementById(`home-${f.id}`).value;
-  const awayOdds = document.getElementById(`away-${f.id}`).value;
-  const drawOdds = document.getElementById(`draw-${f.id}`).value;
-  const note = document.getElementById(`note-${f.id}`).value;
-  const ok = await storageSet(STORAGE_PREFIX + f.id, { homeOdds, awayOdds, drawOdds, note });
-  document.getElementById(`savednote-${f.id}`).style.display = ok ? "block" : "none";
-}
-async function clearTicket(f){
-  await storageDelete(STORAGE_PREFIX + f.id);
-  document.getElementById(`home-${f.id}`).value = "";
-  document.getElementById(`away-${f.id}`).value = "";
-  document.getElementById(`draw-${f.id}`).value = "";
-  document.getElementById(`note-${f.id}`).value = "";
-  document.getElementById(`savednote-${f.id}`).style.display = "none";
-  renderAnalysis(f);
-}
-
-/* ---------------- main load ---------------- */
-async function loadFixtures(){
-  const btn = document.getElementById("refreshBtn");
-  const icon = document.getElementById("refreshIcon");
-  btn.disabled = true; icon.classList.add("spin");
-
-  if(watchlist.length === 0){
-    fixtures = [];
-    renderList();
-    btn.disabled = false; icon.classList.remove("spin");
-    return;
-  }
-
-  const results = await Promise.allSettled(watchlist.map(fetchLeagueFixtures));
-  const all = [];
-  results.forEach(r => { if(r.status === "fulfilled") all.push(...r.value); });
-  all.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
-  fixtures = all;
-
-  await preloadAutoOdds(all);
-  await renderList();
-  renderScoreboard();
-  btn.disabled = false; icon.classList.remove("spin");
-}
-
-/* ---------------- league picker ---------------- */
-function openPicker(){
-  document.getElementById("picker").classList.add("open");
-  document.getElementById("pickerSearch").value = "";
-  document.getElementById("pickerSearch").focus();
-  renderPickerList("");
-}
-function closePicker(){ document.getElementById("picker").classList.remove("open"); }
-document.getElementById("pickerClose").onclick = closePicker;
-document.getElementById("pickerSearch").addEventListener("input", (e) => renderPickerList(e.target.value));
-
-async function renderPickerList(query){
-  const el = document.getElementById("pickerList");
-  el.innerHTML = `<div class="picker-loading">กำลังโหลดรายชื่อลีก…</div>`;
-  let dir;
-  try{ dir = await fetchAllSoccerLeagues(); }
-  catch{ el.innerHTML = `<div class="picker-loading">โหลดรายชื่อลีกไม่สำเร็จ ลองใหม่อีกครั้ง</div>`; return; }
-
-  const watchedIds = new Set(watchlist.map(l => l.id));
-  const q = query.trim().toLowerCase();
-
-  // Default view (no search text): Thai quick-pick chips, no typing needed.
-  if(!q){
-    const resolved = QUICK_PICK_LEAGUES
-      .map(w => {
-        if(w.id){
-          // verified ID — no lookup needed, always works
-          return { id: w.id, nameEn: w.match, nameTh: w.nameTh, flag: w.flag };
-        }
-        const hit = findLeagueFuzzy(dir, w.match);
-        return hit ? { id: hit.id, nameEn: hit.nameEn, nameTh: w.nameTh, flag: w.flag } : null;
-      })
-      .filter(Boolean);
-
-    if(resolved.length === 0){
-      el.innerHTML = `<div class="picker-empty">โหลดลีกแนะนำไม่สำเร็จ ลองพิมพ์ค้นหาด้านบนแทน</div>`;
-      return;
-    }
-
-    el.innerHTML = `<div class="picker-section-label">ลีกยอดนิยม แตะเพื่อติดตาม</div>` +
-      resolved.map(l => `
-        <div class="picker-row">
-          <span>${l.flag} ${l.nameTh}</span>
-          ${watchedIds.has(l.id)
-            ? `<button class="btn-unfollow" data-remove="${l.id}">เอาออก</button>`
-            : `<button class="btn-follow" data-add="${l.id}" data-name="${l.nameEn.replace(/"/g,'&quot;')}" data-nameth="${l.nameTh.replace(/"/g,'&quot;')}" data-flag="${l.flag}">+ ติดตาม</button>`
-          }
-        </div>
-      `).join("");
-    wirePickerButtons(query);
-    return;
-  }
-
-  // Search mode: user typed something — search the full English directory.
-  const results = dir.filter(l => l.nameEn.toLowerCase().includes(q)).slice(0, 40);
-  if(results.length === 0){
-    el.innerHTML = `<div class="picker-empty">ไม่พบลีกที่ค้นหา ลองคำอื่น หรือเลือกจากลีกยอดนิยมแทน</div>`;
-    return;
-  }
-  el.innerHTML = results.map(l => `
-    <div class="picker-row">
-      <span>${l.nameEn}</span>
-      ${watchedIds.has(l.id)
-        ? `<button class="btn-unfollow" data-remove="${l.id}">เอาออก</button>`
-        : `<button class="btn-follow" data-add="${l.id}" data-name="${l.nameEn.replace(/"/g,'&quot;')}">+ ติดตาม</button>`
-      }
-    </div>
-  `).join("");
-  wirePickerButtons(query);
-}
-
-function wirePickerButtons(query){
-  const el = document.getElementById("pickerList");
-  el.querySelectorAll("[data-add]").forEach(btn => {
-    btn.onclick = async () => {
-      const id = btn.getAttribute("data-add");
-      const name = btn.getAttribute("data-name");
-      const nameTh = btn.getAttribute("data-nameth") || name;
-      const flag = btn.getAttribute("data-flag") || "⚽";
-      if(!watchlist.some(l => l.id === id)){
-        watchlist.push({ id, nameEn: name, nameTh, flag });
-        saveWatchlist(watchlist);
-        renderChips();
-        await loadFixtures();
-        renderPickerList(query);
-      }
-    };
-  });
-  el.querySelectorAll("[data-remove]").forEach(btn => {
-    btn.onclick = async () => {
-      const id = btn.getAttribute("data-remove");
-      watchlist = watchlist.filter(l => l.id !== id);
-      saveWatchlist(watchlist);
-      if(activeLeague === id) activeLeague = "all";
-      renderChips();
-      await loadFixtures();
-      renderPickerList(query);
-    };
-  });
-}
-
-/* ---------------- boot ---------------- */
-document.getElementById("refreshBtn").onclick = loadFixtures;
-
-(async function init(){
-  document.getElementById("list").innerHTML = `<div class="empty">
-    <svg class="icon spin" viewBox="0 0 24 24" style="width:28px;height:28px;stroke:var(--gold)"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-    <span>กำลังโหลดโปรแกรมแข่ง…</span>
-  </div>`;
-  watchlist = await loadWatchlist();
-  renderChips();
-  await loadFixtures();
-})();
+load();render();
 </script>
 </body>
 </html>
