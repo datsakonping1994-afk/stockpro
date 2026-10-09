@@ -41,6 +41,30 @@ label{font-size:14px;color:var(--mut)}
 .disp{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:64px;text-align:right;overflow-x:auto}
 .disp .e{font-size:22px;font-weight:600;word-break:break-all}
 .disp .r{font-size:14px;color:var(--mut)}
+.hrow{display:grid;grid-template-columns:46px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.hb{min-height:36px;padding:2px 14px;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{border-radius:20px;min-height:40px;padding:4px 14px}
+.chip.on{background:var(--acc);color:var(--on);border-color:var(--acc);font-weight:600}
+.chip.del{border-color:var(--red);color:var(--red)}
+#am{font-size:24px;font-weight:800;min-height:56px}
+#add{min-height:56px;font-size:18px;padding:8px 18px}
+#ops button{min-height:56px;font-size:28px;font-weight:800}
+#ops [data-op="+"]{background:var(--win);color:var(--on);border-color:var(--win)}
+#ops [data-op="-"]{background:var(--red);color:var(--on);border-color:var(--red)}
+#apv{font-size:20px;margin:2px 0 8px}
+#apv:empty{display:none}
+.ent{padding:12px 0}
+.ent>span:first-child{font-size:20px;font-weight:600}
+.ent .pos,.ent .neg{font-size:24px}
+.ent .x{min-height:44px;min-width:44px;font-size:18px}
+.ent.editing{background:var(--bg);border-radius:10px;padding-left:8px;padding-right:8px;outline:2px solid var(--acc)}
+.ent.tt{border-top:2px solid var(--ink);margin-top:4px}
+.ent.tt>span:first-child{font-weight:800}
+#gt{font-size:24px;font-weight:800;min-height:56px}
+#gsign{min-height:56px}
+.rh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:12px}
+.tg{display:inline-block;font-size:12px;padding:0 7px;border-radius:8px;background:var(--bg);border:1px solid var(--line);color:var(--mut);margin-right:6px}
 </style>
 </head>
 <body>
@@ -53,84 +77,87 @@ label{font-size:14px;color:var(--mut)}
 </section>
 
 <section>
-<h2>บันทึกยอดแต่ละคน</h2>
-<div class="row"><input id="pn" list="pl" placeholder="ชื่อ (พิมพ์ใหม่หรือเลือก)" maxlength="20"><datalist id="pl"></datalist></div>
-<div class="row seg"><button id="bw" class="on w">ได้ (+)</button><button id="bl" class="l">เสีย (−)</button></div>
-<button id="cancel" hidden style="width:100%;margin-bottom:8px">ยกเลิกการแก้ไข</button>
-<div class="row"><input id="am" type="text" inputmode="decimal" autocomplete="off" placeholder="จำนวนเงิน เช่น 500+700-200"><button class="pri fix" id="add">บันทึก</button></div>
-<div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
-<div id="apv" class="mut" style="min-height:22px;margin-bottom:6px"></div>
-<div id="ents"></div>
-<button id="undo" style="width:100%;margin-top:8px">↶ ย้อนกลับรายการล่าสุด</button>
-</section>
-
-<section>
-<h2>เคลียร์เงินกับเพื่อน</h2>
-<div id="people"></div>
-<p class="mut" id="tot"></p>
-</section>
-
-<section>
-<h2>ประวัติการแก้ไข</h2>
-<p class="mut">ทุกการเพิ่ม แก้ไข ลบ ถูกบันทึกไว้ กด "ย้อนก่อนนี้" เพื่อกลับไปสถานะก่อนรายการนั้น การย้อนก็ถูกบันทึกและย้อนซ้ำได้</p>
-<div id="hist"></div>
-<button id="clearH" style="width:100%;margin-top:8px">ล้างประวัติอย่างเดียว (รายการยอดยังอยู่)</button>
-</section>
-
-<section>
 <h2>เงินในเว็บ</h2>
-<div class="mut">ควรเหลือ (ทุน + ผลรวมทุกคน)</div>
+<div class="mut">ควรเหลือ (ทุน + ผลทุกเกม)</div>
 <div class="big" id="web"></div>
 <div class="row" style="margin-top:10px"><label class="fix">ยอดจริงในเว็บ</label><input id="real" type="number" inputmode="decimal" placeholder="ใส่เพื่อเทียบ"></div>
 <div id="diff" class="mut"></div>
 <button id="clear" style="width:100%;margin-top:10px">ล้างทั้งหมด</button>
 </section>
+
+<section>
+<h2>บันทึกยอดแต่ละคน</h2>
+<input id="pn" type="hidden"><datalist id="pl"></datalist>
+<div class="chips" id="chips"></div>
+<div class="row"><input id="nn" placeholder="เพิ่มชื่อล่วงหน้า" maxlength="20"><button class="fix" id="addN">เพิ่มชื่อ</button><button class="fix" id="delMode">ลบชื่อ</button></div>
+<button id="cancel" hidden style="width:100%;margin-bottom:8px">ยกเลิกการแก้ไข</button>
+<div class="row"><input id="am" type="text" inputmode="decimal" autocomplete="off" placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
+<div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
+<div id="apv"></div>
+<div id="ents"></div>
+<button id="undo" style="width:100%;margin-top:8px">↶ ย้อนกลับรายการล่าสุด</button>
+</section>
+
+<section>
+<h2>เครื่องคิดเลข</h2>
+<div class="disp" aria-live="polite"><div class="e" id="ce">0</div><div class="r" id="cr">&nbsp;</div></div>
+<div class="kp" id="kp" style="margin-top:8px">
+<button data-k="C">C</button><button data-k="b" aria-label="ลบตัวสุดท้าย">⌫</button><button class="op" data-k="÷">÷</button><button class="op" data-k="×">×</button>
+<button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button class="op" data-k="−">−</button>
+<button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button class="op" data-k="+">+</button>
+<button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button class="eq" data-k="=">=</button>
+<button data-k="0" style="grid-column:span 2">0</button><button data-k=".">.</button><button data-k="00">00</button>
+</div>
+<button id="cuse" class="pri" style="width:100%;margin-top:8px">ใส่ผลลัพธ์ในช่องยอด</button>
+</section>
+
+<section>
+<h2>ประวัติการแก้ไข</h2>
+<p class="mut">แตะ "ย้อน" เพื่อกลับไปก่อนรายการนั้น (ย้อนผิดก็ย้อนซ้ำได้)</p>
+<div id="hist"></div>
+<button id="hmore" style="width:100%;margin-top:8px" hidden></button>
+<button id="clearH" style="width:100%;margin-top:8px">ล้างประวัติอย่างเดียว (รายการยอดยังอยู่)</button>
+</section>
+
 </main>
 
 <script>
 const $=id=>document.getElementById(id);
-let ents=[{n:"คนที่ 1",a:1000},{n:"คนที่ 2",a:-1000},{n:"เพื่อนคนที่ 3",a:-2000}],sign=1,editIdx=-1,hist=[];
+let ents=[{n:"คนที่ 1",a:1000},{n:"คนที่ 2",a:-1000},{n:"เพื่อนคนที่ 3",a:-2000}],sign=1,editIdx=-1,hist=[],roster=[],delMode=false,banked=0;
 const m=n=>Math.abs(n).toLocaleString("th-TH",{maximumFractionDigits:2});
 const sg=n=>(n>0?"+":n<0?"−":"")+m(n);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 function render(){
   $("add").textContent=editIdx>=0?"บันทึกแก้ไข":"บันทึก";$("cancel").hidden=editIdx<0;apreview();renderHist();save();
-  $("bw").classList.toggle("on",sign>0);$("bl").classList.toggle("on",sign<0);
+  renderNames();
   const by={};ents.forEach(e=>by[e.n]=(by[e.n]||0)+e.a);
   const names=Object.keys(by);
   $("pl").innerHTML=names.map(n=>`<option value="${esc(n)}">`).join("");
-  $("ents").innerHTML=ents.length?ents.map((e,i)=>`<div class="ent"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
-  let pay=0,get=0;
-  $("people").innerHTML=names.map(n=>{
-    const v=by[n];if(v>0)pay+=v;else get-=v;
-    const t=v>0?`คุณต้องจ่ายให้ ${m(v)}`:v<0?`เก็บจากเขา ${m(v)}`:"เสมอ";
-    return `<div class="pp"><div>${esc(n)}<small>${t}</small></div><div class="${v>0?"pos":v<0?"neg":""}">${sg(v)}</div></div>`;
-  }).join("")||'<p class="mut">ยังไม่มีข้อมูล</p>';
+  $("ents").innerHTML=ents.length?ents.map((e,i)=>`<div class="ent${i===editIdx?" editing":""}"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`).join("")+(t=>`<div class="ent tt"><span>รวมเพื่อน</span><span class="${t>0?"pos":t<0?"neg":""}">${sg(t)}</span></div>`)(ents.reduce((a,e)=>a+e.a,0)):'<p class="mut">ยังไม่มีรายการ</p>';
   const sum=names.reduce((a,n)=>a+by[n],0),cap=parseFloat($("cap").value)||0;
-  $("tot").innerHTML=`ต้องเก็บจากเพื่อน <b>${m(get)}</b> · ต้องจ่ายเพื่อน <b>${m(pay)}</b><br>ผลรวมทุกคน <b class="${sum>0?"pos":sum<0?"neg":""}">${sg(sum)}</b> (${sum>=0?"คนเล่นได้สุทธิ เว็บจ่ายออก":"คนเล่นเสียสุทธิ เว็บได้ไป"})`;
-  const web=cap+sum;$("web").textContent=m(web)+" บาท";
+  const web=cap+banked+sum;$("web").textContent=m(web)+" บาท";
   const r=$("real").value;
   if(r===""){$("diff").textContent="";}
   else{const d=parseFloat(r)-web;$("diff").innerHTML=Math.abs(d)<0.005?'<b class="pos">ตรงกัน</b>':`ต่างกัน <b class="${d>0?"pos":"neg"}">${sg(d)}</b> บาท (เช็กว่ามีรายการตกหล่นไหม)`;}
 }
-$("bw").onclick=()=>{sign=1;render();};
-$("bl").onclick=()=>{sign=-1;render();};
+
+
 $("add").onclick=()=>{
   const n=$("pn").value.trim(),v=amtVal();
-  if(!n){$("pn").focus();return;}
+  if(!n){$("apv").innerHTML='<b class="neg">เลือกชื่อก่อน</b>';return;}
   if(v===null||v===0){$("am").focus();return;}
-  const a=v<0?v:sign*v;
-  if(editIdx>=0&&ents[editIdx]){const o=ents[editIdx];logH(`แก้ไข ${o.n} ${sg(o.a)} → ${n} ${sg(a)}`);ents[editIdx]={n,a};}
-  else{logH(`เพิ่ม ${n} ${sg(a)}`);ents.push({n,a});}
+  const a=v;
+  if(editIdx>=0&&ents[editIdx]){const o=ents[editIdx];logH("แก้ไข",{k:"edit",n:o.n,a:o.a,n2:n,a2:a});ents[editIdx]={n,a};}
+  else{logH("เพิ่ม",{k:"add",n,a});ents.push({n,a});}
   editIdx=-1;$("pn").value="";$("am").value="";render();
 };
 $("am").onkeydown=e=>{if(e.key==="Enter")$("add").click();};
 $("cap").oninput=$("real").oninput=render;
 $("ents").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
-  if(b.dataset.e!==undefined){const i=+b.dataset.e,x=ents[i];editIdx=i;sign=x.a<0?-1:1;$("pn").value=x.n;$("am").value=Math.abs(x.a);render();$("am").focus();}
-  else{const x=ents[+b.dataset.i];if(x)logH(`ลบ ${x.n} ${sg(x.a)}`);ents.splice(+b.dataset.i,1);editIdx=-1;render();}
+  if(b.dataset.e!==undefined){const i=+b.dataset.e,x=ents[i];editIdx=i;if(!roster.includes(x.n))roster.push(x.n);$("pn").value=x.n;$("am").value=x.a;render();$("am").focus();}
+  else{const x=ents[+b.dataset.i];if(x)logH("ลบ",{k:"del",n:x.n,a:x.a});ents.splice(+b.dataset.i,1);editIdx=-1;render();}
 };
 $("cancel").onclick=()=>{editIdx=-1;$("pn").value="";$("am").value="";render();};
 let clearArm=false,clearTimer;
@@ -141,26 +168,60 @@ $("clear").onclick=()=>{
     clearTimer=setTimeout(resetClear,4000);return;
   }
   resetClear();
-  ents=[];hist=[];editIdx=-1;$("pn").value="";$("am").value="";render();
+  ents=[];hist=[];banked=0;editIdx=-1;$("pn").value="";$("am").value="";render();
 };
 $("clearH").onclick=()=>{hist=[];render();};
 
+/* รายชื่อล่วงหน้า */
+function renderNames(){
+  $("chips").innerHTML=roster.length?roster.map((n,i)=>`<button class="chip${$("pn").value===n?" on":""}${delMode?" del":""}" data-n="${i}">${delMode?"✕ ":""}${esc(n)}</button>`).join(""):'<span class="mut">ยังไม่มีชื่อ เพิ่มชื่อเพื่อนด้านล่าง</span>';
+  $("delMode").textContent=delMode?"เสร็จ":"ลบชื่อ";
+}
+$("chips").onclick=e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const i=+b.dataset.n,n=roster[i];
+  if(delMode){roster.splice(i,1);if($("pn").value===n)$("pn").value="";}
+  else $("pn").value=$("pn").value===n?"":n;
+  render();
+};
+$("addN").onclick=()=>{
+  const v=$("nn").value.trim();
+  if(v){if(!roster.includes(v))roster.push(v);$("pn").value=v;}
+  $("nn").value="";render();
+};
+$("nn").onkeydown=e=>{if(e.key==="Enter")$("addN").click();};
+$("delMode").onclick=()=>{delMode=!delMode;render();};
+
 /* ประวัติ */
-function logH(label){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents)});if(hist.length>100)hist.pop();}
-function tm(t){return new Date(t).toLocaleString("th-TH",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});}
+function logH(label,x){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents),bk:banked,...x});if(hist.length>100)hist.pop();}
+function tm(t){const d=new Date(t),hm=d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});return d.toDateString()===new Date().toDateString()?hm:d.toLocaleDateString("th-TH",{day:"numeric",month:"short"})+" "+hm;}
+const amt=a=>`<b class="${a>0?"pos":"neg"}">${sg(a)}</b>`;
+const chg=(d,more)=>d>0?`<b class="pos">ได้${more} ${m(d)}</b>`:d<0?`<b class="neg">เสีย${more} ${m(d)}</b>`:'<span class="mut">ไม่เปลี่ยน</span>';
+function hline(h){
+  if(h.k==="add")return `<span class="tg">เพิ่ม</span>${esc(h.n)} ${amt(h.a)}<br>${chg(h.a,"")}`;
+  if(h.k==="edit")return `<span class="tg">แก้</span>${esc(h.n)} ${amt(h.a)} → ${h.n2!==h.n?esc(h.n2)+" ":""}${amt(h.a2)}<br>${h.n2!==h.n?'<span class="mut">เปลี่ยนชื่อ</span>':chg(h.a2-h.a,"เพิ่ม")}`;
+  if(h.k==="del")return `<span class="tg">ลบ</span>${esc(h.n)} ${amt(h.a)}<br><span class="mut">ยอดรวมเปลี่ยน</span> <b class="${-h.a>0?"pos":"neg"}">${sg(-h.a)}</b>`;
+  if(h.k==="game")return `<span class="tg">จบเกม</span>เว็บ ${amt(h.T)}<br><span class="mut">เพื่อน</span> ${amt(h.F)} · <span class="mut">ของคุณ</span> ${amt(h.R)}${h.list?`<br><small class="mut">${esc(h.list)}</small>`:""}`;
+  if(h.k==="undo")return `<span class="tg">ย้อนกลับ</span>${h.d?`<br><span class="mut">ยอดรวมเปลี่ยน</span> <b class="${h.d>0?"pos":"neg"}">${sg(h.d)}</b>`:""}`;
+  return esc(h.label);
+}
+let showAll=false;
 function renderHist(){
-  $("hist").innerHTML=hist.length?hist.map((h,i)=>`<div class="ent"><span><small class="mut">${tm(h.t)}</small><br>${esc(h.label)}</span><button data-h="${i}">ย้อนก่อนนี้</button></div>`).join(""):'<p class="mut">ยังไม่มีประวัติ</p>';
+  const list=showAll?hist:hist.slice(0,5);
+  $("hist").innerHTML=hist.length?list.map(h=>`<div class="hrow"><small class="mut">${tm(h.t)}</small><span>${hline(h)}</span><button class="hb" data-h="${hist.indexOf(h)}" aria-label="ย้อนกลับไปก่อนรายการนี้">ย้อน</button></div>`).join(""):'<p class="mut">ยังไม่มีประวัติ</p>';
+  $("hmore").hidden=hist.length<=5;$("hmore").textContent=showAll?"ย่อ":`ดูทั้งหมด (${hist.length})`;
   $("undo").disabled=!hist.length;
 }
+$("hmore").onclick=()=>{showAll=!showAll;renderHist();};
 function restore(i){
   const h=hist[i];if(!h)return;
-  logH(`ย้อนกลับ: ${h.label}`);
-  ents=JSON.parse(h.before);editIdx=-1;$("pn").value="";$("am").value="";render();
+  const tot=a=>a.reduce((t,e)=>t+e.a,0);logH("ย้อนกลับ",{k:"undo",d:tot(JSON.parse(h.before))-tot(ents)});
+  ents=JSON.parse(h.before);if(h.bk!==undefined)banked=h.bk;editIdx=-1;$("pn").value="";$("am").value="";render();
 }
 $("hist").onclick=e=>{const b=e.target.closest("button");if(b)restore(+b.dataset.h);};
 $("undo").onclick=()=>restore(0);
-function save(){try{localStorage.setItem("hilo-ledger",JSON.stringify({ents,hist,cap:$("cap").value}));}catch(e){}}
-function load(){try{const d=JSON.parse(localStorage.getItem("hilo-ledger")||"null");if(d){ents=d.ents||[];hist=d.hist||[];if(d.cap!==undefined)$("cap").value=d.cap;}}catch(e){}}
+function save(){try{localStorage.setItem("hilo-ledger",JSON.stringify({ents,hist,roster,banked,cap:$("cap").value}));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem("hilo-ledger")||"null");if(d){ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}}catch(e){}}
 
 /* ช่องจำนวนเงินคิดเลขได้ */
 function amtVal(){
@@ -169,7 +230,7 @@ function amtVal(){
 }
 function apreview(){
   const v=amtVal();
-  $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0||sign<0?"เสีย":"ได้"})`;
+  $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0?"เสีย":"ได้"})`;
 }
 $("am").oninput=apreview;
 ["pointerdown","mousedown"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault()));
@@ -203,7 +264,35 @@ function ev(s){
   return Math.round(r*100)/100;
 }
 
-load();render();
+/* เครื่องคิดเลข */
+let cx="";
+const cval=()=>cx?ev(cx.replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-")):null;
+const fmt=v=>(v<0?"−":"")+m(v);
+function crender(){
+  $("ce").textContent=cx||"0";
+  const v=cval(),show=v!==null&&/[+−×÷]./.test(cx.replace(/^−/,""));
+  $("cr").innerHTML=show?"= "+fmt(v):"&nbsp;";
+}
+$("kp").onclick=e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const k=b.dataset.k;
+  if(k==="C")cx="";
+  else if(k==="b")cx=cx.slice(0,-1);
+  else if(k==="="){const v=cval();if(v!==null)cx=String(v).replace("-","−");}
+  else if(/[+−×÷]/.test(k)){
+    if(!cx&&k!=="−")return;
+    if(/[+−×÷]$/.test(cx)&&cx.length>1)cx=cx.slice(0,-1);
+    else if(cx==="−")return;
+    cx+=k;
+  }
+  else if(k==="."){const last=cx.split(/[+−×÷]/).pop();if(last.includes("."))return;cx+=last===""?"0.":".";}
+  else cx+=k;
+  crender();
+};
+$("cuse").onclick=()=>{const v=cval();if(v===null)return;$("am").value=String(v);apreview();$("am").focus();};
+crender();
+
+load();if(!roster.length)ents.forEach(e=>{if(!roster.includes(e.n))roster.push(e.n);});render();
 </script>
 </body>
 </html>
