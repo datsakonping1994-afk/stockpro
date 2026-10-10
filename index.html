@@ -295,7 +295,8 @@ $("cuse").onclick=()=>{const v=cval();if(v===null)return;$("am").value=String(v)
 crender();
 
 /* ซิงค์กับเซิร์ฟเวอร์ (Cloudflare) ให้ทุกเครื่องเห็นข้อมูลเดียวกัน */
-const API="/api/ledger";
+/* ใส่ลิงก์ Worker ของคุณตรงนี้ เช่น "https://hilo.ชื่อบัญชี.workers.dev" (เว้นว่าง = ใช้ในเครื่องนี้เครื่องเดียว) */
+const API="";
 const srv={ver:0,last:"",busy:false,on:false,pin:""};
 try{srv.pin=localStorage.getItem("hilo-pin")||"";}catch(e){}
 const snap=()=>({ents,hist,roster,banked,cap:$("cap").value});
@@ -349,6 +350,7 @@ async function doPush(){
   srv.busy=false;
 }
 async function startSync(){
+  if(!API){setStatus("● ใช้ในเครื่องนี้เครื่องเดียว (ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์)");return;}
   await pull(true);push();
   setInterval(()=>{if(!document.hidden)pull(false);},3000);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull(false);});
