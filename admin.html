@@ -93,7 +93,7 @@ label{font-size:14px;color:var(--mut)}
 <div class="chips" id="chips"></div>
 <div class="row"><input id="nn" placeholder="เพิ่มชื่อล่วงหน้า" maxlength="20"><button class="fix" id="addN">เพิ่มชื่อ</button><button class="fix" id="delMode">ลบชื่อ</button></div>
 <button id="cancel" hidden style="width:100%;margin-bottom:8px">ยกเลิกการแก้ไข</button>
-<div class="row"><input id="am" type="text" inputmode="decimal" autocomplete="off" placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
+<div class="row"><input id="am" name="amt-x" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
 <div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
 <div id="apv"></div>
 <div id="ents"></div>
@@ -242,7 +242,7 @@ function apreview(){
   $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0?"เสีย":"ได้"})`;
 }
 $("am").oninput=apreview;
-["pointerdown","mousedown","touchstart"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault(),{passive:false}));
+["pointerdown","mousedown"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault()));
 $("ops").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
   const o=b.dataset.op,am=$("am");am.focus();let s=am.value;

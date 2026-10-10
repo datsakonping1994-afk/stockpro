@@ -106,7 +106,7 @@ label{font-size:14px;color:var(--mut)}
 <section>
 <h2>บันทึกยอดของฉัน</h2>
 <button id="cancel" hidden style="width:100%;margin-bottom:8px">ยกเลิกการแก้ไข</button>
-<div class="row"><input id="am" type="text" inputmode="decimal" autocomplete="off" placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
+<div class="row"><input id="am" name="amt-x" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
 <div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
 <div id="apv"></div>
 </section>
@@ -204,7 +204,7 @@ $("go").onclick=async()=>{
 };
 $("out").onclick=$("out0").onclick=logout;
 $("am").oninput=preview;
-["pointerdown","mousedown","touchstart"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault(),{passive:false}));
+["pointerdown","mousedown"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault()));
 $("ops").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
   const o=b.dataset.op,am=$("am");am.focus();let s=am.value;
