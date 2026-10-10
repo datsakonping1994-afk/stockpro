@@ -47,7 +47,7 @@ const view = (data, name) => {
     others,
     web: round2((parseFloat(data.cap) || 0) + (+data.banked || 0) + (data.ents || []).reduce((t, e) => t + (+e.a || 0), 0)),
     total: round2(mine.reduce((t, e) => t + (+e.a || 0), 0)),
-    entries: mine.map((e) => ({ id: e.id || null, a: e.a, own: !!e.id && e.o === name })),
+    entries: mine.map((e) => ({ a: e.a })).reverse(),
   };
 };
 
@@ -118,20 +118,7 @@ export default {
           if (!okAmt(a)) return { err: "bad" };
           d.ents.push({ id: crypto.randomUUID().slice(0, 8), n: name, a: round2(a), o: name });
           log({ k: "add", n: name, a: round2(a) });
-        } else if (b.op === "edit") {
-          const e = d.ents.find((x) => x.id && x.id === b.id && x.o === name);
-          const a = +b.a;
-          if (!e || !okAmt(a)) return { err: "bad" };
-          const old = e.a;
-          e.a = round2(a);
-          log({ k: "edit", n: name, a: old, n2: name, a2: round2(a) });
-        } else if (b.op === "del") {
-          const i = d.ents.findIndex((x) => x.id && x.id === b.id && x.o === name);
-          if (i < 0) return { err: "bad" };
-          const gone = d.ents[i];
-          d.ents.splice(i, 1);
-          log({ k: "del", n: name, a: gone.a });
-        } else return { err: "bad" };
+        } else return { err: "bad" }; // ผู้เล่นแก้/ลบไม่ได้ ต้องให้เจ้าของวงทำ
       });
       if (res.err) return json({ error: res.err }, res.err === "nodoc" ? 503 : res.err === "busy" ? 409 : 400);
       return json(view(res.data, name));

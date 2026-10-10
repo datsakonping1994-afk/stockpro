@@ -91,7 +91,13 @@ label{font-size:14px;color:var(--mut)}
 
 <div id="app" hidden>
 <section>
-<div class="mut" id="who"></div>
+<h2>เงินในเว็บ</h2>
+<div class="mut">ยอดที่ควรเหลือตอนนี้</div>
+<div class="big" id="web">-</div>
+</section>
+
+<section>
+<div id="who" style="font-size:24px;font-weight:800;line-height:1.3"></div>
 <div class="mut">ยอดรวมของฉัน</div>
 <div class="huge" id="tot">0</div>
 <div id="st" class="mut"></div>
@@ -106,19 +112,14 @@ label{font-size:14px;color:var(--mut)}
 </section>
 
 <section>
-<h2>เงินในเว็บ</h2>
-<div class="mut">ยอดที่ควรเหลือตอนนี้</div>
-<div class="big" id="web">-</div>
-</section>
-
-<section>
-<h2>ยอดของผู้เล่นคนอื่น</h2>
-<p class="mut" style="margin:0 0 4px">ดูได้อย่างเดียว แก้ไขไม่ได้</p>
+<h2>ยอดของผู้เล่นทั้งหมด</h2>
+<p class="mut" style="margin:0 0 4px">ดูได้อย่างเดียว แก้ไขไม่ได้ (แถวสีเขียวคือคุณ)</p>
 <div id="others"></div>
 </section>
 
 <section>
 <h2>รายการของฉัน</h2>
+<p class="mut" style="margin:0 0 4px">ล่าสุดอยู่บนสุด แก้ไขไม่ได้ ถ้าบันทึกผิดแจ้งเจ้าของวง</p>
 <div id="list"></div>
 </section>
 
@@ -156,12 +157,14 @@ function preview(){
   $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0?"เสีย":"ได้"})`;
 }
 function renderMe(j){
-  $("who").textContent="ชื่อ: "+j.name;
+  $("who").textContent="👤 "+j.name;
   const t=$("tot");t.textContent=sg(j.total)+" บาท";t.className="huge "+(j.total>0?"pos":j.total<0?"neg":"");
   lastList=j.entries;
   $("web").textContent=j.web===undefined?"-":m(j.web)+" บาท";
-  $("others").innerHTML=(j.others&&j.others.length)?j.others.map(o=>`<div class="ent"><span>${esc(o.name)}</span><span class="${o.total>0?"pos":o.total<0?"neg":""}">${sg(o.total)}</span></div>`).join(""):'<p class="mut">ยังไม่มีผู้เล่นคนอื่น</p>';
-  $("list").innerHTML=j.entries.length?j.entries.map(e=>`<div class="ent${e.id&&e.id===editId?" editing":""}"><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span><span>${e.own?`<button class="x" style="color:var(--ink)" data-e="${e.id}" aria-label="แก้ไข">✎</button> <button class="x" data-d="${e.id}" aria-label="ลบ">✕</button>`:'<small class="mut">เจ้าของวงบันทึก</small>'}</span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  const all=(j.others||[]).map(o=>({name:o.name,total:o.total,me:false}));
+  all.push({name:j.name,total:j.total,me:true});all.sort((a,b)=>b.total-a.total);
+  $("others").innerHTML=all.map(o=>`<div class="ent" style="${o.me?"background:var(--bg);border-radius:10px;padding-left:8px;padding-right:8px;font-weight:800":""}"><span>${esc(o.name)}${o.me?" (คุณ)":""}</span><span class="${o.total>0?"pos":o.total<0?"neg":""}">${sg(o.total)}</span></div>`).join("");
+  $("list").innerHTML=j.entries.length?j.entries.map(e=>`<div class="ent"><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
   $("cancel").hidden=editId===null;
   $("add").textContent=editId===null?"บันทึก":"บันทึกแก้ไข";
 }
