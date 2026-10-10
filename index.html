@@ -296,7 +296,7 @@ crender();
 
 /* ซิงค์กับเซิร์ฟเวอร์ (Cloudflare) ให้ทุกเครื่องเห็นข้อมูลเดียวกัน */
 /* ใส่ลิงก์ Worker ของคุณตรงนี้ เช่น "https://hilo.ชื่อบัญชี.workers.dev" (เว้นว่าง = ใช้ในเครื่องนี้เครื่องเดียว) */
-const API="";
+const API="https://hilo.mv5gg8kp2t.workers.dev";
 const srv={ver:0,last:"",busy:false,on:false,pin:""};
 try{srv.pin=localStorage.getItem("hilo-pin")||"";}catch(e){}
 const snap=()=>({ents,hist,roster,banked,cap:$("cap").value});
