@@ -96,7 +96,8 @@ label{font-size:14px;color:var(--mut)}
 <div class="row"><input id="am" name="amt-x" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
 <div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
 <div id="apv"></div>
-<div id="ents"></div>
+<div id="ents" style="display:none"></div>
+<div class="row" id="pg" hidden style="margin-top:8px;display:none !important"><button id="pgn">‹ ใหม่กว่า</button><span class="mut" id="pgi" style="text-align:center"></span><button id="pgo">เก่ากว่า ›</button></div>
 <button id="undo" style="width:100%;margin-top:8px">↶ ย้อนกลับรายการล่าสุด</button>
 </section>
 
@@ -136,13 +137,17 @@ const m=n=>Math.abs(n).toLocaleString("th-TH",{maximumFractionDigits:2});
 const sg=n=>(n>0?"+":n<0?"−":"")+m(n);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+let ePage=0;
 function render(){
   $("add").textContent=editIdx>=0?"บันทึกแก้ไข":"บันทึก";$("cancel").hidden=editIdx<0;apreview();renderHist();save();
   renderNames();
   const by={};ents.forEach(e=>by[e.n]=(by[e.n]||0)+e.a);
   const names=Object.keys(by);
   $("pl").innerHTML=names.map(n=>`<option value="${esc(n)}">`).join("");
-  $("ents").innerHTML=ents.length?ents.map((e,i)=>`<div class="ent${i===editIdx?" editing":""}"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  const PER=10,pages=Math.max(1,Math.ceil(ents.length/PER));if(ePage>=pages)ePage=pages-1;if(ePage<0)ePage=0;
+  const idx=ents.map((_,k)=>k).reverse().slice(ePage*PER,ePage*PER+PER);
+  $("ents").innerHTML=ents.length?idx.map(i=>{const e=ents[i];return `<div class="ent${i===editIdx?" editing":""}"><span>${esc(e.n)}</span><span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span> <button class="x" style="color:var(--ink)" data-e="${i}" aria-label="แก้ไขรายการ">✎</button> <button class="x" data-i="${i}" aria-label="ลบรายการ">✕</button></span></div>`}).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  $("pg").hidden=pages<2;$("pgi").textContent=`หน้า ${ePage+1}/${pages} · ทั้งหมด ${ents.length}`;$("pgn").disabled=ePage<=0;$("pgo").disabled=ePage>=pages-1;
   const sum=names.reduce((a,n)=>a+by[n],0),cap=parseFloat($("cap").value)||0;
   const web=cap+banked+sum;$("web").textContent=m(web)+" บาท";
   const r=$("real").value;
@@ -157,7 +162,7 @@ $("add").onclick=()=>{
   if(v===null||v===0){$("am").focus();return;}
   const a=v;
   if(editIdx>=0&&ents[editIdx]){const o=ents[editIdx];logH("แก้ไข",{k:"edit",n:o.n,a:o.a,n2:n,a2:a});ents[editIdx]={...o,n,a};}
-  else{logH("เพิ่ม",{k:"add",n,a});ents.push({n,a});}
+  else{logH("เพิ่ม",{k:"add",n,a});ents.push({n,a});ePage=0;}
   editIdx=-1;$("pn").value="";$("am").value="";render();
 };
 $("am").onkeydown=e=>{if(e.key==="Enter")$("add").click();};
@@ -229,6 +234,7 @@ function restore(i){
 }
 $("hist").onclick=e=>{const b=e.target.closest("button");if(b)restore(+b.dataset.h);};
 $("undo").onclick=()=>restore(0);
+$("pgn").onclick=()=>{ePage--;render();};$("pgo").onclick=()=>{ePage++;render();};
 function save(){try{localStorage.setItem("hilo-ledger",JSON.stringify({ents,hist,roster,banked,cap:$("cap").value}));}catch(e){}push();}
 function load(){try{const d=JSON.parse(localStorage.getItem("hilo-ledger")||"null");if(d){ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}}catch(e){}}
 
