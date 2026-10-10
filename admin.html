@@ -201,7 +201,7 @@ $("nn").onkeydown=e=>{if(e.key==="Enter")$("addN").click();};
 $("delMode").onclick=()=>{delMode=!delMode;render();};
 
 /* ประวัติ */
-function logH(label,x){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents),bk:banked,...x});if(hist.length>100)hist.pop();}
+function logH(label,x){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents),bk:banked,...x});if(hist.length>30)hist.length=30;}
 function tm(t){const d=new Date(t),hm=d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});return d.toDateString()===new Date().toDateString()?hm:d.toLocaleDateString("th-TH",{day:"numeric",month:"short"})+" "+hm;}
 const amt=a=>`<b class="${a>0?"pos":"neg"}">${sg(a)}</b>`;
 const chg=(d,more)=>d>0?`<b class="pos">ได้${more} ${m(d)}</b>`:d<0?`<b class="neg">เสีย${more} ${m(d)}</b>`:'<span class="mut">ไม่เปลี่ยน</span>';
@@ -315,20 +315,21 @@ function askPin(){
   srv.pin=p.trim();try{localStorage.setItem("hilo-pin",srv.pin);}catch(e){}
   return true;
 }
+function fetchT(u,o){const ac=new AbortController();const t=setTimeout(()=>ac.abort(),10000);return fetch(u,{...o,signal:ac.signal}).finally(()=>clearTimeout(t));}
 async function api(method,body,path=""){
-  const r=await fetch(API+path,{method,headers:{"content-type":"application/json","x-pin":srv.pin},body:body?JSON.stringify(body):undefined});
+  const r=await fetchT(API+path,{method,headers:{"content-type":"application/json","x-pin":srv.pin},body:body?JSON.stringify(body):undefined});
   if(r.status===401){const e=new Error("pin");e.pin=true;throw e;}
   return {status:r.status,j:await r.json()};
 }
 async function pull(first){
   if(srv.busy)return;srv.busy=true;
   try{
-    const {j}=await api("GET");
+    const {j}=await api("GET",null,first?"":"/?v="+srv.ver);
     if(first&&!j.data){srv.ver=0;srv.last="";}
     else if(j.data&&(first||(j.ver!==srv.ver&&!dirty()&&editIdx<0))){
       applyState(j.data);srv.ver=j.ver;srv.last=JSON.stringify(snap());render();
     }
-    srv.on=true;setStatus("● ซิงค์แล้ว");pullPlayers();
+    srv.on=true;setStatus("● ซิงค์แล้ว");srv.n=(srv.n||0)+1;if(first||srv.n%10===0)pullPlayers();
   }catch(e){
     if(e.pin){setStatus("● ต้องใส่รหัสวง",true);srv.busy=false;if(askPin())return pull(first);return;}
     setStatus("● ออฟไลน์ (บันทึกในเครื่องไว้ก่อน)",true);

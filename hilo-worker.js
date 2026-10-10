@@ -38,21 +38,31 @@ async function mutate(env, fn) {
 }
 const view = (data, name) => {
   const mine = (data.ents || []).filter((e) => e.n === name);
+  const by = {};
+  for (const e of data.ents || []) if (e.n !== name) by[e.n] = (by[e.n] || 0) + (+e.a || 0);
+  const others = Object.keys(by).map((n) => ({ name: n, total: round2(by[n]) })).sort((a, b) => b.total - a.total);
   return {
     status: "approved",
     name,
+    others,
+    web: round2((parseFloat(data.cap) || 0) + (+data.banked || 0) + (data.ents || []).reduce((t, e) => t + (+e.a || 0), 0)),
     total: round2(mine.reduce((t, e) => t + (+e.a || 0), 0)),
     entries: mine.map((e) => ({ id: e.id || null, a: e.a, own: !!e.id && e.o === name })),
   };
 };
 
+let ready = false; // สร้างตารางครั้งเดียวต่อ instance ไม่ต้องทำทุกคำขอ
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-    await env.DB.batch([
-      env.DB.prepare("CREATE TABLE IF NOT EXISTS doc (id TEXT PRIMARY KEY, data TEXT NOT NULL, ver INTEGER NOT NULL)"),
-      env.DB.prepare("CREATE TABLE IF NOT EXISTS players (name TEXT PRIMARY KEY, h TEXT NOT NULL, ok INTEGER NOT NULL DEFAULT 0)"),
-    ]);
+    if (!ready) {
+      await env.DB.batch([
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS doc (id TEXT PRIMARY KEY, data TEXT NOT NULL, ver INTEGER NOT NULL)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS players (name TEXT PRIMARY KEY, h TEXT NOT NULL, ok INTEGER NOT NULL DEFAULT 0)"),
+      ]);
+      ready = true;
+    }
     const path = new URL(request.url).pathname.replace(/\/+$/, "") || "/";
     const admin = !!env.PIN && request.headers.get("x-pin") === env.PIN;
     const body = async () => { try { return await request.json(); } catch { return null; } };
@@ -77,14 +87,20 @@ export default {
     if (path === "/me") {
       const name = dec(request.headers.get("x-name"));
       const code = dec(request.headers.get("x-code"));
-      const p = name && code ? await env.DB.prepare("SELECT h, ok FROM players WHERE name = ?1").bind(name).first() : null;
+      // ถามผู้เล่นกับเอกสารพร้อมกัน ลดเวลารอ
+      const pq = name && code ? env.DB.prepare("SELECT h, ok FROM players WHERE name = ?1").bind(name).first() : Promise.resolve(null);
+      const dq = request.method === "GET" ? env.DB.prepare(SEL).first() : Promise.resolve(null);
+      const [p, row] = await Promise.all([pq, dq]);
       if (!p || p.h !== (await hash(name, code))) return json({ error: "auth" }, 401);
       if (!p.ok) return json({ status: "pending" }, 403);
 
       if (request.method === "GET") {
-        const row = await env.DB.prepare(SEL).first();
         if (!row) return json({ error: "nodoc" }, 503);
-        return json(view(JSON.parse(row.data), name));
+        const qv = new URL(request.url).searchParams.get("v");
+        if (qv !== null && +qv === row.ver) return json({ status: "approved", same: true, ver: row.ver });
+        const out = view(JSON.parse(row.data), name);
+        out.ver = row.ver;
+        return json(out);
       }
       if (request.method !== "POST") return json({ error: "method" }, 405);
       const b = await body();
@@ -130,8 +146,11 @@ export default {
     }
 
     const row = await env.DB.prepare(SEL).first();
-    if (request.method === "GET")
+    if (request.method === "GET") {
+      const qv = new URL(request.url).searchParams.get("v");
+      if (row && qv !== null && +qv === row.ver) return json({ ver: row.ver, same: true });
       return json({ ver: row ? row.ver : 0, data: row ? JSON.parse(row.data) : null });
+    }
     if (request.method !== "PUT") return json({ error: "method" }, 405);
 
     const b = await body();
