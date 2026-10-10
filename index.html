@@ -101,6 +101,21 @@ label{font-size:14px;color:var(--mut)}
 </section>
 
 <section>
+<h2>ประวัติการแก้ไข</h2>
+<p class="mut">แตะ "ย้อน" เพื่อกลับไปก่อนรายการนั้น (ย้อนผิดก็ย้อนซ้ำได้)</p>
+<div id="hist"></div>
+<button id="hmore" style="width:100%;margin-top:8px" hidden></button>
+<button id="clearH" style="width:100%;margin-top:8px">ล้างประวัติอย่างเดียว (รายการยอดยังอยู่)</button>
+</section>
+
+<section>
+<h2>ผู้เล่น (เพื่อนล็อกอินเอง)</h2>
+<p class="mut" style="margin:0 0 8px">ส่งลิงก์นี้ให้เพื่อน ให้ใส่ชื่อและตั้งรหัสของตัวเอง แล้วกดอนุมัติที่นี่ เพื่อนจะเห็นและแก้ได้เฉพาะยอดของตัวเอง (ชื่อต้องตรงกับชื่อที่คุณบันทึกให้เขา)</p>
+<div id="plink" class="mut" style="word-break:break-all;margin-bottom:8px"></div>
+<div id="plist"></div>
+</section>
+
+<section>
 <h2>เครื่องคิดเลข</h2>
 <div class="disp" aria-live="polite"><div class="e" id="ce">0</div><div class="r" id="cr">&nbsp;</div></div>
 <div class="kp" id="kp" style="margin-top:8px">
@@ -112,15 +127,6 @@ label{font-size:14px;color:var(--mut)}
 </div>
 <button id="cuse" class="pri" style="width:100%;margin-top:8px">ใส่ผลลัพธ์ในช่องยอด</button>
 </section>
-
-<section>
-<h2>ประวัติการแก้ไข</h2>
-<p class="mut">แตะ "ย้อน" เพื่อกลับไปก่อนรายการนั้น (ย้อนผิดก็ย้อนซ้ำได้)</p>
-<div id="hist"></div>
-<button id="hmore" style="width:100%;margin-top:8px" hidden></button>
-<button id="clearH" style="width:100%;margin-top:8px">ล้างประวัติอย่างเดียว (รายการยอดยังอยู่)</button>
-</section>
-
 </main>
 
 <script>
@@ -150,7 +156,7 @@ $("add").onclick=()=>{
   if(!n){$("apv").innerHTML='<b class="neg">เลือกชื่อก่อน</b>';return;}
   if(v===null||v===0){$("am").focus();return;}
   const a=v;
-  if(editIdx>=0&&ents[editIdx]){const o=ents[editIdx];logH("แก้ไข",{k:"edit",n:o.n,a:o.a,n2:n,a2:a});ents[editIdx]={n,a};}
+  if(editIdx>=0&&ents[editIdx]){const o=ents[editIdx];logH("แก้ไข",{k:"edit",n:o.n,a:o.a,n2:n,a2:a});ents[editIdx]={...o,n,a};}
   else{logH("เพิ่ม",{k:"add",n,a});ents.push({n,a});}
   editIdx=-1;$("pn").value="";$("am").value="";render();
 };
@@ -309,8 +315,8 @@ function askPin(){
   srv.pin=p.trim();try{localStorage.setItem("hilo-pin",srv.pin);}catch(e){}
   return true;
 }
-async function api(method,body){
-  const r=await fetch(API,{method,headers:{"content-type":"application/json","x-pin":srv.pin},body:body?JSON.stringify(body):undefined});
+async function api(method,body,path=""){
+  const r=await fetch(API+path,{method,headers:{"content-type":"application/json","x-pin":srv.pin},body:body?JSON.stringify(body):undefined});
   if(r.status===401){const e=new Error("pin");e.pin=true;throw e;}
   return {status:r.status,j:await r.json()};
 }
@@ -322,7 +328,7 @@ async function pull(first){
     else if(j.data&&(first||(j.ver!==srv.ver&&!dirty()&&editIdx<0))){
       applyState(j.data);srv.ver=j.ver;srv.last=JSON.stringify(snap());render();
     }
-    srv.on=true;setStatus("● ซิงค์แล้ว");
+    srv.on=true;setStatus("● ซิงค์แล้ว");pullPlayers();
   }catch(e){
     if(e.pin){setStatus("● ต้องใส่รหัสวง",true);srv.busy=false;if(askPin())return pull(first);return;}
     setStatus("● ออฟไลน์ (บันทึกในเครื่องไว้ก่อน)",true);
@@ -355,6 +361,22 @@ async function startSync(){
   setInterval(()=>{if(!document.hidden)pull(false);},3000);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull(false);});
 }
+
+/* ผู้เล่น */
+let plist=[];
+async function pullPlayers(){
+  try{const {j}=await api("GET",null,"/players");plist=j.players||[];renderPlayers();}catch(e){}
+}
+function renderPlayers(){
+  $("plink").textContent=new URL("player.html",location.href).href;
+  $("plist").innerHTML=plist.length?plist.map((p,i)=>`<div class="ent"><span>${esc(p.name)} <small class="mut">${p.ok?"อนุมัติแล้ว":"รออนุมัติ"}</small></span><span>${p.ok?"":`<button class="x" style="color:var(--win);width:auto" data-pa="ok" data-pi="${i}">อนุมัติ</button> `}<button class="x" style="width:auto" data-pa="rm" data-pi="${i}">ลบ</button></span></div>`).join(""):'<p class="mut">ยังไม่มีผู้เล่นสมัคร</p>';
+}
+$("plist").onclick=async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const p=plist[+b.dataset.pi];if(!p)return;
+  try{await api("POST",{name:p.name,action:b.dataset.pa==="ok"?"approve":"remove"},"/players");}catch(_){}
+  pullPlayers();
+};
 
 load();if(!roster.length)ents.forEach(e=>{if(!roster.includes(e.n))roster.push(e.n);});render();
 startSync();

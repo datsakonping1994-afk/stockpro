@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ยอดของฉัน</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f1e4;--card:#fffdf6;--ink:#17332c;--mut:#6b7a73;--line:#ddd5bf;--acc:#12503f;--red:#c8372d;--win:#12703f;--on:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1f1a;--card:#17302a;--ink:#f1ead6;--mut:#9db0a8;--line:#2b4a41;--acc:#3fa583;--red:#ff7b6e;--win:#5fd09a;--on:#0f1f1a}}
+:root[data-theme="dark"]{--bg:#0f1f1a;--card:#17302a;--ink:#f1ead6;--mut:#9db0a8;--line:#2b4a41;--acc:#3fa583;--red:#ff7b6e;--win:#5fd09a;--on:#0f1f1a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button{-webkit-user-select:none;user-select:none}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Noto Sans Thai",system-ui,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:24px;font-weight:800;margin:4px 0 14px}
+h2{font-size:16px;font-weight:800;margin:0 0 10px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;min-height:44px}
+button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 12px;min-height:44px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.pri{background:var(--acc);color:var(--on);border-color:var(--acc);font-weight:600}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.row>*{flex:1}.row>.fix{flex:none}
+.seg button.on.w{background:var(--win);color:var(--on);border-color:var(--win);font-weight:600}
+.seg button.on.l{background:var(--red);color:var(--on);border-color:var(--red);font-weight:600}
+.ent{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.x{min-height:36px;padding:2px 10px;color:var(--red)}
+.pos{color:var(--win);font-weight:800}.neg{color:var(--red);font-weight:800}
+.pp{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.pp small{display:block;color:var(--mut)}
+.big{font-size:26px;font-weight:800}
+.mut{color:var(--mut);font-size:14px}
+label{font-size:14px;color:var(--mut)}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.kp button{font-size:20px;min-height:48px;padding:4px}
+.kp .op{background:var(--card);font-weight:600}
+.kp .eq{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.disp{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:64px;text-align:right;overflow-x:auto}
+.disp .e{font-size:22px;font-weight:600;word-break:break-all}
+.disp .r{font-size:14px;color:var(--mut)}
+.hrow{display:grid;grid-template-columns:46px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.hb{min-height:36px;padding:2px 14px;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{border-radius:20px;min-height:40px;padding:4px 14px}
+.chip.on{background:var(--acc);color:var(--on);border-color:var(--acc);font-weight:600}
+.chip.del{border-color:var(--red);color:var(--red)}
+#am{font-size:24px;font-weight:800;min-height:56px}
+#add{min-height:56px;font-size:18px;padding:8px 18px}
+#ops button{min-height:56px;font-size:28px;font-weight:800}
+#ops [data-op="+"]{background:var(--win);color:var(--on);border-color:var(--win)}
+#ops [data-op="-"]{background:var(--red);color:var(--on);border-color:var(--red)}
+#apv{font-size:20px;margin:2px 0 8px}
+#apv:empty{display:none}
+.ent{padding:12px 0}
+.ent>span:first-child{font-size:20px;font-weight:600}
+.ent .pos,.ent .neg{font-size:24px}
+.ent .x{min-height:44px;min-width:44px;font-size:18px}
+.ent.editing{background:var(--bg);border-radius:10px;padding-left:8px;padding-right:8px;outline:2px solid var(--acc)}
+.ent.tt{border-top:2px solid var(--ink);margin-top:4px}
+.ent.tt>span:first-child{font-weight:800}
+#gt{font-size:24px;font-weight:800;min-height:56px}
+#gsign{min-height:56px}
+.rh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:12px}
+.tg{display:inline-block;font-size:12px;padding:0 7px;border-radius:8px;background:var(--bg);border:1px solid var(--line);color:var(--mut);margin-right:6px}
+.huge{font-size:40px;font-weight:800;line-height:1.2}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>ยอดของฉัน</h1>
+
+<section id="login">
+<h2>เข้าสู่ระบบ / สมัคร</h2>
+<p class="mut" style="margin:0 0 8px">ใส่ชื่อของคุณและตั้งรหัสส่วนตัว (อย่างน้อย 6 ตัว) ครั้งแรกต้องรอเจ้าของวงอนุมัติ ครั้งต่อไปใช้ชื่อและรหัสเดิม</p>
+<div class="row"><input id="nm" placeholder="ชื่อของคุณ" maxlength="20" autocomplete="off"></div>
+<div class="row"><input id="cd" type="password" placeholder="รหัสส่วนตัว (6 ตัวขึ้นไป)" autocomplete="off"></div>
+<button id="go" class="pri" style="width:100%;min-height:52px">เข้าสู่ระบบ</button>
+<p id="msg" class="neg" style="margin:8px 0 0"></p>
+</section>
+
+<section id="wait" hidden>
+<h2>รอเจ้าของวงอนุมัติ</h2>
+<p class="mut" style="margin:0">ส่งคำขอแล้ว เมื่อเจ้าของวงกดอนุมัติ หน้านี้จะเปิดให้เองภายในไม่กี่วินาที</p>
+<button id="out0" style="width:100%;margin-top:10px">ยกเลิก / เปลี่ยนชื่อ</button>
+</section>
+
+<div id="app" hidden>
+<section>
+<div class="mut" id="who"></div>
+<div class="mut">ยอดรวมของฉัน</div>
+<div class="huge" id="tot">0</div>
+<div id="st" class="mut"></div>
+</section>
+
+<section>
+<h2>บันทึกยอดของฉัน</h2>
+<button id="cancel" hidden style="width:100%;margin-bottom:8px">ยกเลิกการแก้ไข</button>
+<div class="row"><input id="am" type="text" inputmode="decimal" autocomplete="off" placeholder="ยอด เช่น 500, -300, 500-800"><button class="pri fix" id="add">บันทึก</button></div>
+<div class="row" id="ops"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
+<div id="apv"></div>
+</section>
+
+<section>
+<h2>รายการของฉัน</h2>
+<div id="list"></div>
+</section>
+
+<button id="out" style="width:100%">ออกจากระบบ</button>
+</div>
+</main>
+
+<script>
+const API="https://hilo.mv5gg8kp2t.workers.dev";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const m=n=>Math.abs(n).toLocaleString("th-TH",{maximumFractionDigits:2});
+const sg=n=>(n>0?"+":n<0?"−":"")+m(n);
+let cred=null,editId=null,timer=null,lastList=[];
+try{cred=JSON.parse(localStorage.getItem("hilo-player")||"null");}catch(e){}
+
+function show(id){["login","wait","app"].forEach(x=>$(x).hidden=x!==id);}
+async function call(path,method,body,auth){
+  const h={"content-type":"application/json"};
+  if(auth&&cred){h["x-name"]=encodeURIComponent(cred.name);h["x-code"]=encodeURIComponent(cred.code);}
+  const r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  return {status:r.status,j:await r.json().catch(()=>({}))};
+}
+function amount(){
+  const s=$("am").value.replace(/[,\s]/g,"").replace(/−/g,"-");
+  if(!/^-?\d+(\.\d+)?([+-]\d+(\.\d+)?)*$/.test(s))return null;
+  const t=s.match(/[+-]?\d+(\.\d+)?/g);
+  return Math.round(t.reduce((a,x)=>a+parseFloat(x),0)*100)/100;
+}
+function preview(){
+  const v=amount();
+  $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0?"เสีย":"ได้"})`;
+}
+function renderMe(j){
+  $("who").textContent="ชื่อ: "+j.name;
+  const t=$("tot");t.textContent=sg(j.total)+" บาท";t.className="huge "+(j.total>0?"pos":j.total<0?"neg":"");
+  lastList=j.entries;
+  $("list").innerHTML=j.entries.length?j.entries.map(e=>`<div class="ent${e.id&&e.id===editId?" editing":""}"><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span><span>${e.own?`<button class="x" style="color:var(--ink)" data-e="${e.id}" aria-label="แก้ไข">✎</button> <button class="x" data-d="${e.id}" aria-label="ลบ">✕</button>`:'<small class="mut">เจ้าของวงบันทึก</small>'}</span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  $("cancel").hidden=editId===null;
+  $("add").textContent=editId===null?"บันทึก":"บันทึกแก้ไข";
+}
+async function refresh(){
+  if(!cred)return;
+  try{
+    const {status,j}=await call("/me","GET",null,true);
+    if(status===200){renderMe(j);show("app");$("st").textContent="● ซิงค์แล้ว";}
+    else if(status===403){show("wait");}
+    else if(status===401){logout();$("msg").textContent="รหัสหรือชื่อไม่ถูกต้อง";}
+    else if(status===503){show("app");$("st").textContent="เจ้าของวงยังไม่เปิดระบบ ลองใหม่ภายหลัง";}
+  }catch(e){$("st").textContent="● ออฟไลน์";}
+}
+function start(){
+  clearInterval(timer);refresh();
+  timer=setInterval(()=>{if(!document.hidden)refresh();},5000);
+}
+function logout(){
+  clearInterval(timer);cred=null;editId=null;
+  try{localStorage.removeItem("hilo-player");}catch(e){}
+  show("login");
+}
+$("go").onclick=async()=>{
+  const name=$("nm").value.trim(),code=$("cd").value;
+  $("msg").textContent="";
+  if(!name||code.length<6){$("msg").textContent="ใส่ชื่อ และรหัสอย่างน้อย 6 ตัว";return;}
+  try{
+    const {status}=await call("/join","POST",{name,code});
+    if(status===403){$("msg").textContent="ชื่อนี้มีคนใช้แล้ว หรือรหัสไม่ถูกต้อง";return;}
+    if(status!==200){$("msg").textContent="ส่งไม่สำเร็จ ลองใหม่";return;}
+    cred={name,code};
+    try{localStorage.setItem("hilo-player",JSON.stringify(cred));}catch(e){}
+    start();
+  }catch(e){$("msg").textContent="เชื่อมต่อไม่ได้ ลองใหม่";}
+};
+$("out").onclick=$("out0").onclick=logout;
+$("am").oninput=preview;
+["pointerdown","mousedown"].forEach(t=>$("ops").addEventListener(t,e=>e.preventDefault()));
+$("ops").onclick=e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const o=b.dataset.op,am=$("am");let s=am.value;
+  if(o==="b")s=s.slice(0,-1);
+  else{
+    if(!s&&o!=="-")return;
+    if(/[+\-−]$/.test(s))s=s.slice(0,-1);
+    s+=o;
+  }
+  am.value=s;preview();am.focus();
+};
+$("add").onclick=async()=>{
+  const v=amount();
+  if(v===null||v===0){$("am").focus();return;}
+  try{
+    const {status,j}=await call("/me","POST",editId===null?{op:"add",a:v}:{op:"edit",id:editId,a:v},true);
+    if(status===200){editId=null;$("am").value="";preview();renderMe(j);}
+    else if(status===409)$("apv").textContent="มีการบันทึกพร้อมกัน กดบันทึกอีกครั้ง";
+    else $("apv").textContent="บันทึกไม่สำเร็จ";
+  }catch(e){$("apv").textContent="เชื่อมต่อไม่ได้";}
+};
+$("cancel").onclick=()=>{editId=null;$("am").value="";preview();refresh();};
+$("list").onclick=async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.e){
+    const x=lastList.find(y=>y.id===b.dataset.e);if(!x)return;
+    editId=x.id;$("am").value=String(x.a);preview();renderMe({name:"",total:0,entries:lastList});refresh();$("am").focus();
+  }else if(b.dataset.d){
+    if(!confirm("ลบรายการนี้?"))return;
+    try{const {status,j}=await call("/me","POST",{op:"del",id:b.dataset.d},true);if(status===200){if(editId===b.dataset.d){editId=null;$("am").value="";preview();}renderMe(j);}}catch(_){}
+  }
+};
+if(cred)start();else show("login");
+</script>
+</body>
+</html>
