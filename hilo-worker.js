@@ -107,19 +107,30 @@ export default {
       if (!b) return json({ error: "bad" }, 400);
       const res = await mutate(env, (d) => {
         d.ents = d.ents || [];
+        const before = JSON.stringify(d.ents);
+        const log = (x) => {
+          d.hist = d.hist || [];
+          d.hist.unshift({ t: Date.now(), label: "ผู้เล่น", before, bk: +d.banked || 0, gtv: "", by: name, ...x });
+          if (d.hist.length > 30) d.hist.length = 30;
+        };
         if (b.op === "add") {
           const a = +b.a;
           if (!okAmt(a)) return { err: "bad" };
           d.ents.push({ id: crypto.randomUUID().slice(0, 8), n: name, a: round2(a), o: name });
+          log({ k: "add", n: name, a: round2(a) });
         } else if (b.op === "edit") {
           const e = d.ents.find((x) => x.id && x.id === b.id && x.o === name);
           const a = +b.a;
           if (!e || !okAmt(a)) return { err: "bad" };
+          const old = e.a;
           e.a = round2(a);
+          log({ k: "edit", n: name, a: old, n2: name, a2: round2(a) });
         } else if (b.op === "del") {
           const i = d.ents.findIndex((x) => x.id && x.id === b.id && x.o === name);
           if (i < 0) return { err: "bad" };
+          const gone = d.ents[i];
           d.ents.splice(i, 1);
+          log({ k: "del", n: name, a: gone.a });
         } else return { err: "bad" };
       });
       if (res.err) return json({ error: res.err }, res.err === "nodoc" ? 503 : res.err === "busy" ? 409 : 400);
