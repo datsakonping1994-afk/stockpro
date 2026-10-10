@@ -71,6 +71,7 @@ label{font-size:14px;color:var(--mut)}
 <body>
 <main>
 <h1>สมุดบัญชีวงไฮโล</h1>
+<div id="sync" class="mut" style="margin:-8px 0 12px">● กำลังเชื่อมต่อ…</div>
 
 <section>
 <h2>ทุนที่คุณเติมเข้าเว็บ</h2>
@@ -221,7 +222,7 @@ function restore(i){
 }
 $("hist").onclick=e=>{const b=e.target.closest("button");if(b)restore(+b.dataset.h);};
 $("undo").onclick=()=>restore(0);
-function save(){try{localStorage.setItem("hilo-ledger",JSON.stringify({ents,hist,roster,banked,cap:$("cap").value}));}catch(e){}}
+function save(){try{localStorage.setItem("hilo-ledger",JSON.stringify({ents,hist,roster,banked,cap:$("cap").value}));}catch(e){}push();}
 function load(){try{const d=JSON.parse(localStorage.getItem("hilo-ledger")||"null");if(d){ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}}catch(e){}}
 
 /* ช่องจำนวนเงินคิดเลขได้ */
@@ -293,7 +294,68 @@ $("kp").onclick=e=>{
 $("cuse").onclick=()=>{const v=cval();if(v===null)return;$("am").value=String(v);apreview();$("am").focus();};
 crender();
 
+/* ซิงค์กับเซิร์ฟเวอร์ (Cloudflare) ให้ทุกเครื่องเห็นข้อมูลเดียวกัน */
+const API="/api/ledger";
+const srv={ver:0,last:"",busy:false,on:false,pin:""};
+try{srv.pin=localStorage.getItem("hilo-pin")||"";}catch(e){}
+const snap=()=>({ents,hist,roster,banked,cap:$("cap").value});
+const dirty=()=>JSON.stringify(snap())!==srv.last;
+function applyState(d){ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}
+function setStatus(t,bad){const el=$("sync");el.textContent=t;el.className=bad?"neg":"mut";}
+function askPin(){
+  const p=prompt("ใส่รหัสวง (PIN)");
+  if(p===null||!p.trim())return false;
+  srv.pin=p.trim();try{localStorage.setItem("hilo-pin",srv.pin);}catch(e){}
+  return true;
+}
+async function api(method,body){
+  const r=await fetch(API,{method,headers:{"content-type":"application/json","x-pin":srv.pin},body:body?JSON.stringify(body):undefined});
+  if(r.status===401){const e=new Error("pin");e.pin=true;throw e;}
+  return {status:r.status,j:await r.json()};
+}
+async function pull(first){
+  if(srv.busy)return;srv.busy=true;
+  try{
+    const {j}=await api("GET");
+    if(first&&!j.data){srv.ver=0;srv.last="";}
+    else if(j.data&&(first||(j.ver!==srv.ver&&!dirty()&&editIdx<0))){
+      applyState(j.data);srv.ver=j.ver;srv.last=JSON.stringify(snap());render();
+    }
+    srv.on=true;setStatus("● ซิงค์แล้ว");
+  }catch(e){
+    if(e.pin){setStatus("● ต้องใส่รหัสวง",true);srv.busy=false;if(askPin())return pull(first);return;}
+    setStatus("● ออฟไลน์ (บันทึกในเครื่องไว้ก่อน)",true);
+  }
+  srv.busy=false;
+}
+let pushT;
+function push(){
+  if(!srv.on)return;
+  if(JSON.stringify(snap())===srv.last)return;
+  clearTimeout(pushT);pushT=setTimeout(doPush,250);
+}
+async function doPush(){
+  if(srv.busy){pushT=setTimeout(doPush,300);return;}
+  const d=snap(),s=JSON.stringify(d);if(s===srv.last)return;
+  srv.busy=true;
+  try{
+    const {status,j}=await api("PUT",{ver:srv.ver,data:d});
+    if(status===200){srv.ver=j.ver;srv.last=s;setStatus("● ซิงค์แล้ว");}
+    else if(status===409){
+      if(j.data)applyState(j.data);srv.ver=j.ver;srv.last=JSON.stringify(snap());editIdx=-1;render();
+      alert("มีคนอื่นบันทึกพร้อมกัน ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาทำรายการอีกครั้ง");
+    }else setStatus("● ส่งไม่สำเร็จ",true);
+  }catch(e){setStatus("● ส่งไม่สำเร็จ",true);}
+  srv.busy=false;
+}
+async function startSync(){
+  await pull(true);push();
+  setInterval(()=>{if(!document.hidden)pull(false);},3000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull(false);});
+}
+
 load();if(!roster.length)ents.forEach(e=>{if(!roster.includes(e.n))roster.push(e.n);});render();
+startSync();
 </script>
 </body>
 </html>
