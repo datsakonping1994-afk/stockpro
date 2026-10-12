@@ -215,13 +215,13 @@ $("nn").onkeydown=e=>{if(e.key==="Enter")$("addN").click();};
 $("delMode").onclick=()=>{delMode=!delMode;render();};
 
 /* ประวัติ */
-function logH(label,x){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents),bk:banked,...x});if(hist.length>30)hist.length=30;}
+function logH(label,x){hist.unshift({t:Date.now(),label,before:JSON.stringify(ents),bk:banked,...x});if(hist.length>30)hist.length=30;hist.forEach((h,i)=>{if(i>=10)delete h.before;});}
 function tm(t){const d=new Date(t),hm=d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});return d.toDateString()===new Date().toDateString()?hm:d.toLocaleDateString("th-TH",{day:"numeric",month:"short"})+" "+hm;}
 const amt=a=>`<b class="${a>0?"pos":"neg"}">${sg(a)}</b>`;
 const chg=(d,more)=>d>0?`<b class="pos">ได้${more} ${m(d)}</b>`:d<0?`<b class="neg">เสีย${more} ${m(d)}</b>`:'<span class="mut">ไม่เปลี่ยน</span>';
 function hline(h){return (h.by?`<small class="mut">${esc(h.by)} · </small>`:"")+hline0(h);}
 function hline0(h){
-  if(h.k==="add")return `<span class="tg">เพิ่ม</span>${esc(h.n)} ${amt(h.a)}<br>${chg(h.a,"")}`;
+  if(h.k==="add")return `<span class="tg">เพิ่ม</span>${esc(h.n)} ${amt(h.a)}`;
   if(h.k==="edit")return `<span class="tg">แก้</span>${esc(h.n)} ${amt(h.a)} → ${h.n2!==h.n?esc(h.n2)+" ":""}${amt(h.a2)}<br>${h.n2!==h.n?'<span class="mut">เปลี่ยนชื่อ</span>':chg(h.a2-h.a,"เพิ่ม")}`;
   if(h.k==="del")return `<span class="tg">ลบ</span>${esc(h.n)} ${amt(h.a)}<br><span class="mut">ยอดรวมเปลี่ยน</span> <b class="${-h.a>0?"pos":"neg"}">${sg(-h.a)}</b>`;
   if(h.k==="game")return `<span class="tg">จบเกม</span>เว็บ ${amt(h.T)}<br><span class="mut">เพื่อน</span> ${amt(h.F)} · <span class="mut">ของคุณ</span> ${amt(h.R)}${h.list?`<br><small class="mut">${esc(h.list)}</small>`:""}`;
@@ -231,13 +231,13 @@ function hline0(h){
 let showAll=false;
 function renderHist(){
   const list=showAll?hist:hist.slice(0,5);
-  $("hist").innerHTML=hist.length?list.map(h=>`<div class="hrow"><small class="mut">${tm(h.t)}</small><span>${hline(h)}</span><button class="hb" data-h="${hist.indexOf(h)}" aria-label="ย้อนกลับไปก่อนรายการนี้">ย้อน</button></div>`).join(""):'<p class="mut">ยังไม่มีประวัติ</p>';
+  $("hist").innerHTML=hist.length?list.map(h=>`<div class="hrow"><small class="mut">${tm(h.t)}</small><span>${hline(h)}</span>${h.before?`<button class="hb" data-h="${hist.indexOf(h)}" aria-label="ย้อนกลับไปก่อนรายการนี้">ย้อน</button>`:""}</div>`).join(""):'<p class="mut">ยังไม่มีประวัติ</p>';
   $("hmore").hidden=hist.length<=5;$("hmore").textContent=showAll?"ย่อ":`ดูทั้งหมด (${hist.length})`;
-  $("undo").disabled=!hist.length;
+  $("undo").disabled=!(hist[0]&&hist[0].before);
 }
 $("hmore").onclick=()=>{showAll=!showAll;renderHist();};
 function restore(i){
-  const h=hist[i];if(!h)return;
+  const h=hist[i];if(!h||!h.before)return;
   const tot=a=>a.reduce((t,e)=>t+e.a,0);logH("ย้อนกลับ",{k:"undo",d:tot(JSON.parse(h.before))-tot(ents)});
   ents=JSON.parse(h.before);if(h.bk!==undefined)banked=h.bk;editIdx=-1;$("pn").value="";$("am").value="";render();
 }
@@ -375,7 +375,7 @@ async function doPush(){
 async function startSync(){
   if(!API){setStatus("● ใช้ในเครื่องนี้เครื่องเดียว (ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์)");return;}
   await pull(true);push();
-  setInterval(()=>{if(!document.hidden)pull(false);},3000);
+  setInterval(()=>{if(!document.hidden)pull(false);},2000);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull(false);});
 }
 

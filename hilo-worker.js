@@ -112,6 +112,7 @@ export default {
           d.hist = d.hist || [];
           d.hist.unshift({ t: Date.now(), label: "ผู้เล่น", before, bk: +d.banked || 0, gtv: "", by: name, ...x });
           if (d.hist.length > 30) d.hist.length = 30;
+          d.hist.forEach((h, i) => { if (i >= 10) delete h.before; });
         };
         if (b.op === "add") {
           const a = +b.a;
