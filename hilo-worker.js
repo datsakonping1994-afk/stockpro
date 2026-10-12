@@ -117,7 +117,7 @@ export default {
         if (b.op === "add") {
           const a = +b.a;
           if (!okAmt(a)) return { err: "bad" };
-          d.ents.push({ id: crypto.randomUUID().slice(0, 8), n: name, a: round2(a), o: name });
+          d.ents.push({ id: crypto.randomUUID().slice(0, 8), n: name, a: round2(a), o: name, t: Date.now() });
           log({ k: "add", n: name, a: round2(a) });
         } else return { err: "bad" }; // ผู้เล่นแก้/ลบไม่ได้ ต้องให้เจ้าของวงทำ
       });
