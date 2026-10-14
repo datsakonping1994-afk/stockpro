@@ -386,16 +386,46 @@ function push(){
   if(JSON.stringify(snap())===srv.last)return;
   clearTimeout(pushT);pushT=setTimeout(doPush,250);
 }
+const jk=x=>JSON.stringify(x);
+const norm=x=>JSON.stringify({ents:x.ents||[],hist:x.hist||[],roster:x.roster||[],banked:x.banked||0,checks:x.checks||[],cap:x.cap});
+function msub(a,b){const c=new Map();b.forEach(x=>{const k=jk(x);c.set(k,(c.get(k)||0)+1);});const o=[];a.forEach(x=>{const k=jk(x),n=c.get(k)||0;if(n>0)c.set(k,n-1);else o.push(x);});return o;}
+function byT(baseL,localL,latestL){
+  const bt=new Set(baseL.map(h=>h.t)),lt=new Set(localL.map(h=>h.t)),ut=new Set(latestL.map(h=>h.t));
+  const added=localL.filter(h=>!bt.has(h.t)&&!ut.has(h.t)),gone=new Set(baseL.filter(h=>!lt.has(h.t)).map(h=>h.t));
+  return [...added,...latestL.filter(h=>!gone.has(h.t))].sort((x,y)=>y.t-x.t);
+}
+/* ผสานสิ่งที่แอดมินเปลี่ยนในเครื่อง (local เทียบกับ base) เข้ากับข้อมูลล่าสุดในเซิร์ฟเวอร์ (latest) เพื่อไม่ให้ยอดของผู้เล่นหาย */
+function rebase(base,local,latest){
+  const o={...latest};
+  const bE=base.ents||[],lE=local.ents||[],ents=[...(latest.ents||[])];
+  msub(bE,lE).forEach(x=>{const k=jk(x),p=ents.findIndex(y=>jk(y)===k);if(p>=0)ents.splice(p,1);});
+  o.ents=ents.concat(msub(lE,bE));
+  let h=byT(base.hist||[],local.hist||[],latest.hist||[]);if(h.length>30)h.length=30;h.forEach((x,i)=>{if(i>=10)delete x.before;});o.hist=h;
+  o.checks=byT(base.checks||[],local.checks||[],latest.checks||[]).slice(0,30);
+  const bR=base.roster||[],lR=local.roster||[],rm=new Set(bR.filter(n=>!lR.includes(n)));
+  o.roster=[...(latest.roster||[]).filter(n=>!rm.has(n)),...lR.filter(n=>!bR.includes(n)&&!(latest.roster||[]).includes(n))];
+  o.banked=(local.banked!==base.banked)?local.banked:latest.banked;
+  o.cap=(local.cap!==base.cap)?local.cap:latest.cap;
+  return o;
+}
 async function doPush(){
   if(srv.busy){pushT=setTimeout(doPush,300);return;}
   const d=snap(),s=JSON.stringify(d);if(s===srv.last)return;
   srv.busy=true;
   try{
-    const {status,j}=await api("PUT",{ver:srv.ver,data:d});
-    if(status===200){srv.ver=j.ver;srv.last=s;setStatus("● ซิงค์แล้ว");}
-    else if(status===409){
-      if(j.data)applyState(j.data);srv.ver=j.ver;srv.last=JSON.stringify(snap());editIdx=-1;render();
-      alert("มีคนอื่นบันทึกพร้อมกัน ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาทำรายการอีกครั้ง");
+    let base=srv.last?JSON.parse(srv.last):{},data=d,ver=srv.ver,ok=false,sent=d;
+    for(let k=0;k<4&&!ok;k++){
+      const {status,j}=await api("PUT",{ver,data});
+      if(status===200){srv.ver=j.ver;ok=true;sent=data;}
+      else if(status===409&&j.data){data=rebase(base,d,j.data);ver=j.ver;}
+      else break;
+    }
+    if(ok){
+      /* server ตอนนี้ = sent; ถ้าระหว่างส่งมีการเปลี่ยนในเครื่องอีก ให้ผสานซ้ำ ไม่ทับของที่เพิ่งผสาน */
+      const now=snap(),changed=JSON.stringify(now)!==s;
+      if(changed){applyState(rebase(d,now,sent));srv.last=norm(sent);}
+      else{applyState(sent);srv.last=JSON.stringify(snap());}
+      setStatus("● ซิงค์แล้ว");render();
     }else setStatus("● ส่งไม่สำเร็จ",true);
   }catch(e){setStatus("● ส่งไม่สำเร็จ",true);}
   srv.busy=false;
