@@ -86,11 +86,15 @@ label{font-size:14px;color:var(--mut)}
 <h3 style="font-size:16px;margin:0 0 4px">เช็กตานี้</h3>
 <div class="mut" style="margin-bottom:8px">ผู้เล่นกรอกไว้ตั้งแต่จุดเช็กล่าสุด</div>
 <div id="seg"></div>
+<div id="pendbox"></div>
+<div id="rform">
 <div style="margin-top:12px"><label>ผลบวกลบของตานี้ที่คุณเห็นในเว็บ</label></div>
 <div class="row" style="margin-top:6px"><input id="rdel" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="เช่น +1000 หรือ -500"></div>
 <div class="row" id="rops" style="margin-top:6px"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
 <div id="rprev" style="margin-top:8px"></div>
-<button id="chk" class="pri" style="width:100%;margin-top:8px">เช็กและบันทึกจุดเช็ก</button>
+<button id="setp" class="pri" style="width:100%;margin-top:8px">ตั้งเป้าตานี้ ให้ระบบรอผู้เล่นกรอกเอง</button>
+<button id="chk" style="width:100%;margin-top:8px">เช็กเลยตอนนี้</button>
+</div>
 <details style="margin-top:10px"><summary class="mut" style="cursor:pointer">หรือใส่ยอดรวมจริงในเว็บแทน</summary>
 <div class="row" style="margin-top:8px"><label class="fix">ยอดจริงในเว็บ</label><input id="real" type="number" inputmode="decimal" placeholder="ใส่เพื่อเทียบ"></div>
 <div id="diff" class="mut"></div></details>
@@ -154,7 +158,7 @@ const m=n=>Math.abs(n).toLocaleString("th-TH",{maximumFractionDigits:2});
 const sg=n=>(n>0?"+":n<0?"−":"")+m(n);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-let ePage=0;let checks=[];const openP=new Set();
+let ePage=0;let checks=[];let pend=null;const openP=new Set();
 document.addEventListener("toggle",e=>{const d=e.target;if(d.classList&&d.classList.contains("pd")){d.open?openP.add(d.dataset.n):openP.delete(d.dataset.n);}},true);
 function render(){
   $("add").textContent=editIdx>=0?"บันทึกแก้ไข":"บันทึก";$("cancel").hidden=editIdx<0;apreview();renderHist();save();
@@ -171,7 +175,7 @@ function render(){
   $("pg").hidden=pages<2;$("pgi").textContent=`หน้า ${ePage+1}/${pages} · ทั้งหมด ${ents.length}`;$("pgn").disabled=ePage<=0;$("pgo").disabled=ePage>=pages-1;
   const sum=names.reduce((a,n)=>a+by[n],0),cap=parseFloat($("cap").value)||0;
   const web=cap+banked+sum;$("web").textContent=m(web)+" บาท";
-  renderChecks();renderSeg();rdelPrev();
+  renderChecks();renderSeg();rdelPrev();pendTick();
   const r=$("real").value;
   if(r===""){$("diff").textContent="";}
   else{const d=parseFloat(r)-web;$("diff").innerHTML=Math.abs(d)<0.005?'<b class="pos">ตรงกัน</b>':`ต่างกัน <b class="${d>0?"pos":"neg"}">${sg(d)}</b> บาท (เช็กว่ามีรายการตกหล่นไหม)`;}
@@ -203,7 +207,7 @@ $("clear").onclick=()=>{
     clearTimer=setTimeout(resetClear,4000);return;
   }
   resetClear();
-  ents=[];hist=[];checks=[];banked=0;editIdx=-1;$("pn").value="";$("am").value="";render();
+  ents=[];hist=[];checks=[];pend=null;banked=0;editIdx=-1;$("pn").value="";$("am").value="";render();
 };
 $("clearH").onclick=()=>{hist=[];render();};
 
@@ -267,7 +271,7 @@ function renderChecks(){
     const prev=checks[i+1],pt=prev?prev.t:0;
     const seg=ents.filter(e=>e.t&&e.t>pt&&e.t<=c.t).reverse();
     const ok=Math.abs(c.chg)<0.005;
-    const head=`<span><small class="mut">${tm(c.t)}</small> ${ok?'<b class="pos">✓ ตรงกัน</b>':`<b class="neg">⚠ ต่างกัน ${sg(c.chg)}</b>`}</span><span class="mut">${c.delta!==undefined?`ใส่ ${sg(c.delta)} · ผู้เล่น ${sg(c.sum)}`:`เว็บจริง ${m(c.real)}`}</span>`;
+    const head=`<span><small class="mut">${tm(c.t)}</small> ${ok?'<b class="pos">✓ ตรงกัน</b>':`<b class="neg">⚠ ต่างกัน ${sg(c.chg)}</b>`}</span><span class="mut">${c.delta!==undefined?`ใส่ ${sg(c.delta)} · ผู้เล่น ${sg(c.sum)}`:`เว็บจริง ${m(c.real)}`} <button class="x" data-ck="${c.t}" aria-label="ลบจุดเช็กนี้" style="color:var(--red)">✕</button></span>`;
     if(ok||!seg.length)return `<div class="ent">${head}</div>`;
     return `<details class="ck" data-t="${c.t}"${openC.has(c.t)?" open":""}><summary style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;cursor:pointer">${head}</summary><div style="padding:0 0 6px 10px"><small class="mut">ยอดที่กรอกในช่วงนี้ (${seg.length} รายการ) ตรวจดูว่ามีตัวไหนผิด</small>${seg.map(e=>`<div class="ent"><span>${esc(e.n)}</span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span></div>`).join("")}</div></details>`;
   }).join("");
@@ -291,6 +295,45 @@ $("rops").onclick=e=>{
   if(o==="b")s=s.slice(0,-1);
   else{if(!s&&o!=="-"&&o!=="+")return;if(/[+\-−]$/.test(s))s=s.slice(0,-1);s+=o;}
   r.value=s;rdelPrev();r.focus();try{r.setSelectionRange(s.length,s.length);}catch(_){}
+};
+$("checks").onclick=e=>{
+  const b=e.target.closest("button[data-ck]");if(!b)return;
+  e.preventDefault();e.stopPropagation();
+  if(!confirm("ลบจุดเช็กนี้? (ยอดของผู้เล่นไม่หาย)"))return;
+  const i=checks.findIndex(c=>String(c.t)===b.dataset.ck);if(i<0)return;
+  checks.splice(i,1);
+  if(i>0){const n=checks[i-1],p=checks[i];n.chg=Math.round((n.diff-(p?p.diff:0))*100)/100;}
+  render();
+};
+
+function mkCheck(delta){
+  const exp=curWeb(),g=segInfo(),real=Math.round((baseReal()+delta)*100)/100,diff=Math.round((real-exp)*100)/100,prevDiff=checks.length?checks[0].diff:0;
+  return {t:Date.now(),real,exp,diff,chg:Math.round((diff-prevDiff)*100)/100,delta,sum:g.S};
+}
+function completePend(){
+  if(!pend)return;
+  const c=mkCheck(pend.d);c.pid=pend.t;
+  checks.unshift(c);if(checks.length>30)checks.length=30;pend=null;render();
+}
+let matchAt=0,autoT=null;
+function pendTick(){
+  const box=$("pendbox"),form=$("rform");if(!box||!form)return;
+  if(!pend){box.innerHTML="";form.hidden=false;matchAt=0;clearTimeout(autoT);return;}
+  form.hidden=true;
+  const g=segInfo(),rem=Math.round((pend.d-g.S)*100)/100,match=Math.abs(rem)<0.005&&g.cnt>0;
+  box.innerHTML=`<div class="ent"><b>เป้าตานี้ (ที่คุณใส่)</b><b class="${pend.d>0?"pos":pend.d<0?"neg":""}" style="font-size:20px">${pend.d===0?"0":sg(pend.d)}</b></div>
+<div class="ent"><span>ผู้เล่นกรอกแล้ว</span><b class="${g.S>0?"pos":g.S<0?"neg":""}">${g.S===0?"0":sg(g.S)}</b></div>
+<p style="margin:10px 0 0">${match?'<b class="pos" style="font-size:18px">✓ ตรงกันแล้ว กำลังบันทึกจุดเช็กให้อัตโนมัติ…</b>':rem>0?`<b>⏳ รอผู้เล่นกรอกอีก ${sg(rem)}</b> <span class="mut">ระบบเช็กให้เองทุกครั้งที่มีคนกรอกเพิ่ม</span>`:`<b class="neg">⚠ ผู้เล่นกรอกเกินมา ${m(rem)}</b> <span class="mut">ตรวจดูรายการของแต่ละคนด้านบน แก้แล้วระบบเช็กให้ใหม่เอง</span>`}</p>
+<div class="row" style="margin-top:8px"><button id="pcancel">ยกเลิกเป้า</button>${match?"":'<button id="pclose">ปิดตานี้ทั้งที่ไม่ตรง</button>'}</div>`;
+  $("pcancel").onclick=()=>{pend=null;render();};
+  const pc=$("pclose");if(pc)pc.onclick=()=>{if(confirm("ปิดตานี้ทั้งที่ยอดไม่ตรง? จะบันทึกเป็นจุดเช็ก ⚠"))completePend();};
+  if(match){
+    if(!matchAt){matchAt=Date.now();clearTimeout(autoT);autoT=setTimeout(()=>{const g2=segInfo();if(pend&&Math.abs(pend.d-g2.S)<0.005&&g2.cnt>0)completePend();else matchAt=0;},4000);}
+  }else{matchAt=0;clearTimeout(autoT);}
+}
+$("setp").onclick=()=>{
+  const d=delVal();if(d===null){$("rdel").focus();return;}
+  pend={d,t:Date.now()};$("rdel").value="";$("rprev").textContent="";render();
 };
 $("chk").onclick=()=>{
   let real,delta;
@@ -396,9 +439,9 @@ crender();
 const API="https://hilo.mv5gg8kp2t.workers.dev";
 const srv={ver:0,last:"",busy:false,on:false,pin:""};
 try{srv.pin=localStorage.getItem("hilo-pin")||"";}catch(e){}
-const snap=()=>({ents,hist,roster,banked,checks,cap:$("cap").value});
+const snap=()=>({ents,hist,roster,banked,checks,pend,cap:$("cap").value});
 const dirty=()=>JSON.stringify(snap())!==srv.last;
-function applyState(d){checks=d.checks||[];ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}
+function applyState(d){pend=d.pend||null;checks=d.checks||[];ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}
 function setStatus(t,bad){const el=$("sync");el.textContent=t;el.className=bad?"neg":"mut";}
 function askPin(){
   const p=prompt("ใส่รหัสวง (PIN)");
@@ -434,12 +477,12 @@ function push(){
   clearTimeout(pushT);pushT=setTimeout(doPush,250);
 }
 const jk=x=>JSON.stringify(x);
-const norm=x=>JSON.stringify({ents:x.ents||[],hist:x.hist||[],roster:x.roster||[],banked:x.banked||0,checks:x.checks||[],cap:x.cap});
+const norm=x=>JSON.stringify({ents:x.ents||[],hist:x.hist||[],roster:x.roster||[],banked:x.banked||0,checks:x.checks||[],pend:x.pend||null,cap:x.cap});
 function msub(a,b){const c=new Map();b.forEach(x=>{const k=jk(x);c.set(k,(c.get(k)||0)+1);});const o=[];a.forEach(x=>{const k=jk(x),n=c.get(k)||0;if(n>0)c.set(k,n-1);else o.push(x);});return o;}
-function byT(baseL,localL,latestL){
-  const bt=new Set(baseL.map(h=>h.t)),lt=new Set(localL.map(h=>h.t)),ut=new Set(latestL.map(h=>h.t));
-  const added=localL.filter(h=>!bt.has(h.t)&&!ut.has(h.t)),gone=new Set(baseL.filter(h=>!lt.has(h.t)).map(h=>h.t));
-  return [...added,...latestL.filter(h=>!gone.has(h.t))].sort((x,y)=>y.t-x.t);
+function byT(baseL,localL,latestL,key=h=>h.t){
+  const bt=new Set(baseL.map(key)),lt=new Set(localL.map(key)),ut=new Set(latestL.map(key));
+  const added=localL.filter(h=>!bt.has(key(h))&&!ut.has(key(h))),gone=new Set(baseL.filter(h=>!lt.has(key(h))).map(key));
+  return [...added,...latestL.filter(h=>!gone.has(key(h)))].sort((x,y)=>y.t-x.t);
 }
 /* ผสานสิ่งที่แอดมินเปลี่ยนในเครื่อง (local เทียบกับ base) เข้ากับข้อมูลล่าสุดในเซิร์ฟเวอร์ (latest) เพื่อไม่ให้ยอดของผู้เล่นหาย */
 function rebase(base,local,latest){
@@ -448,7 +491,8 @@ function rebase(base,local,latest){
   msub(bE,lE).forEach(x=>{const k=jk(x),p=ents.findIndex(y=>jk(y)===k);if(p>=0)ents.splice(p,1);});
   o.ents=ents.concat(msub(lE,bE));
   let h=byT(base.hist||[],local.hist||[],latest.hist||[]);if(h.length>30)h.length=30;h.forEach((x,i)=>{if(i>=10)delete x.before;});o.hist=h;
-  o.checks=byT(base.checks||[],local.checks||[],latest.checks||[]).slice(0,30);
+  o.checks=byT(base.checks||[],local.checks||[],latest.checks||[],c=>c.pid||c.t).slice(0,30);
+  o.pend=(jk(local.pend||null)!==jk(base.pend||null))?(local.pend||null):(latest.pend||null);
   const bR=base.roster||[],lR=local.roster||[],rm=new Set(bR.filter(n=>!lR.includes(n)));
   o.roster=[...(latest.roster||[]).filter(n=>!rm.has(n)),...lR.filter(n=>!bR.includes(n)&&!(latest.roster||[]).includes(n))];
   o.banked=(local.banked!==base.banked)?local.banked:latest.banked;
