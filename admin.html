@@ -251,11 +251,30 @@ let showAll=false;
 function segInfo(){
   const prev=checks[0],baseExp=prev?prev.exp:(parseFloat($("cap").value)||0)+banked;
   const S=Math.round((curWeb()-baseExp)*100)/100,pt=prev?prev.t:0,rows={};let cnt=0,tsum=0;
-  ents.forEach(e=>{if(e.t&&e.t>pt){rows[e.n]=(rows[e.n]||0)+e.a;tsum+=e.a;cnt++;}});
-  return {S,rows,other:Math.round((S-tsum)*100)/100,cnt};
+  const list=[];ents.forEach(e=>{if(e.t&&e.t>pt){rows[e.n]=(rows[e.n]||0)+e.a;tsum+=e.a;cnt++;list.push(e);}});
+  return {S,rows,list:list.reverse(),other:Math.round((S-tsum)*100)/100,cnt};
+}
+function suspect(seg,miss){
+  const flags=seg.map(e=>{
+    if(Math.abs(e.a+miss)<0.005)return `ตัดรายการนี้ออกจะตรงพอดี (${sg(e.a)})`;
+    if(Math.abs(e.a+miss/2)<0.005)return `ถ้าเครื่องหมายกลับเป็น ${sg(-e.a)} จะตรงพอดี`;
+    return "";
+  });
+  const have=new Set(seg.map(e=>e.n)),all=new Set(roster);ents.forEach(e=>all.add(e.n));
+  const absent=[...all].filter(n=>n&&!have.has(n));
+  return {flags,absent};
+}
+function suspHtml(seg,miss){
+  if(Math.abs(miss)<0.005)return "";
+  const r=suspect(seg,miss),hit=seg.map((e,i)=>r.flags[i]?`<div class="ent"><span>🔎 <b>${esc(e.n)}</b> ${sg(e.a)}</span><small class="mut">${r.flags[i]}</small></div>`:"").join("");
+  let h=`<div style="margin-top:10px;padding:10px;border:1px solid #d9d2c0;border-radius:10px"><b>ใครน่าสงสัย</b> <small class="mut">(ส่วนต่าง ${m(miss)})</small>`;
+  h+=hit||`<p class="mut" style="margin:6px 0 0">ไม่มีรายการเดียวที่อธิบายส่วนต่างนี้ได้พอดี อาจมีหลายรายการผิดหรือพิมพ์ตัวเลขผิด</p>`;
+  if(miss>0&&r.absent.length)h+=`<p style="margin:8px 0 0"><span class="mut">ผู้เล่นที่ยังไม่กรอกตานี้:</span> <b>${r.absent.map(esc).join(", ")}</b> <small class="mut">(ขาดอยู่ ${m(miss)})</small></p>`;
+  return h+"</div>";
 }
 function renderSeg(){
   const el=$("seg");if(!el)return;
+  if(pend){el.innerHTML="";return;}
   const g=segInfo(),names=Object.keys(g.rows).sort((x,y)=>g.rows[y]-g.rows[x]);
   el.innerHTML=`<div class="ent"><b>รวมที่ผู้เล่นกรอก</b><b class="${g.S>0?"pos":g.S<0?"neg":""}" style="font-size:20px">${g.S===0?"0":sg(g.S)}</b></div>`+
     names.map(n=>`<div class="ent"><span class="mut">${esc(n)}</span><span class="${g.rows[n]>0?"pos":"neg"}">${sg(g.rows[n])}</span></div>`).join("")+
@@ -273,7 +292,7 @@ function renderChecks(){
     const ok=Math.abs(c.chg)<0.005;
     const head=`<span><small class="mut">${tm(c.t)}</small> ${ok?'<b class="pos">✓ ตรงกัน</b>':`<b class="neg">⚠ ต่างกัน ${sg(c.chg)}</b>`}</span><span class="mut">${c.delta!==undefined?`ใส่ ${sg(c.delta)} · ผู้เล่น ${sg(c.sum)}`:`เว็บจริง ${m(c.real)}`} <button class="x" data-ck="${c.t}" aria-label="ลบจุดเช็กนี้" style="color:var(--red)">✕</button></span>`;
     if(ok||!seg.length)return `<div class="ent">${head}</div>`;
-    return `<details class="ck" data-t="${c.t}"${openC.has(c.t)?" open":""}><summary style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;cursor:pointer">${head}</summary><div style="padding:0 0 6px 10px"><small class="mut">ยอดที่กรอกในช่วงนี้ (${seg.length} รายการ) ตรวจดูว่ามีตัวไหนผิด</small>${seg.map(e=>`<div class="ent"><span>${esc(e.n)}</span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span></div>`).join("")}</div></details>`;
+    return `<details class="ck" data-t="${c.t}"${openC.has(c.t)?" open":""}><summary style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;cursor:pointer">${head}</summary><div style="padding:0 0 6px 10px"><small class="mut">ยอดที่กรอกในช่วงนี้ (${seg.length} รายการ) ตรวจดูว่ามีตัวไหนผิด</small>${seg.map(e=>`<div class="ent"><span>${esc(e.n)}</span><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span></div>`).join("")}${suspHtml(seg,c.chg)}</div></details>`;
   }).join("");
 }
 const openC=new Set();
@@ -285,7 +304,7 @@ function rdelPrev(){
   const d=delVal();
   if(d===null){$("rprev").textContent=($("rdel").value||"").trim()?"ใส่ตัวเลขให้ถูกต้อง":"";return;}
   const g=segInfo(),diff=Math.round((d-g.S)*100)/100;
-  $("rprev").innerHTML=Math.abs(diff)<0.005?`<b class="pos" style="font-size:18px">✓ ตรงกัน</b> <span class="mut">ผู้เล่นกรอกรวม ${sg(g.S)} ตรงกับที่คุณใส่ ${sg(d)}</span>`:`<b class="neg" style="font-size:18px">⚠ ไม่ตรง ต่างกัน ${m(diff)}</b><br><span class="mut">ผู้เล่นกรอกรวม ${sg(g.S)} แต่คุณใส่ ${sg(d)} (${diff>0?"ผู้เล่นกรอกขาดไป":"ผู้เล่นกรอกเกินมา"} ${m(diff)})</span>`;
+  $("rprev").innerHTML=Math.abs(diff)<0.005?`<b class="pos" style="font-size:18px">✓ ตรงกัน</b> <span class="mut">ผู้เล่นกรอกรวม ${sg(g.S)} ตรงกับที่คุณใส่ ${sg(d)}</span>`:`<b class="neg" style="font-size:18px">⚠ ไม่ตรง ต่างกัน ${m(diff)}</b><br><span class="mut">ผู้เล่นกรอกรวม ${sg(g.S)} แต่คุณใส่ ${sg(d)} (${diff>0?"ผู้เล่นกรอกขาดไป":"ผู้เล่นกรอกเกินมา"} ${m(diff)})</span>${suspHtml(g.list,diff)}`;
 }
 $("rdel").oninput=rdelPrev;
 ["pointerdown","mousedown"].forEach(t=>$("rops").addEventListener(t,e=>e.preventDefault()));
@@ -322,8 +341,9 @@ function pendTick(){
   form.hidden=true;
   const g=segInfo(),rem=Math.round((pend.d-g.S)*100)/100,match=Math.abs(rem)<0.005&&g.cnt>0;
   box.innerHTML=`<div class="ent"><b>เป้าตานี้ (ที่คุณใส่)</b><b class="${pend.d>0?"pos":pend.d<0?"neg":""}" style="font-size:20px">${pend.d===0?"0":sg(pend.d)}</b></div>
-<div class="ent"><span>ผู้เล่นกรอกแล้ว</span><b class="${g.S>0?"pos":g.S<0?"neg":""}">${g.S===0?"0":sg(g.S)}</b></div>
+<div class="ent"><span>ผู้เล่นกรอกแล้ว</span><b class="${g.S>0?"pos":g.S<0?"neg":""}">${g.S===0?"0":sg(g.S)}</b></div>${Object.keys(g.rows).map(n=>`<div class="ent"><small class="mut">• ${esc(n)}</small><small class="${g.rows[n]>0?"pos":"neg"}">${sg(g.rows[n])}</small></div>`).join("")}
 <p style="margin:10px 0 0">${match?'<b class="pos" style="font-size:18px">✓ ตรงกันแล้ว กำลังบันทึกจุดเช็กให้อัตโนมัติ…</b>':rem>0?`<b>⏳ รอผู้เล่นกรอกอีก ${sg(rem)}</b> <span class="mut">ระบบเช็กให้เองทุกครั้งที่มีคนกรอกเพิ่ม</span>`:`<b class="neg">⚠ ผู้เล่นกรอกเกินมา ${m(rem)}</b> <span class="mut">ตรวจดูรายการของแต่ละคนด้านบน แก้แล้วระบบเช็กให้ใหม่เอง</span>`}</p>
+${match||(g.cnt===0&&rem===0)?"":suspHtml(g.list,rem)}
 <div class="row" style="margin-top:8px"><button id="pcancel">ยกเลิกเป้า</button>${match?"":'<button id="pclose">ปิดตานี้ทั้งที่ไม่ตรง</button>'}</div>`;
   $("pcancel").onclick=()=>{pend=null;render();};
   const pc=$("pclose");if(pc)pc.onclick=()=>{if(confirm("ปิดตานี้ทั้งที่ยอดไม่ตรง? จะบันทึกเป็นจุดเช็ก ⚠"))completePend();};
