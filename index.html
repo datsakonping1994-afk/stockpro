@@ -121,6 +121,7 @@ label{font-size:14px;color:var(--mut)}
 <h2>รายการของฉัน</h2>
 <p class="mut" style="margin:0 0 4px">ล่าสุดอยู่บนสุด แก้ไขไม่ได้ ถ้าบันทึกผิดแจ้งเจ้าของวง</p>
 <div id="list"></div>
+<button id="lmore" hidden style="width:100%;margin-top:8px"></button>
 </section>
 
 <button id="out" style="width:100%">ออกจากระบบ</button>
@@ -133,6 +134,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const m=n=>Math.abs(n).toLocaleString("th-TH",{maximumFractionDigits:2});
 const sg=n=>(n>0?"+":n<0?"−":"")+m(n);
+let showAllMine=false;
 let cred=null,editId=null,timer=null,lastList=[];
 try{cred=JSON.parse(localStorage.getItem("hilo-player")||"null");}catch(e){}
 
@@ -156,7 +158,9 @@ function preview(){
   const v=amount();
   $("apv").innerHTML=v===null||v===0?"":`= <b>${m(v)}</b> บาท (${v<0?"เสีย":"ได้"})`;
 }
+let lastView=null;
 function renderMe(j){
+  lastView=j;
   $("who").textContent="👤 "+j.name;
   const t=$("tot");t.textContent=sg(j.total)+" บาท";t.className="huge "+(j.total>0?"pos":j.total<0?"neg":"");
   lastList=j.entries;
@@ -164,7 +168,9 @@ function renderMe(j){
   const all=(j.others||[]).map(o=>({name:o.name,total:o.total,me:false}));
   all.push({name:j.name,total:j.total,me:true});all.sort((a,b)=>b.total-a.total);
   $("others").innerHTML=all.map(o=>`<div class="ent" style="${o.me?"background:var(--bg);border-radius:10px;padding-left:8px;padding-right:8px;font-weight:800":""}"><span>${esc(o.name)}${o.me?" (คุณ)":""}</span><span class="${o.total>0?"pos":o.total<0?"neg":""}">${sg(o.total)}</span></div>`).join("");
-  $("list").innerHTML=j.entries.length?j.entries.map(e=>`<div class="ent"><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  const LIM=10,rows=showAllMine?j.entries:j.entries.slice(0,LIM);
+  $("list").innerHTML=j.entries.length?rows.map(e=>`<div class="ent"><span class="${e.a>0?"pos":"neg"}">${sg(e.a)}</span></div>`).join(""):'<p class="mut">ยังไม่มีรายการ</p>';
+  $("lmore").hidden=j.entries.length<=LIM;$("lmore").textContent=showAllMine?"ย่อรายการ":`ดูทั้งหมด (${j.entries.length} รายการ)`;
   $("cancel").hidden=editId===null;
   $("add").textContent=editId===null?"บันทึก":"บันทึกแก้ไข";
 }
@@ -230,6 +236,7 @@ $("add").onclick=async()=>{
   }catch(e){$("apv").textContent="เชื่อมต่อไม่ได้";}
   $("add").disabled=false;
 };
+$("lmore").onclick=()=>{showAllMine=!showAllMine;if(lastView)renderMe(lastView);};
 $("cancel").onclick=()=>{editId=null;$("am").value="";preview();refresh();};
 $("list").onclick=async e=>{
   const b=e.target.closest("button");if(!b)return;
