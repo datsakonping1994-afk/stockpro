@@ -84,7 +84,11 @@ label{font-size:14px;color:var(--mut)}
 <div class="big" id="web"></div>
 <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
 <h3 style="font-size:16px;margin:0 0 4px">เช็กตานี้</h3>
-<div class="mut" style="margin-bottom:8px">ผู้เล่นกรอกไว้ตั้งแต่จุดเช็กล่าสุด</div>
+<div class="mut" style="margin-bottom:8px">ใส่ยอดจริงในเว็บตอนนี้ ระบบเทียบกับยอดที่ทุกคนกรอก</div>
+<div class="row"><label class="fix">ยอดจริงในเว็บ</label><input id="real" type="number" inputmode="decimal" placeholder="ใส่เพื่อเทียบ"></div>
+<div id="diff" class="mut" style="margin-top:6px"></div>
+<button id="chk" class="pri" style="width:100%;margin-top:8px">บันทึกจุดเช็ก</button>
+<div hidden>
 <div id="seg"></div>
 <div id="pendbox"></div>
 <div id="rform">
@@ -93,11 +97,8 @@ label{font-size:14px;color:var(--mut)}
 <div class="row" id="rops" style="margin-top:6px"><button data-op="+">+</button><button data-op="-">−</button><button data-op="b" aria-label="ลบตัวสุดท้าย">⌫</button></div>
 <div id="rprev" style="margin-top:8px"></div>
 <button id="setp" class="pri" style="width:100%;margin-top:8px">ตั้งเป้าตานี้ ให้ระบบรอผู้เล่นกรอกเอง</button>
-<button id="chk" style="width:100%;margin-top:8px">เช็กเลยตอนนี้</button>
 </div>
-<details style="margin-top:10px"><summary class="mut" style="cursor:pointer">หรือใส่ยอดรวมจริงในเว็บแทน</summary>
-<div class="row" style="margin-top:8px"><label class="fix">ยอดจริงในเว็บ</label><input id="real" type="number" inputmode="decimal" placeholder="ใส่เพื่อเทียบ"></div>
-<div id="diff" class="mut"></div></details>
+</div>
 </div>
 <div id="checks"></div>
 <button id="clear" style="width:100%;margin-top:10px">ล้างทั้งหมด</button>
@@ -461,7 +462,7 @@ const srv={ver:0,last:"",busy:false,on:false,pin:""};
 try{srv.pin=localStorage.getItem("hilo-pin")||"";}catch(e){}
 const snap=()=>({ents,hist,roster,banked,checks,pend,cap:$("cap").value});
 const dirty=()=>JSON.stringify(snap())!==srv.last;
-function applyState(d){pend=d.pend||null;checks=d.checks||[];ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}
+function applyState(d){pend=null;checks=d.checks||[];ents=d.ents||[];hist=d.hist||[];roster=d.roster||[];banked=d.banked||0;if(d.cap!==undefined)$("cap").value=d.cap;}
 function setStatus(t,bad){const el=$("sync");el.textContent=t;el.className=bad?"neg":"mut";}
 function askPin(){
   const p=prompt("ใส่รหัสวง (PIN)");
