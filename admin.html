@@ -193,6 +193,7 @@ $("add").onclick=()=>{
   editIdx=-1;$("pn").value="";$("am").value="";render();
 };
 $("am").onkeydown=e=>{if(e.key==="Enter")$("add").click();};
+["add","chk","cuse"].forEach(i=>{const el=$(i);if(el)["pointerdown","mousedown"].forEach(t=>el.addEventListener(t,e=>e.preventDefault()));});
 $("cap").oninput=$("real").oninput=render;
 $("ents").onclick=$("ptot").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
